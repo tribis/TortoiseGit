@@ -1,4 +1,24 @@
-﻿= Release 2.8.0 =
+﻿######################### Configured by Najub ###################################
+
+Congratulations!
+
+You have just installed a version of TortoiseGIT that has been especially
+configured by Najub for easier work on binary files.
+
+You can further adjust the configuration settings by:
+1. Right click on a folder in Windows Explorer [a context menu opens]
+2. Mouse over the TortoiseGit item on the context menu
+3. Click on the "Settings" item on the submenu [a "Settings" window opens]
+4. On the "Settings" window, select General > Context Menu
+5. ...or select General > Set Extended Menu Item
+6. check as needed and click OK.
+
+You can safely run updates from the built in update check without loosing your
+settings.
+
+################################################################################
+
+= Release 2.8.0 =
 Released: unreleased
 
 == Features ==
