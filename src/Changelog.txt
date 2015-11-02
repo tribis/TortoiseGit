@@ -1,4 +1,24 @@
-﻿= Release 2.3.0 =
+﻿######################### Configured by Najub ###################################
+
+Congratulations!
+
+You have just installed a version of TortoiseGIT that has been especially
+configured by Najub for easier work on binary files.
+
+You can further adjust the configuration settings by:
+1. Right click on a folder in Windows Explorer [a context menu opens]
+2. Mouse over the TortoiseGit item on the context menu
+3. Click on the "Settings" item on the submenu [a "Settings" window opens]
+4. On the "Settings" window, select General > Context Menu
+5. ...or select General > Set Extended Menu Item
+6. check as needed and click OK.
+
+You can safely run updates from the built in update check without loosing your
+settings.
+
+################################################################################
+
+= Release 2.3.0 =
 Released: 2016-10-01
 
 == Features ==
@@ -411,7 +431,7 @@ Released: 2014-08-12
 == Known Issues ==
  * There seems to be a bug in the MFC library which occurs when opening the revision graph in the x64
    version on AMD CPUs, we cannot fix this. Please vote for this on Microsoft Connect:
-   https://connect.microsoft.com/VisualStudio/feedback/details/893171/c000001d-illegal-instruction-on-msvcr120-log-0x2d3-on-x64. 
+   https://connect.microsoft.com/VisualStudio/feedback/details/893171/c000001d-illegal-instruction-on-msvcr120-log-0x2d3-on-x64.
 
 = Release 1.8.9.0 =
 Released: 2014-06-09
