@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2016 - TortoiseGit
 // Copyright (C) 2003-2008 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -64,33 +64,9 @@ CTGitPath::~CTGitPath(void)
 {
 }
 // Create a TGitPath object from an unknown path type (same as using SetFromUnknown)
-CTGitPath::CTGitPath(const CString& sUnknownPath) :
-	  m_bDirectoryKnown(false)
-	, m_bIsDirectory(false)
-	, m_bURLKnown(false)
-	, m_bHasAdminDirKnown(false)
-	, m_bHasAdminDir(false)
-	, m_bIsValidOnWindowsKnown(false)
-	, m_bIsValidOnWindows(false)
-	, m_bIsReadOnly(false)
-	, m_bIsAdminDirKnown(false)
-	, m_bIsAdminDir(false)
-	, m_bExists(false)
-	, m_bExistsKnown(false)
-	, m_bLastWriteTimeKnown(0)
-	, m_lastWriteTime(0)
-	, m_customData(NULL)
-	, m_bIsSpecialDirectoryKnown(false)
-	, m_bIsSpecialDirectory(false)
-	, m_bIsWCRootKnown(false)
-	, m_bIsWCRoot(false)
-	, m_fileSize(0)
-	, m_Checked(false)
+CTGitPath::CTGitPath(const CString& sUnknownPath) : CTGitPath()
 {
 	SetFromUnknown(sUnknownPath);
-	m_Action=0;
-	m_Stage=0;
-	m_ParentNo=0;
 }
 
 int CTGitPath::ParserAction(BYTE action)
@@ -335,7 +311,7 @@ bool CTGitPath::Delete(bool bTrash, bool bShowErrorUI) const
 	{
 		if ((bTrash)||(IsDirectory()))
 		{
-			std::unique_ptr<TCHAR[]> buf(new TCHAR[m_sBackslashPath.GetLength() + 2]);
+			auto buf = std::make_unique<TCHAR[]>(m_sBackslashPath.GetLength() + 2);
 			_tcscpy_s(buf.get(), m_sBackslashPath.GetLength() + 2, m_sBackslashPath);
 			buf[m_sBackslashPath.GetLength()] = 0;
 			buf[m_sBackslashPath.GetLength()+1] = 0;
@@ -876,7 +852,7 @@ bool CTGitPath::HasStashDir() const
 		return false;
 
 	DWORD size = 0;
-	std::unique_ptr<char[]> buff(new char[filesize + 1]);
+	auto buff = std::make_unique<char[]>(filesize + 1);
 	ReadFile(hfile, buff.get(), filesize, &size, nullptr);
 	buff.get()[filesize] = '\0';
 
@@ -1179,7 +1155,7 @@ int CTGitPathList::FillUnRev(unsigned int action, CTGitPathList *list, CString *
 	}
 	return 0;
 }
-int CTGitPathList::FillBasedOnIndexFlags(unsigned short flag, CTGitPathList* list /*nullptr*/)
+int CTGitPathList::FillBasedOnIndexFlags(unsigned short flag, unsigned short flagextended, CTGitPathList* list /*nullptr*/)
 {
 	Clear();
 	CTGitPath path;
@@ -1203,7 +1179,7 @@ int CTGitPathList::FillBasedOnIndexFlags(unsigned short flag, CTGitPathList* lis
 		{
 			const git_index_entry *e = git_index_get_byindex(index, i);
 
-			if (!e || !((e->flags | e->flags_extended) & flag) || !e->path)
+			if (!e || !((e->flags & flag) || (e->flags_extended & flagextended)) || !e->path)
 				continue;
 
 			CString one = CUnicodeUtils::GetUnicode(e->path);
@@ -1213,9 +1189,9 @@ int CTGitPathList::FillBasedOnIndexFlags(unsigned short flag, CTGitPathList* lis
 
 			//SetFromGit will clear all status
 			path.SetFromGit(one);
-			if ((e->flags | e->flags_extended) & GIT_IDXENTRY_SKIP_WORKTREE)
+			if (e->flags_extended & GIT_IDXENTRY_SKIP_WORKTREE)
 				path.m_Action = CTGitPath::LOGACTIONS_SKIPWORKTREE;
-			else if ((e->flags | e->flags_extended) & GIT_IDXENTRY_VALID)
+			else if (e->flags & GIT_IDXENTRY_VALID)
 				path.m_Action = CTGitPath::LOGACTIONS_ASSUMEVALID;
 			AddPath(path);
 		}

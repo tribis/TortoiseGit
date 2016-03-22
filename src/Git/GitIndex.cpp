@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2016 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -46,7 +46,6 @@ CGitIndexList::CGitIndexList()
 {
 	this->m_LastModifyTime = 0;
 	m_critRepoSec.Init();
-	m_bCheckContent = !!(CRegDWORD(_T("Software\\TortoiseGit\\TGitCacheCheckContent"), TRUE) == TRUE);
 	m_iMaxCheckSize = (__int64)CRegDWORD(_T("Software\\TortoiseGit\\TGitCacheCheckContentMaxSize"), 10 * 1024) * 1024; // stored in KiB
 }
 
@@ -69,12 +68,9 @@ int CGitIndexList::ReadIndex(CString dgitdir)
 {
 	this->clear();
 
-	m_critRepoSec.Lock();
+	CAutoLocker lock(m_critRepoSec);
 	if (repository.Open(dgitdir))
-	{
-		m_critRepoSec.Unlock();
 		return -1;
-	}
 
 	// add config files
 	CAutoConfig config(true);
@@ -97,7 +93,6 @@ int CGitIndexList::ReadIndex(CString dgitdir)
 	if (git_repository_index(index.GetPointer(), repository))
 	{
 		repository.Free();
-		m_critRepoSec.Unlock();
 		return -1;
 	}
 
@@ -109,11 +104,11 @@ int CGitIndexList::ReadIndex(CString dgitdir)
 	{
 		const git_index_entry *e = git_index_get_byindex(index, i);
 
-		this->at(i).m_FileName.Empty();
 		this->at(i).m_FileName = CUnicodeUtils::GetUnicode(e->path);
 		this->at(i).m_FileName.MakeLower();
 		this->at(i).m_ModifyTime = e->mtime.seconds;
-		this->at(i).m_Flags = e->flags | e->flags_extended;
+		this->at(i).m_Flags = e->flags;
+		this->at(i).m_FlagsExtended = e->flags_extended;
 		this->at(i).m_IndexHash = e->id.id;
 		this->at(i).m_Size = e->file_size;
 		m_bHasConflicts |= GIT_IDXENTRY_STAGE(e);
@@ -121,8 +116,6 @@ int CGitIndexList::ReadIndex(CString dgitdir)
 
 	CGit::GetFileModifyTime(dgitdir + _T("index"), &this->m_LastModifyTime);
 	std::sort(this->begin(), this->end(), SortIndex);
-
-	m_critRepoSec.Unlock();
 
 	return 0;
 }
@@ -150,7 +143,7 @@ int CGitIndexList::GetFileStatus(const CString &gitdir, const CString &pathorg, 
 	}
 
 	// skip-worktree has higher priority than assume-valid
-	if (at(index).m_Flags & GIT_IDXENTRY_SKIP_WORKTREE)
+	if (at(index).m_FlagsExtended & GIT_IDXENTRY_SKIP_WORKTREE)
 	{
 		*status = git_wc_status_normal;
 		if (skipWorktree)
@@ -166,7 +159,7 @@ int CGitIndexList::GetFileStatus(const CString &gitdir, const CString &pathorg, 
 		*status = git_wc_status_modified;
 	else if (time == at(index).m_ModifyTime)
 		*status = git_wc_status_normal;
-	else if (m_bCheckContent && repository && filesize < m_iMaxCheckSize)
+	else if (repository && filesize < m_iMaxCheckSize)
 	{
 		git_oid actual;
 		CStringA fileA = CUnicodeUtils::GetMulti(pathorg, CP_UTF8);
@@ -185,7 +178,7 @@ int CGitIndexList::GetFileStatus(const CString &gitdir, const CString &pathorg, 
 
 	if (at(index).m_Flags & GIT_IDXENTRY_STAGEMASK)
 		*status = git_wc_status_conflicted;
-	else if (at(index).m_Flags & GIT_IDXENTRY_INTENT_TO_ADD)
+	else if (at(index).m_FlagsExtended & GIT_IDXENTRY_INTENT_TO_ADD)
 		*status = git_wc_status_added;
 
 	if (pHash)
@@ -244,7 +237,7 @@ int CGitIndexList::GetStatus(const CString& gitdir, CString path, git_wc_status_
 		{
 			*status = git_wc_status_normal;
 			if (callback)
-				callback(CombinePath(gitdir, path), *status, false, pData, ((*it).m_Flags & GIT_IDXENTRY_VALID) && !((*it).m_Flags & GIT_IDXENTRY_SKIP_WORKTREE), ((*it).m_Flags & GIT_IDXENTRY_SKIP_WORKTREE) != 0);
+				callback(CombinePath(gitdir, path), *status, false, pData, ((*it).m_Flags & GIT_IDXENTRY_VALID) && !((*it).m_FlagsExtended & GIT_IDXENTRY_SKIP_WORKTREE), ((*it).m_FlagsExtended & GIT_IDXENTRY_SKIP_WORKTREE) != 0);
 
 			return 0;
 		}
@@ -415,18 +408,16 @@ int CGitHeadFileList::GetPackRef(const CString &gitdir)
 		return -1;
 
 	DWORD size = 0;
-	std::unique_ptr<char[]> buff(new char[filesize]);
+	auto buff = std::make_unique<char[]>(filesize);
 	ReadFile(hfile, buff.get(), filesize, &size, nullptr);
 
 	if (size != filesize)
 		return -1;
 
-	CString hash;
-	CString ref;
 	for (DWORD i = 0; i < filesize;)
 	{
-		hash.Empty();
-		ref.Empty();
+		CString hash;
+		CString ref;
 		if (buff[i] == '#' || buff[i] == '^')
 		{
 			while (buff[i] != '\n')
@@ -650,7 +641,6 @@ int CGitHeadFileList::CallBack(const unsigned char *sha1, const char *base, int 
 	size_t cur = p->size();
 	p->resize(p->size() + 1);
 	p->at(cur).m_Hash = sha1;
-	p->at(cur).m_FileName.Empty();
 
 	CGit::StringAppend(&p->at(cur).m_FileName, (BYTE*)base, CP_UTF8, baselen);
 	CGit::StringAppend(&p->at(cur).m_FileName, (BYTE*)pathname, CP_UTF8);
@@ -1020,9 +1010,9 @@ int CGitIgnoreList::LoadAllIgnoreFile(const CString &gitdir, const CString &path
 bool CGitIgnoreList::CheckAndUpdateGitSystemConfigPath(bool force)
 {
 	// recheck every 30 seconds
-	if (GetTickCount() - m_dGitSystemConfigPathLastChecked > 30000 || force)
+	if (GetTickCount64() - m_dGitSystemConfigPathLastChecked > 30000UL || force)
 	{
-		m_dGitSystemConfigPathLastChecked = GetTickCount();
+		m_dGitSystemConfigPathLastChecked = GetTickCount64();
 		CString gitSystemConfigPath(CRegString(REG_SYSTEM_GITCONFIGPATH, _T(""), FALSE));
 		if (gitSystemConfigPath != m_sGitSystemConfigPath)
 		{

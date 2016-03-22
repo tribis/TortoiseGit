@@ -1,6 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2003-2014 - TortoiseSVN
+// Copyright (C) 2016 - TortoiseGit
+// Copyright (C) 2003-2014, 2016 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -61,7 +62,6 @@ CBrowseFolder::retVal CBrowseFolder::Show(HWND parent, LPTSTR path, size_t pathl
 }
 CBrowseFolder::retVal CBrowseFolder::Show(HWND parent, CString& path, const CString& sDefaultPath /* = CString() */)
 {
-	retVal ret = OK;		//assume OK
 	m_sDefaultPath = sDefaultPath;
 	if (m_sDefaultPath.IsEmpty() && !path.IsEmpty())
 	{
@@ -82,131 +82,88 @@ CBrowseFolder::retVal CBrowseFolder::Show(HWND parent, CString& path, const CStr
 		m_sDefaultPath = path;
 	}
 
-	HRESULT hr;
-
 	// Create a new common open file dialog
-	IFileOpenDialog* pfd = NULL;
-	hr = CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pfd));
-	if (SUCCEEDED(hr))
+	CComPtr<IFileOpenDialog> pfd;
+	if (FAILED(pfd.CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER)))
 	{
-		// Set the dialog as a folder picker
-		DWORD dwOptions;
-		if (SUCCEEDED(hr = pfd->GetOptions(&dwOptions)))
-		{
-			hr = pfd->SetOptions(dwOptions | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM | FOS_PATHMUSTEXIST);
-		}
-
-		// Set a title
-		if (SUCCEEDED(hr))
-		{
-			TCHAR * nl = _tcschr(m_title, '\n');
-			if (nl)
-				*nl = 0;
-			pfd->SetTitle(m_title);
-		}
-
-		// set the default folder
-		if (SUCCEEDED(hr))
-		{
-			typedef HRESULT (WINAPI *SHCIFPN)(PCWSTR pszPath, IBindCtx * pbc, REFIID riid, void ** ppv);
-
-			CAutoLibrary hLib = AtlLoadSystemLibraryUsingFullPath(L"shell32.dll");
-			if (hLib)
-			{
-				SHCIFPN pSHCIFPN = (SHCIFPN)GetProcAddress(hLib, "SHCreateItemFromParsingName");
-				if (pSHCIFPN)
-				{
-					IShellItem *psiDefault = 0;
-					hr = pSHCIFPN(m_sDefaultPath, NULL, IID_PPV_ARGS(&psiDefault));
-					if (SUCCEEDED(hr))
-					{
-						hr = pfd->SetFolder(psiDefault);
-						psiDefault->Release();
-					}
-				}
-			}
-		}
-
-		if (m_CheckText[0] != 0)
-		{
-			IFileDialogCustomize* pfdCustomize = 0;
-			hr = pfd->QueryInterface(IID_PPV_ARGS(&pfdCustomize));
-			if (SUCCEEDED(hr))
-			{
-				pfdCustomize->StartVisualGroup(100, L"");
-				pfdCustomize->AddCheckButton(101, m_CheckText, FALSE);
-				if (m_CheckText2[0] != 0)
-				{
-					pfdCustomize->AddCheckButton(102, m_CheckText2, FALSE);
-				}
-				pfdCustomize->EndVisualGroup();
-				pfdCustomize->Release();
-			}
-		}
-
-		// Show the open file dialog
-		if (SUCCEEDED(hr) && SUCCEEDED(hr = pfd->Show(parent)))
-		{
-			// Get the selection from the user
-			IShellItem* psiResult = NULL;
-			hr = pfd->GetResult(&psiResult);
-			if (SUCCEEDED(hr))
-			{
-				PWSTR pszPath = NULL;
-				hr = psiResult->GetDisplayName(SIGDN_FILESYSPATH, &pszPath);
-				if (SUCCEEDED(hr))
-				{
-					path = pszPath;
-					CoTaskMemFree(pszPath);
-				}
-				psiResult->Release();
-
-				IFileDialogCustomize* pfdCustomize = 0;
-				hr = pfd->QueryInterface(IID_PPV_ARGS(&pfdCustomize));
-				if (SUCCEEDED(hr))
-				{
-					pfdCustomize->GetCheckButtonState(101, &m_bCheck);
-					pfdCustomize->GetCheckButtonState(102, &m_bCheck2);
-					pfdCustomize->Release();
-				}
-			}
-			else
-				ret = CANCEL;
-		}
-		else
-			ret = CANCEL;
-
-		pfd->Release();
-	}
-	else
-	{
-		BROWSEINFO browseInfo		= {};
-		browseInfo.hwndOwner		= parent;
-		browseInfo.pidlRoot			= m_root;
-		browseInfo.pszDisplayName	= m_displayName;
-		browseInfo.lpszTitle		= m_title;
-		browseInfo.ulFlags			= m_style;
-		browseInfo.lParam			= (LPARAM)this;
-		browseInfo.lpfn				= BrowseCallBackProc;
+		BROWSEINFO browseInfo = {};
+		browseInfo.hwndOwner = parent;
+		browseInfo.pidlRoot = m_root;
+		browseInfo.pszDisplayName = m_displayName;
+		browseInfo.lpszTitle = m_title;
+		browseInfo.ulFlags = m_style;
+		browseInfo.lParam = (LPARAM)this;
+		browseInfo.lpfn = BrowseCallBackProc;
 
 		PCIDLIST_ABSOLUTE itemIDList = SHBrowseForFolder(&browseInfo);
-
 		//is the dialog canceled?
 		if (!itemIDList)
-			ret = CANCEL;
+			return CANCEL;
+		SCOPE_EXIT{ CoTaskMemFree((LPVOID)itemIDList); };
 
-		if (ret != CANCEL)
-		{
-			if (!SHGetPathFromIDList(itemIDList, path.GetBuffer(MAX_PATH)))		// MAX_PATH ok. Explorer can't handle paths longer than MAX_PATH.
-				ret = NOPATH;
+		if (!SHGetPathFromIDList(itemIDList, CStrBuf(path, MAX_PATH)))		// MAX_PATH ok. Explorer can't handle paths longer than MAX_PATH.
+			return NOPATH;
 
-			path.ReleaseBuffer();
-
-			CoTaskMemFree((LPVOID)itemIDList);
-		}
+		return OK;
 	}
 
-	return ret;
+	// Set the dialog as a folder picker
+	DWORD dwOptions;
+	if (FAILED(pfd->GetOptions(&dwOptions)))
+		return CANCEL;
+	if (FAILED(pfd->SetOptions(dwOptions | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM | FOS_PATHMUSTEXIST)))
+		return CANCEL;
+
+	// Set a title
+	TCHAR* nl = _tcschr(m_title, '\n');
+	if (nl)
+		*nl = 0;
+	pfd->SetTitle(m_title);
+
+	// set the default folder
+	CComPtr<IShellItem> psiDefault;
+	if (FAILED(SHCreateItemFromParsingName(m_sDefaultPath, nullptr, IID_PPV_ARGS(&psiDefault))))
+		return CANCEL;
+	if (FAILED(pfd->SetFolder(psiDefault)))
+		return CANCEL;
+
+	if (m_CheckText[0] != 0)
+	{
+		CComPtr<IFileDialogCustomize> pfdCustomize;
+		if (FAILED(pfd.QueryInterface(&pfdCustomize)))
+			return CANCEL;
+
+		pfdCustomize->StartVisualGroup(100, L"");
+		pfdCustomize->AddCheckButton(101, m_CheckText, FALSE);
+		if (m_CheckText2[0] != 0)
+			pfdCustomize->AddCheckButton(102, m_CheckText2, FALSE);
+		pfdCustomize->EndVisualGroup();
+	}
+
+	// Show the open file dialog
+	if (FAILED(pfd->Show(parent)))
+		return CANCEL;
+
+	// Get the selection from the user
+	CComPtr<IShellItem> psiResult;
+	if (FAILED(pfd->GetResult(&psiResult)))
+		return CANCEL;
+
+	PWSTR pszPath = nullptr;
+	if (SUCCEEDED(psiResult->GetDisplayName(SIGDN_FILESYSPATH, &pszPath)))
+	{
+		path = pszPath;
+		CoTaskMemFree(pszPath);
+	}
+
+	CComPtr<IFileDialogCustomize> pfdCustomize;
+	if (SUCCEEDED(pfd.QueryInterface(&pfdCustomize)))
+	{
+		pfdCustomize->GetCheckButtonState(101, &m_bCheck);
+		pfdCustomize->GetCheckButtonState(102, &m_bCheck2);
+	}
+
+	return OK;
 }
 
 void CBrowseFolder::SetInfo(LPCTSTR title)

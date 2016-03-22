@@ -1,7 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
 // Copyright (C) 2003-2008 - TortoiseSVN
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2016 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -32,6 +32,7 @@
 #include "Git.h"
 #include "HyperLink.h"
 #include "PatchViewDlg.h"
+#include "MenuButton.h"
 
 #include <regex>
 
@@ -78,7 +79,18 @@ public:
 
 		m_ctrlShowPatch.Invalidate();
 	}
+	void SetAuthor(CString author)
+	{
+		m_bSetAuthor = TRUE;
+		m_sAuthor = author;
+	}
+	void SetTime(CTime time)
+	{
+		m_bSetCommitDateTime = TRUE;
+		m_wantCommitTime = time;
+	}
 private:
+	CTime m_wantCommitTime;
 	void ReloadHistoryEntries();
 	static UINT StatusThreadEntry(LPVOID pVoid);
 	UINT StatusThread();
@@ -120,6 +132,8 @@ protected:
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
 	afx_msg void OnSize(UINT nType, int cx, int cy);
 	void Refresh();
+	void StartStatusThread();
+	void StopStatusThread();
 	void GetAutocompletionList();
 	void ScanFile(const CString& sFilePath, const CString& sRegex, const CString& sExt);
 	void DoSize(int delta);
@@ -203,6 +217,17 @@ private:
 	CButton				m_AsCommitDateCtrl;
 	CLinkControl		m_linkControl;
 	CString				m_sLogTemplate;
+	CMenuButton			m_ctrlOkButton;
+	CRegDWORD			m_regLastAction;
+	void				PrepareOkButton();
+	typedef struct
+	{
+		int id;
+		int cnt;
+		int wmid;
+	} ACCELLERATOR;
+	std::map<TCHAR, ACCELLERATOR>	m_accellerators;
+	HACCEL							m_hAccelOkButton;
 
 	CBugTraqAssociation	m_bugtraq_association;
 	HACCEL				m_hAccel;
@@ -224,4 +249,14 @@ protected:
 	afx_msg void OnBnClickedCommitAsCommitDate();
 	afx_msg void OnBnClickedCheckNewBranch();
 	afx_msg void OnBnClickedCommitSetauthor();
+
+	CLinkControl		m_CheckAll;
+	CLinkControl		m_CheckNone;
+	CLinkControl		m_CheckUnversioned;
+	CLinkControl		m_CheckVersioned;
+	CLinkControl		m_CheckAdded;
+	CLinkControl		m_CheckDeleted;
+	CLinkControl		m_CheckModified;
+	CLinkControl		m_CheckFiles;
+	CLinkControl		m_CheckSubmodules;
 };

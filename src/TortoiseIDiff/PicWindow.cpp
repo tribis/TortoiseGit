@@ -21,7 +21,6 @@
 #include <CommCtrl.h>
 #include "PicWindow.h"
 #include <math.h>
-#include "SysInfo.h"
 #include <memory>
 
 #pragma comment(lib, "Msimg32.lib")
@@ -1305,16 +1304,11 @@ void CPicWindow::Paint(HWND hwnd)
             SetBkColor(memDC, transparentColor);
             if (bShowInfo)
             {
-               std::unique_ptr<TCHAR[]> infostring(new TCHAR[8192]);
+                auto infostring = std::make_unique<TCHAR[]>(8192);
                 BuildInfoString(infostring.get(), 8192, false);
                 // set the font
                 NONCLIENTMETRICS metrics = {0};
                 metrics.cbSize = sizeof(NONCLIENTMETRICS);
-
-                if (!SysInfo::Instance().IsVistaOrLater())
-                {
-                    metrics.cbSize -= sizeof(int);  // subtract the size of the iPaddedBorderWidth member which is not available on XP
-                }
 
                 SystemParametersInfo(SPI_GETNONCLIENTMETRICS, 0, &metrics, FALSE);
                 HFONT hFont = CreateFontIndirect(&metrics.lfStatusFont);
@@ -1351,10 +1345,6 @@ void CPicWindow::Paint(HWND hwnd)
             // set the font
             NONCLIENTMETRICS metrics = {0};
             metrics.cbSize = sizeof(NONCLIENTMETRICS);
-            if (!SysInfo::Instance().IsVistaOrLater())
-            {
-                metrics.cbSize -= sizeof(int);  // subtract the size of the iPaddedBorderWidth member which is not available on XP
-            }
             SystemParametersInfo(SPI_GETNONCLIENTMETRICS, 0, &metrics, FALSE);
             HFONT hFont = CreateFontIndirect(&metrics.lfStatusFont);
             HFONT hFontOld = (HFONT)SelectObject(memDC, (HGDIOBJ)hFont);

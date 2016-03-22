@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2016 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -115,20 +115,11 @@ BOOL CTortoiseGitBlameDoc::OnOpenDocument(LPCTSTR lpszPathName,CString Rev)
 	{
 		CString temp;
 		temp.Format(IDS_CANNOTBLAMENOGIT, (LPCTSTR)m_CurrentFileName);
-		CMessageBox::Show(NULL, temp, _T("TortoiseGitBlame"), MB_OK);
+		MessageBox(nullptr, temp, _T("TortoiseGitBlame"), MB_OK | MB_ICONERROR);
 		return FALSE;
 	}
 	else
 	{
-		CString oldTopDir;
-		if (topdir != g_Git.m_CurrentDir && CTGitPath(g_Git.m_CurrentDir).HasAdminDir(&oldTopDir) && oldTopDir != topdir)
-		{
-			CString sMsg;
-			sMsg.Format(IDS_ERR_DIFFENERTPREPO, (LPCTSTR)oldTopDir, (LPCTSTR)topdir);
-			MessageBox(NULL, sMsg, _T("TortoiseGitBlame"), MB_OK | MB_ICONERROR);
-			return FALSE;
-		}
-
 		m_IsGitFile=TRUE;
 		sOrigCWD = g_Git.m_CurrentDir = topdir;
 
@@ -193,7 +184,7 @@ BOOL CTortoiseGitBlameDoc::OnOpenDocument(LPCTSTR lpszPathName,CString Rev)
 				CGit::StringAppend(&str, &m_BlameData[0], CP_UTF8);
 			if (!err.empty())
 				CGit::StringAppend(&str, &err[0], CP_UTF8);
-			MessageBox(NULL, CString(MAKEINTRESOURCE(IDS_BLAMEERROR)) + _T("\n\n") + str, _T("TortoiseGitBlame"), MB_OK);
+			MessageBox(nullptr, CString(MAKEINTRESOURCE(IDS_BLAMEERROR)) + _T("\n\n") + str, _T("TortoiseGitBlame"), MB_OK | MB_ICONERROR);
 
 			return FALSE;
 		}
@@ -213,7 +204,7 @@ BOOL CTortoiseGitBlameDoc::OnOpenDocument(LPCTSTR lpszPathName,CString Rev)
 		{
 			CString str;
 			str.Format(IDS_CHECKOUTFAILED, (LPCTSTR)path.GetGitPathString());
-			MessageBox(NULL, CString(MAKEINTRESOURCE(IDS_BLAMEERROR)) + _T("\n\n") + str, _T("TortoiseGitBlame"), MB_OK);
+			MessageBox(nullptr, CString(MAKEINTRESOURCE(IDS_BLAMEERROR)) + _T("\n\n") + str, _T("TortoiseGitBlame"), MB_OK | MB_ICONERROR);
 			return FALSE;
 		}
 #endif

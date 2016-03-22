@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2016 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -97,6 +97,7 @@ protected:
 	void UpdateProgress();
 	void UpdateCurrentStatus();
 	void ListConflictFile();
+	int	RunGitCmdRetryOrAbort(const CString& cmd);
 	int  DoRebase();
 	afx_msg LRESULT OnGitStatusListCtrlNeedsRefresh(WPARAM, LPARAM);
 	void Refresh();
@@ -120,11 +121,57 @@ protected:
 	CString GetRebaseModeName(int rebasemode);
 
 	CString m_SquashMessage;
-	CString m_SquashFirstMetaData;
+	struct SquashFirstMetaData
+	{
+		CString name;
+		CString email;
+		CTime time;
+		bool set = false;
+		
+		SquashFirstMetaData()
+			: set(false)
+		{
+		}
+
+		SquashFirstMetaData(GitRev* rev)
+			: set(true)
+		{
+			name = rev->GetAuthorName();
+			email = rev->GetAuthorEmail();
+			time = rev->GetAuthorDate();
+		}
+
+		void Empty()
+		{
+			set = false;
+			name.Empty();
+			email.Empty();
+			time = 0;
+		}
+
+		CString GetAuthor() const
+		{
+			if (!set)
+				return CString();
+			CString temp;
+			temp.Format(L"%s <%s>", (LPCTSTR)name, (LPCTSTR)email);
+			return temp;
+		}
+
+		CString GetAsParam() const
+		{
+			if (!set)
+				return CString();
+			CString temp;
+			temp.Format(_T("--date=%s --author=\"%s\" "), (LPCTSTR)time.Format(_T("%Y-%m-%dT%H:%M:%S")), (LPCTSTR)GetAuthor());
+			return temp;
+		}
+	} m_SquashFirstMetaData;
 
 	int CheckNextCommitIsSquash();
 	int GetCurrentCommitID();
 	int FinishRebase();
+	void RewriteNotes();
 
 	CMenuButton m_PostButton;
 
@@ -146,6 +193,7 @@ protected:
 	BOOL				m_bForce;
 	BOOL				m_bAddCherryPickedFrom;
 	BOOL				m_bAutoSkipFailedCommit;
+	bool				m_bRebaseAutoEnd;
 
 public:
 	CStringArray		m_PostButtonTexts;
@@ -156,7 +204,8 @@ public:
 	CString				m_Onto;
 
 	BOOL				m_IsCherryPick;
-
+	bool				m_bRebaseAutoStart;
+	BOOL				m_bPreserveMerges;
 protected:
 	CSplitterControl	m_wndSplitter;
 	CMFCTabCtrl			m_ctrlTabCtrl;
@@ -174,6 +223,11 @@ protected:
 	bool				m_bFinishedRebase;
 	bool				m_bStashed;
 
+	std::map<CGitHash, CGitHash> m_rewrittenCommitsMap;
+	std::vector<CGitHash> m_forRewrite;
+	std::map<CGitHash, GIT_REV_LIST> m_droppedCommitsMap;
+	std::vector<CGitHash> m_currentCommits;
+
 	void AddBranchToolTips(CHistoryCombo *pBranch);
 	void AddLogString(CString str);
 	int StartRebase();
@@ -183,6 +237,7 @@ protected:
 	int StateAction();
 	int GoNext();
 	void ResetParentForSquash(const CString& commitMessage);
+	void CleanUpRebaseActiveFolder();
 	afx_msg void OnBnClickedButtonReverse();
 	afx_msg void OnBnClickedButtonBrowse();
 	afx_msg void OnBnClickedRebaseCheckForce();
@@ -191,6 +246,7 @@ protected:
 	afx_msg void OnBnClickedSplitAllOptions();
 	afx_msg void OnBnClickedButtonUp2();
 	afx_msg void OnBnClickedButtonDown2();
+	afx_msg void OnHelp();
 
 	afx_msg LRESULT	OnTaskbarBtnCreated(WPARAM wParam, LPARAM lParam);
 	CComPtr<ITaskbarList3>	m_pTaskbarList;

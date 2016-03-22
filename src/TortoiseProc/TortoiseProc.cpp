@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2016 - TortoiseGit
 // Copyright (C) 2003-2008, 2012-2014 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -43,6 +43,7 @@
 #include "HistoryCombo.h"
 #include "gitindex.h"
 #include <math.h>
+#include <random>
 #include "SendMail.h"
 
 #define STRUCT_IOVEC_DEFINED
@@ -68,7 +69,6 @@ CTortoiseProcApp::CTortoiseProcApp()
 	_tputenv(_T("GIT_DIR="));
 	CCrashReport::Instance().AddUserInfoToReport(L"CommandLine", GetCommandLine());
 	EnableHtmlHelp();
-	SYS_IMAGE_LIST();
 	CHooks::Create();
 	git_libgit2_init();
 	CGit::SetGit2CredentialCallback(CAppUtils::Git2GetUserPassword);
@@ -77,7 +77,7 @@ CTortoiseProcApp::CTortoiseProcApp()
 	m_bSaveState = FALSE;
 	retSuccess = false;
 	m_gdiplusToken = NULL;
-#if defined (_WIN64) && _MSC_VER >= 1800
+#if defined (_WIN64) && _MSC_VER == 1800
 	_set_FMA3_enable(0);
 #endif
 }
@@ -85,7 +85,6 @@ CTortoiseProcApp::CTortoiseProcApp()
 CTortoiseProcApp::~CTortoiseProcApp()
 {
 	CHooks::Destroy();
-	SYS_IMAGE_LIST().Cleanup();
 	git_libgit2_shutdown();
 }
 
@@ -110,7 +109,6 @@ BOOL CTortoiseProcApp::InitInstance()
 	CheckUpgrade();
 	CMFCVisualManager::SetDefaultManager(RUNTIME_CLASS(CMFCVisualManagerWindows));
 	CMFCButton::EnableWindowsTheming();
-	CHistoryCombo::m_nGitIconIndex = SYS_IMAGE_LIST().AddIcon((HICON)LoadImage(AfxGetResourceHandle(), MAKEINTRESOURCE(IDI_GITCONFIG), IMAGE_ICON, 0, 0, LR_DEFAULTSIZE));
 
 	Gdiplus::GdiplusStartupInput gdiplusStartupInput;
 	Gdiplus::GdiplusStartup(&m_gdiplusToken,&gdiplusStartupInput,NULL);
@@ -260,6 +258,8 @@ BOOL CTortoiseProcApp::InitInstance()
 	AfxInitRichEdit5();
 	CWinAppEx::InitInstance();
 	SetRegistryKey(_T("TortoiseGit"));
+	SYS_IMAGE_LIST();
+	CHistoryCombo::m_nGitIconIndex = SYS_IMAGE_LIST().AddIcon((HICON)LoadImage(AfxGetResourceHandle(), MAKEINTRESOURCE(IDI_GITCONFIG), IMAGE_ICON, 0, 0, LR_DEFAULTSIZE));
 	AfxGetApp()->m_pszProfileName = _tcsdup(_T("TortoiseProc")); // w/o this ResizableLib will store data under TortoiseGitProc which is not compatible with older versions
 
 	CCmdLineParser parser(AfxGetApp()->m_lpCmdLine);
@@ -396,7 +396,7 @@ BOOL CTortoiseProcApp::InitInstance()
 		DWORD len = GetCurrentDirectory(0, NULL);
 		if (len)
 		{
-			std::unique_ptr<TCHAR[]> originalCurrentDirectory(new TCHAR[len]);
+			auto originalCurrentDirectory = std::make_unique<TCHAR[]>(len);
 			if (GetCurrentDirectory(len, originalCurrentDirectory.get()))
 			{
 				sOrigCWD = originalCurrentDirectory.get();
@@ -515,7 +515,7 @@ BOOL CTortoiseProcApp::InitInstance()
 	// apps might still be needing the recent ones.
 	{
 		DWORD len = GetTortoiseGitTempPath(0, NULL);
-		std::unique_ptr<TCHAR[]> path(new TCHAR[len + 100]);
+		auto path = std::make_unique<TCHAR[]>(len + 100);
 		len = GetTortoiseGitTempPath (len + 100, path.get());
 		if (len != 0)
 		{
@@ -601,15 +601,23 @@ void CTortoiseProcApp::CheckUpgrade()
 
 	CMessageBox::RemoveRegistryKey(_T("OldMsysgitVersionWarning"));
 
-	srand((unsigned)time(0));
 	CRegDWORD checkNewerWeekDay = CRegDWORD(_T("Software\\TortoiseGit\\CheckNewerWeekDay"), 0);
-	if (!checkNewerWeekDay.exists())
-		checkNewerWeekDay = rand() % 7;
+	if (!checkNewerWeekDay.exists() || lVersion <= 0x01081000)
+	{
+		std::random_device rd;
+		std::mt19937 mt(rd());
+		std::uniform_int_distribution<int> dist(0, 6);
+		checkNewerWeekDay = dist(mt);
+	}
 
 	// version specific updates
-	if (lVersion <= 0x01080802)
+	if (lVersion <= 0x01090000)
 	{
-		CRegStdDWORD(_T("Software\\TortoiseGit\\TortoiseProc\\ResizableState\\CleanTypeDlgWindowPlacement")).removeValue();
+		if (CRegDWORD(_T("Software\\TortoiseGit\\TGitCacheCheckContent"), TRUE) == FALSE)
+		{
+			CRegDWORD(_T("Software\\TortoiseGit\\TGitCacheCheckContentMaxSize")) = 0;
+			CRegDWORD(_T("Software\\TortoiseGit\\TGitCacheCheckContent")).removeValue();
+		}
 	}
 
 	if (lVersion <= 0x01080801)
@@ -735,6 +743,7 @@ void CTortoiseProcApp::DoInitializeJumpList(const CString& appid)
 
 int CTortoiseProcApp::ExitInstance()
 {
+	SYS_IMAGE_LIST().Cleanup();
 	Gdiplus::GdiplusShutdown(m_gdiplusToken);
 
 	CWinAppEx::ExitInstance();

@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2016 - TortoiseGit
 // Copyright (C) 2003-2008 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -152,9 +152,11 @@ public:
 												bool bIgnoreAncestry = false,
 												bool blame  = false,
 												bool bMerge = false,
-												bool bCompact = false);
+												bool bCompact = false,
+												bool bNoPrefix = false);
 
 	static bool Export(const CString* BashHash = nullptr, const CTGitPath* orgPath = nullptr);
+	static bool UpdateBranchDescription(const CString& branch, CString description);
 	static bool CreateBranchTag(bool isTag = true, const CString* commitHash = nullptr, bool switchNewBranch = false, LPCTSTR name = nullptr);
 	static bool Switch(const CString& initialRefName = CString());
 	static bool PerformSwitch(const CString& ref, bool bForce = false, const CString& sNewBranch = CString(), bool bBranchOverride = false, BOOL bTrack = 2, bool bMerge = false);
@@ -166,7 +168,13 @@ public:
 	static CString GetMergeTempFile(const CString& str, const CTGitPath& merge);
 	static bool	StashSave(const CString& msg = CString(), bool showPull = false, bool pullShowPush = false, bool showMerge = false, const CString& mergeRev = CString());
 	static bool StashApply(CString ref, bool showChanges = true);
-	static bool	StashPop(bool showChanges = true);
+	/** Execute "stash pop"
+	 * showChanges
+	 *              0: only show info on error (and allow to diff on error)
+	 *              1: allow to open diff dialog on error or success
+	 *              2: only show error or success message
+	 */
+	static bool	StashPop(int showChanges = 1);
 
 	static bool IsSSHPutty();
 
@@ -188,8 +196,10 @@ public:
 	static int  GetLogOutputEncode(CGit *pGit=&g_Git);
 
 	static bool Pull(bool showPush = false, bool showStashPop = false);
-	static bool RebaseAfterFetch(const CString& upstream = _T(""));
+	// rebase = 1: ask user what to do, rebase = 2: run autorebase
+	static bool RebaseAfterFetch(const CString& upstream = _T(""), int rebase = 0, bool preserveMerges = false);
 	static bool Fetch(const CString& remoteName = _T(""), bool allRemotes = false);
+	static bool DoPush(bool autoloadKey, bool pack, bool tags, bool allRemotes, bool allBranches, bool force, bool forceWithLease, const CString& localBranch, const CString& remote, const CString& remoteBranch, bool setUpstream, int recurseSubmodules);
 	static bool Push(const CString& selectLocalBranch = CString());
 	static bool RequestPull(const CString& endrevision = _T(""), const CString& repositoryUrl = _T(""), bool bIsMainWnd = false);
 
@@ -211,6 +221,7 @@ public:
 	static void MarkWindowAsUnpinnable(HWND hWnd);
 
 	static bool BisectStart(const CString& lastGood, const CString& firstBad, bool bIsMainWnd = false);
+	static bool BisectOperation(const CString& op, const CString& ref = _T(""), bool bIsMainWnd = false);
 
 	static int	Git2GetUserPassword(git_cred **out, const char *url, const char *username_from_url, unsigned int allowed_types, void *payload);
 

@@ -1,7 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2012-2013, 2015 - TortoiseGit
-// Copyright (C) 2003-2008,2011 - TortoiseSVN
+// Copyright (C) 2012-2013, 2015-2016 - TortoiseGit
+// Copyright (C) 2003-2008,2011,2014 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -69,19 +69,19 @@ void CShellUpdater::AddPathsForUpdate(const CTGitPathList& pathList)
 
 void CShellUpdater::Flush()
 {
-	if (!m_pathsForUpdating.IsEmpty())
-	{
-		CTraceToOutputDebugString::Instance()(__FUNCTION__ ": Flushing shell update list\n");
+	if (m_pathsForUpdating.IsEmpty())
+		return;
 
-		UpdateShell();
-		m_pathsForUpdating.Clear();
-	}
+	CTraceToOutputDebugString::Instance()(__FUNCTION__ ": Flushing shell update list\n");
+
+	UpdateShell();
+	m_pathsForUpdating.Clear();
 }
 
 void CShellUpdater::UpdateShell()
 {
 	// Tell the shell extension to purge its cache
-	CTraceToOutputDebugString::Instance()(__FUNCTION__ ": Setting cache invalidation event %d\n", GetTickCount());
+	CTraceToOutputDebugString::Instance()(__FUNCTION__ ": Setting cache invalidation event %I64u\n", GetTickCount64());
 	SetEvent(m_hInvalidationEvent);
 
 	// We use the SVN 'notify' call-back to add items to the list
@@ -123,7 +123,7 @@ void CShellUpdater::UpdateShell()
 	for (int nPath = 0; nPath < m_pathsForUpdating.GetCount(); ++nPath)
 	{
 		path.SetFromWin(g_Git.CombinePath(m_pathsForUpdating[nPath]));
-		CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": Cache Item Update for %s (%d)\n"), (LPCTSTR)path.GetWinPathString(), GetTickCount());
+		CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": Cache Item Update for %s (%I64u)\n"), (LPCTSTR)path.GetWinPathString(), GetTickCount64());
 		if (!path.IsDirectory())
 		{
 			// send notifications to the shell for changed files - folders are updated by the cache itself.
@@ -164,18 +164,18 @@ bool CShellUpdater::RebuildIcons()
 {
 	const int BUFFER_SIZE = 1024;
 	TCHAR buf[BUFFER_SIZE] = { 0 };
-	HKEY hRegKey = 0;
+	HKEY hRegKey = nullptr;
 	DWORD dwRegValue;
 	DWORD dwRegValueTemp;
 	DWORD dwSize;
 	DWORD_PTR dwResult;
 	LONG lRegResult;
-	bool bResult = false;
 
 	lRegResult = RegOpenKeyEx(HKEY_CURRENT_USER, _T("Control Panel\\Desktop\\WindowMetrics"),
 		0, KEY_READ | KEY_WRITE, &hRegKey);
 	if (lRegResult != ERROR_SUCCESS)
-		goto Cleanup;
+		return false;
+	SCOPE_EXIT { RegCloseKey(hRegKey); };
 
 	// we're going to change the Shell Icon Size value
 	const TCHAR* sRegValueName = _T("Shell Icon Size");
@@ -193,7 +193,7 @@ bool CShellUpdater::RebuildIcons()
 		_sntprintf_s(buf, BUFFER_SIZE, BUFFER_SIZE, _T("%d"), iDefaultIconSize);
 	}
 	else if (lRegResult != ERROR_SUCCESS)
-		goto Cleanup;
+		return false;
 
 	// Change registry value
 	dwRegValue = _ttoi(buf);
@@ -203,8 +203,7 @@ bool CShellUpdater::RebuildIcons()
 	lRegResult = RegSetValueEx(hRegKey, sRegValueName, 0, REG_SZ,
 		(LPBYTE) buf, dwSize);
 	if (lRegResult != ERROR_SUCCESS)
-		goto Cleanup;
-
+		return false;
 
 	// Update all windows
 	SendMessageTimeout(HWND_BROADCAST, WM_SETTINGCHANGE, SPI_SETNONCLIENTMETRICS,
@@ -214,19 +213,12 @@ bool CShellUpdater::RebuildIcons()
 	dwSize = _sntprintf_s(buf, BUFFER_SIZE, BUFFER_SIZE, _T("%lu"), dwRegValue) + sizeof(TCHAR);
 	lRegResult = RegSetValueEx(hRegKey, sRegValueName, 0, REG_SZ,
 		(LPBYTE) buf, dwSize);
-	if(lRegResult != ERROR_SUCCESS)
-		goto Cleanup;
+	if (lRegResult != ERROR_SUCCESS)
+		return false;
 
 	// Update all windows
 	SendMessageTimeout(HWND_BROADCAST, WM_SETTINGCHANGE, SPI_SETNONCLIENTMETRICS,
 		0, SMTO_ABORTIFHUNG, 5000, &dwResult);
 
-	bResult = true;
-
-Cleanup:
-	if (hRegKey != 0)
-	{
-		RegCloseKey(hRegKey);
-	}
-	return bResult;
+	return true;
 }

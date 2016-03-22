@@ -1,7 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2003-2013 - TortoiseSVN
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2003-2014 - TortoiseSVN
+// Copyright (C) 2008-2016 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -39,6 +39,7 @@
 #include "MassiveGitTask.h"
 #include "LogDlg.h"
 #include "BstrSafeVector.h"
+#include "StringUtils.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -81,12 +82,15 @@ CCommitDlg::CCommitDlg(CWnd* pParent /*=NULL*/)
 	, m_nPopupPickCommitMessage(0)
 	, m_hAccel(nullptr)
 	, m_bWarnDetachedHead(true)
+	, m_hAccelOkButton(nullptr)
 {
 	this->m_bCommitAmend=FALSE;
 }
 
 CCommitDlg::~CCommitDlg()
 {
+	if (m_hAccelOkButton)
+		DestroyAcceleratorTable(m_hAccelOkButton);
 	delete m_pThread;
 }
 
@@ -113,6 +117,16 @@ void CCommitDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_COMMIT_DATEPICKER, m_CommitDate);
 	DDX_Control(pDX, IDC_COMMIT_TIMEPICKER, m_CommitTime);
 	DDX_Control(pDX, IDC_COMMIT_AS_COMMIT_DATE, m_AsCommitDateCtrl);
+	DDX_Control(pDX, IDC_CHECKALL, m_CheckAll);
+	DDX_Control(pDX, IDC_CHECKNONE, m_CheckNone);
+	DDX_Control(pDX, IDC_CHECKUNVERSIONED, m_CheckUnversioned);
+	DDX_Control(pDX, IDC_CHECKVERSIONED, m_CheckVersioned);
+	DDX_Control(pDX, IDC_CHECKADDED, m_CheckAdded);
+	DDX_Control(pDX, IDC_CHECKDELETED, m_CheckDeleted);
+	DDX_Control(pDX, IDC_CHECKMODIFIED, m_CheckModified);
+	DDX_Control(pDX, IDC_CHECKFILES, m_CheckFiles);
+	DDX_Control(pDX, IDC_CHECKSUBMODULES, m_CheckSubmodules);
+	DDX_Control(pDX, IDOK, m_ctrlOkButton);
 }
 
 BEGIN_MESSAGE_MAP(CCommitDlg, CResizableStandAloneDialog)
@@ -198,13 +212,6 @@ BOOL CCommitDlg::OnInitDialog()
 	}
 	RunStartCommitHook();
 
-	if (CTGitPath(g_Git.m_CurrentDir).IsMergeActive())
-	{
-		DialogEnableWindow(IDC_CHECK_NEWBRANCH, FALSE);
-		m_bCreateNewBranch = FALSE;
-		GetDlgItem(IDC_MERGEACTIVE)->ShowWindow(SW_SHOW);
-	}
-
 	m_regAddBeforeCommit = CRegDWORD(_T("Software\\TortoiseGit\\AddBeforeCommit"), TRUE);
 	m_bShowUnversioned = m_regAddBeforeCommit;
 
@@ -230,6 +237,17 @@ BOOL CCommitDlg::OnInitDialog()
 		m_bWholeProject2 = true;
 
 	SetDlgTitle();
+
+	if (m_bSetAuthor)
+		GetDlgItem(IDC_COMMIT_AUTHORDATA)->ShowWindow(SW_SHOW);
+
+	if (m_bSetCommitDateTime)
+	{
+		m_CommitDate.SetTime(&m_wantCommitTime);
+		m_CommitTime.SetTime(&m_wantCommitTime);
+		GetDlgItem(IDC_COMMIT_DATEPICKER)->ShowWindow(SW_SHOW);
+		GetDlgItem(IDC_COMMIT_TIMEPICKER)->ShowWindow(SW_SHOW);
+	}
 
 	UpdateData(FALSE);
 
@@ -330,16 +348,6 @@ BOOL CCommitDlg::OnInitDialog()
 	AdjustControlSize(IDC_NOAUTOSELECTSUBMODULES);
 	AdjustControlSize(IDC_KEEPLISTS);
 	AdjustControlSize(IDC_COMMIT_AS_COMMIT_DATE);
-
-	m_linkControl.ConvertStaticToLink(m_hWnd, IDC_CHECKALL);
-	m_linkControl.ConvertStaticToLink(m_hWnd, IDC_CHECKNONE);
-	m_linkControl.ConvertStaticToLink(m_hWnd, IDC_CHECKUNVERSIONED);
-	m_linkControl.ConvertStaticToLink(m_hWnd, IDC_CHECKVERSIONED);
-	m_linkControl.ConvertStaticToLink(m_hWnd, IDC_CHECKADDED);
-	m_linkControl.ConvertStaticToLink(m_hWnd, IDC_CHECKDELETED);
-	m_linkControl.ConvertStaticToLink(m_hWnd, IDC_CHECKMODIFIED);
-	m_linkControl.ConvertStaticToLink(m_hWnd, IDC_CHECKFILES);
-	m_linkControl.ConvertStaticToLink(m_hWnd, IDC_CHECKSUBMODULES);
 
 	// line up all controls and adjust their sizes.
 #define LINKSPACING 9
@@ -443,20 +451,7 @@ BOOL CCommitDlg::OnInitDialog()
 
 	m_updatedPathList = m_pathList;
 
-	//first start a thread to obtain the file list with the status without
-	//blocking the dialog
-	InterlockedExchange(&m_bBlock, TRUE);
-	m_pThread = AfxBeginThread(StatusThreadEntry, this, THREAD_PRIORITY_NORMAL,0,CREATE_SUSPENDED);
-	if (m_pThread==NULL)
-	{
-		CMessageBox::Show(this->m_hWnd, IDS_ERR_THREADSTARTFAILED, IDS_APPNAME, MB_OK | MB_ICONERROR);
-		InterlockedExchange(&m_bBlock, FALSE);
-	}
-	else
-	{
-		m_pThread->m_bAutoDelete = FALSE;
-		m_pThread->ResumeThread();
-	}
+	StartStatusThread();
 	CRegDWORD err = CRegDWORD(_T("Software\\TortoiseGit\\ErrorOccurred"), FALSE);
 	CRegDWORD historyhint = CRegDWORD(_T("Software\\TortoiseGit\\HistoryHintShown"), FALSE);
 	if ((((DWORD)err)!=FALSE)&&((((DWORD)historyhint)==FALSE)))
@@ -471,8 +466,57 @@ BOOL CCommitDlg::OnInitDialog()
 	if (g_Git.GetConfigValueBool(_T("tgit.commitshowpatch")))
 		OnStnClickedViewPatch();
 
+	if (CTGitPath(g_Git.m_CurrentDir).IsMergeActive())
+	{
+		DialogEnableWindow(IDC_CHECK_NEWBRANCH, FALSE);
+		m_bCreateNewBranch = FALSE;
+		GetDlgItem(IDC_MERGEACTIVE)->ShowWindow(SW_SHOW);
+		CMessageBox::ShowCheck(GetSafeHwnd(), IDS_COMMIT_MERGE_HINT, IDS_APPNAME, MB_ICONINFORMATION, L"CommitMergeHint", IDS_MSGBOX_DONOTSHOWAGAIN);
+	}
+
+	PrepareOkButton();
+
 	return FALSE;  // return TRUE unless you set the focus to a control
 	// EXCEPTION: OCX Property Pages should return FALSE
+}
+
+void CCommitDlg::PrepareOkButton()
+{
+	m_regLastAction = CRegDWORD(L"Software\\TortoiseGit\\CommitLastAction", 0);
+	int i = 0;
+	for (auto labelId : { IDS_COMMIT_COMMIT, IDS_COMMIT_RECOMMIT, IDS_COMMIT_COMMITPUSH })
+	{
+		++i;
+		CString label;
+		label.LoadString(labelId);
+		m_ctrlOkButton.AddEntry(label);
+		TCHAR accellerator = CStringUtils::GetAccellerator(label);
+		if (accellerator == L'\0')
+			continue;
+		++m_accellerators[accellerator].cnt;
+		if (m_accellerators[accellerator].cnt > 1)
+			m_accellerators[accellerator].id = -1;
+		else
+			m_accellerators[accellerator].id = i - 1;
+	}
+	m_ctrlOkButton.SetCurrentEntry(m_regLastAction);
+	if (m_accellerators.size())
+	{
+		LPACCEL lpaccelNew = (LPACCEL)LocalAlloc(LPTR, m_accellerators.size() * sizeof(ACCEL));
+		if (!lpaccelNew)
+			return;
+		SCOPE_EXIT{ LocalFree(lpaccelNew); };
+		i = 0;
+		for (auto& entry : m_accellerators)
+		{
+			lpaccelNew[i].cmd = (WORD)(WM_USER + 1 + entry.second.id);
+			lpaccelNew[i].fVirt = FVIRTKEY | FALT;
+			lpaccelNew[i].key = entry.first;
+			entry.second.wmid = lpaccelNew[i].cmd;
+			++i;
+		}
+		m_hAccelOkButton = CreateAcceleratorTable(lpaccelNew, (int)m_accellerators.size());
+	}
 }
 
 static bool UpdateIndex(CMassiveGitTask &mgt, CSysProgressDlg &sysProgressDlg, int progress, int maxProgress)
@@ -496,6 +540,22 @@ static bool UpdateIndex(CMassiveGitTask &mgt, CSysProgressDlg &sysProgressDlg, i
 	return mgt.Execute(cancel);
 }
 
+static void DoPush()
+{
+	CString head;
+	if (g_Git.GetCurrentBranchFromFile(g_Git.m_CurrentDir, head))
+		return;
+	CString remote, remotebranch;
+	g_Git.GetRemoteTrackedBranchForHEAD(remote, remotebranch);
+	if (remote.IsEmpty() || remotebranch.IsEmpty())
+	{
+		CAppUtils::Push();
+		return;
+	}
+
+	CAppUtils::DoPush(CAppUtils::IsSSHPutty(), false, false, false, false, false, false, head, remote, remotebranch, false, 0);
+}
+
 void CCommitDlg::OnOK()
 {
 	if (m_bBlock)
@@ -503,15 +563,7 @@ void CCommitDlg::OnOK()
 	if (m_bThreadRunning)
 	{
 		m_bCancelled = true;
-		InterlockedExchange(&m_bRunThread, FALSE);
-		WaitForSingleObject(m_pThread->m_hThread, 1000);
-		if (m_bThreadRunning)
-		{
-			// we gave the thread a chance to quit. Since the thread didn't
-			// listen to us we have to kill it.
-			TerminateThread(m_pThread->m_hThread, (DWORD)-1);
-			InterlockedExchange(&m_bThreadRunning, FALSE);
-		}
+		StopStatusThread();
 	}
 	this->UpdateData();
 
@@ -659,7 +711,7 @@ void CCommitDlg::OnOK()
 	}
 
 	CBlockCacheForPath cacheBlock(g_Git.m_CurrentDir);
-	DWORD currentTicks = GetTickCount();
+	ULONGLONG currentTicks = GetTickCount64();
 
 	if (g_Git.UsingLibGit2(CGit::GIT_CMD_COMMIT_UPDATE_INDEX))
 	{
@@ -719,12 +771,12 @@ void CCommitDlg::OnOK()
 
 				if (sysProgressDlg.IsVisible())
 				{
-					if (GetTickCount() - currentTicks > 1000 || j == nListItems - 1 || j == 0)
+					if (GetTickCount64() - currentTicks > 1000UL || j == nListItems - 1 || j == 0)
 					{
 						sysProgressDlg.SetLine(2, entry->GetGitPathString(), true);
 						sysProgressDlg.SetProgress(j, nListItems);
 						AfxGetThread()->PumpMessage(); // process messages, in order to avoid freezing; do not call this too often: this takes time!
-						currentTicks = GetTickCount();
+						currentTicks = GetTickCount64();
 					}
 				}
 
@@ -936,6 +988,7 @@ void CCommitDlg::OnOK()
 				if (!sError.IsEmpty())
 				{
 					CMessageBox::Show(m_hWnd, sError, _T("TortoiseGit"), MB_ICONERROR);
+					InterlockedExchange(&m_bBlock, FALSE);
 					return;
 				}
 			}
@@ -951,6 +1004,7 @@ void CCommitDlg::OnOK()
 		if (CAppUtils::SaveCommitUnicodeFile(tempfile, m_sLogMessage))
 		{
 			CMessageBox::Show(nullptr, _T("Could not save commit message"), _T("TortoiseGit"), MB_OK | MB_ICONERROR);
+			InterlockedExchange(&m_bBlock, FALSE);
 			return;
 		}
 
@@ -979,6 +1033,7 @@ void CCommitDlg::OnOK()
 		if (m_bSetAuthor)
 			author.Format(_T("--author=\"%s\""), (LPCTSTR)m_sAuthor);
 		CString allowEmpty = m_bCommitMessageOnly ? _T("--allow-empty") : _T("");
+		// TODO: make sure notes.amend.rewrite does still work when switching to libgit2
 		cmd.Format(_T("git.exe commit %s %s %s %s -F \"%s\""), (LPCTSTR)author, (LPCTSTR)dateTime, (LPCTSTR)amend, (LPCTSTR)allowEmpty, (LPCTSTR)tempfile);
 
 		CCommitProgressDlg progress;
@@ -986,6 +1041,8 @@ void CCommitDlg::OnOK()
 		progress.m_GitCmd=cmd;
 		progress.m_bShowCommand = FALSE;	// don't show the commit command
 		progress.m_PreText = out;			// show any output already generated in log window
+		if (m_ctrlOkButton.GetCurrentEntry() > 0)
+			progress.m_AutoClose = GitProgressAutoClose::AUTOCLOSE_IF_NO_ERRORS;
 
 		progress.m_PostCmdCallback = [&](DWORD status, PostCmdList& postCmdList)
 		{
@@ -1003,6 +1060,10 @@ void CCommitDlg::OnOK()
 
 		m_PostCmd = GIT_POSTCOMMIT_CMD_NOTHING;
 		progress.DoModal();
+
+		m_regLastAction = (int)m_ctrlOkButton.GetCurrentEntry();
+		if (m_ctrlOkButton.GetCurrentEntry() == 1)
+			m_PostCmd = GIT_POSTCOMMIT_CMD_RECOMMIT;
 
 		if (progress.m_GitStatus || m_PostCmd == GIT_POSTCOMMIT_CMD_RECOMMIT)
 		{
@@ -1035,8 +1096,6 @@ void CCommitDlg::OnOK()
 			}
 
 			UpdateData(FALSE);
-			this->Refresh();
-			this->BringWindowToTop();
 		}
 
 		::DeleteFile(tempfile);
@@ -1111,8 +1170,17 @@ void CCommitDlg::OnOK()
 
 	SaveSplitterPos();
 
-	if( bCloseCommitDlg )
+	if (bCloseCommitDlg)
+	{
+		if (m_ctrlOkButton.GetCurrentEntry() == 2)
+			DoPush();
 		CResizableStandAloneDialog::OnOK();
+	}
+	else if (m_PostCmd == GIT_POSTCOMMIT_CMD_RECOMMIT)
+	{
+		this->Refresh();
+		this->BringWindowToTop();
+	}
 
 	CShellUpdater::Instance().Flush();
 }
@@ -1147,10 +1215,6 @@ UINT CCommitDlg::StatusThread()
 	//get the status of all selected file/folders recursively
 	//and show the ones which have to be committed to the user
 	//in a list control.
-	InterlockedExchange(&m_bBlock, TRUE);
-	InterlockedExchange(&m_bThreadRunning, TRUE);// so the main thread knows that this thread is still running
-	InterlockedExchange(&m_bRunThread, TRUE);	// if this is set to FALSE, the thread should stop
-
 	m_pathwatcher.Stop();
 
 	m_ListCtrl.SetBusy(true);
@@ -1230,6 +1294,8 @@ UINT CCommitDlg::StatusThread()
 
 		SetDlgItemText(IDC_COMMIT_TO, g_Git.GetCurrentBranch());
 		m_tooltips.AddTool(GetDlgItem(IDC_STATISTICS), m_ListCtrl.GetStatisticsString());
+		if (m_ListCtrl.GetItemCount() != 0)
+			m_ListCtrl.SetItemState(0, LVIS_SELECTED, LVIS_SELECTED);
 	}
 	if (!success)
 	{
@@ -1348,17 +1414,7 @@ void CCommitDlg::OnCancel()
 	m_pathwatcher.Stop();
 
 	if (m_bThreadRunning)
-	{
-		InterlockedExchange(&m_bRunThread, FALSE);
-		WaitForSingleObject(m_pThread->m_hThread, 1000);
-		if (m_bThreadRunning)
-		{
-			// we gave the thread a chance to quit. Since the thread didn't
-			// listen to us we have to kill it.
-			TerminateThread(m_pThread->m_hThread, (DWORD)-1);
-			InterlockedExchange(&m_bThreadRunning, FALSE);
-		}
-	}
+		StopStatusThread();
 	if (!RestoreFiles())
 		return;
 	UpdateData();
@@ -1393,6 +1449,8 @@ BOOL CCommitDlg::PreTranslateMessage(MSG* pMsg)
 		if (ret)
 			return TRUE;
 	}
+	if (m_hAccelOkButton && GetDlgItem(IDOK)->IsWindowEnabled() && TranslateAccelerator(m_hWnd, m_hAccelOkButton, pMsg))
+		return TRUE;
 
 	if (pMsg->message == WM_KEYDOWN)
 	{
@@ -1435,18 +1493,41 @@ void CCommitDlg::Refresh()
 	if (m_bThreadRunning)
 		return;
 
-	InterlockedExchange(&m_bBlock, TRUE);
-	m_pThread = AfxBeginThread(StatusThreadEntry, this, THREAD_PRIORITY_NORMAL,0,CREATE_SUSPENDED);
-	if (m_pThread==NULL)
+	StartStatusThread();
+}
+
+void CCommitDlg::StartStatusThread()
+{
+	if (InterlockedExchange(&m_bBlock, TRUE) != FALSE)
+		return;
+
+	delete m_pThread;
+	m_pThread = nullptr;
+
+	m_pThread = AfxBeginThread(StatusThreadEntry, this, THREAD_PRIORITY_NORMAL, 0, CREATE_SUSPENDED);
+	if (!m_pThread)
 	{
-		CMessageBox::Show(this->m_hWnd, IDS_ERR_THREADSTARTFAILED, IDS_APPNAME, MB_OK | MB_ICONERROR);
+		CMessageBox::Show(GetSafeHwnd(), IDS_ERR_THREADSTARTFAILED, IDS_APPNAME, MB_OK | MB_ICONERROR);
 		InterlockedExchange(&m_bBlock, FALSE);
+		return;
 	}
-	else
-	{
-		m_pThread->m_bAutoDelete = FALSE;
-		m_pThread->ResumeThread();
-	}
+	InterlockedExchange(&m_bThreadRunning, TRUE);// so the main thread knows that this thread is still running
+	InterlockedExchange(&m_bRunThread, TRUE);	// if this is set to FALSE, the thread should stop
+	m_pThread->m_bAutoDelete = FALSE;
+	m_pThread->ResumeThread();
+}
+
+void CCommitDlg::StopStatusThread()
+{
+	InterlockedExchange(&m_bRunThread, FALSE);
+	WaitForSingleObject(m_pThread->m_hThread, 1000);
+	if (!m_bThreadRunning)
+		return;
+
+	// we gave the thread a chance to quit. Since the thread didn't
+	// listen to us we have to kill it.
+	TerminateThread(m_pThread->m_hThread, (DWORD)-1);
+	InterlockedExchange(&m_bThreadRunning, FALSE);
 }
 
 void CCommitDlg::OnBnClickedShowunversioned()
@@ -1654,7 +1735,7 @@ void CCommitDlg::GetAutocompletionList()
 	std::map<CString, CString> mapRegex;
 	CString sRegexFile = CPathUtils::GetAppDirectory();
 	CRegDWORD regtimeout = CRegDWORD(_T("Software\\TortoiseGit\\AutocompleteParseTimeout"), 5);
-	DWORD timeoutvalue = regtimeout*1000;
+	ULONGLONG timeoutvalue = ULONGLONG(DWORD(regtimeout)) * 1000UL;;
 	sRegexFile += _T("autolist.txt");
 	if (!m_bRunThread)
 		return;
@@ -1675,7 +1756,7 @@ void CCommitDlg::GetAutocompletionList()
 	for (const auto& snip : m_snippet)
 		m_autolist.emplace(snip.first, AUTOCOMPLETE_SNIPPET);
 
-	DWORD starttime = GetTickCount();
+	ULONGLONG starttime = GetTickCount64();
 
 	// now we have two arrays of strings, where the first array contains all
 	// file extensions we can use and the second the corresponding regex strings
@@ -1688,7 +1769,7 @@ void CCommitDlg::GetAutocompletionList()
 	for (int i=0; i<nListItems && m_bRunThread; ++i)
 	{
 		// stop parsing after timeout
-		if ((!m_bRunThread) || (GetTickCount() - starttime > timeoutvalue))
+		if ((!m_bRunThread) || (GetTickCount64() - starttime > timeoutvalue))
 			return;
 
 		CTGitPath *path = (CTGitPath*)m_ListCtrl.GetItemData(i);
@@ -1731,7 +1812,7 @@ void CCommitDlg::GetAutocompletionList()
 
 		ScanFile(path->GetWinPathString(), rdata, sExt);
 	}
-	CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": Auto completion list loaded in %d msec\n"), GetTickCount() - starttime);
+	CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": Auto completion list loaded in %I64u msec\n"), GetTickCount64() - starttime);
 }
 
 void CCommitDlg::ScanFile(const CString& sFilePath, const CString& sRegex, const CString& sExt)
@@ -1749,7 +1830,7 @@ void CCommitDlg::ScanFile(const CString& sFilePath, const CString& sRegex, const
 			return;
 		}
 		// allocate memory to hold file contents
-		std::unique_ptr<char[]> buffer(new char[size]);
+		auto buffer = std::make_unique<char[]>(size);
 		DWORD readbytes;
 		if (!ReadFile(hFile, buffer.get(), size, &readbytes, NULL))
 			return;
@@ -1766,7 +1847,7 @@ void CCommitDlg::ScanFile(const CString& sFilePath, const CString& sRegex, const
 		if ((opts & IS_TEXT_UNICODE_NOT_UNICODE_MASK) || (opts == 0))
 		{
 			const int ret = MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, (LPCSTR)buffer.get(), readbytes, NULL, 0);
-			std::unique_ptr<wchar_t[]> pWideBuf(new wchar_t[ret]);
+			auto pWideBuf = std::make_unique<wchar_t[]>(ret);
 			const int ret2 = MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, (LPCSTR)buffer.get(), readbytes, pWideBuf.get(), ret);
 			if (ret2 == ret)
 				sFileContent = std::wstring(pWideBuf.get(), ret);
@@ -1845,11 +1926,7 @@ bool CCommitDlg::HandleMenuItemClick(int cmd, CSciEdit * pSciEdit)
 		// only one revision must be selected however
 		dlg.SingleSelection(true);
 		if (dlg.DoModal() == IDOK)
-		{
-			// get selected hash if any
-			CString selectedHash = dlg.GetSelectedHash();
-			pSciEdit->InsertText(selectedHash);
-		}
+			pSciEdit->InsertText(dlg.GetSelectedHash().at(0).ToString());
 		return true;
 	}
 
@@ -1863,10 +1940,8 @@ bool CCommitDlg::HandleMenuItemClick(int cmd, CSciEdit * pSciEdit)
 		dlg.SingleSelection(true);
 		if (dlg.DoModal() == IDOK)
 		{
-			// get selected hash if any
-			CString selectedHash = dlg.GetSelectedHash();
 			GitRev rev;
-			if (rev.GetCommit(selectedHash))
+			if (rev.GetCommit(dlg.GetSelectedHash().at(0).ToString()))
 			{
 				MessageBox(rev.GetLastErr(), _T("TortoiseGit"), MB_ICONERROR);
 				return false;
@@ -2169,7 +2244,8 @@ LRESULT CCommitDlg::OnUpdateOKButton(WPARAM, LPARAM)
 	if (m_bBlock)
 		return 0;
 
-	bool bValidLogSize = !m_cLogMessage.GetText().IsEmpty() && m_cLogMessage.GetText().GetLength() >= m_ProjectProperties.nMinLogSize;
+	CString text = m_cLogMessage.GetText().Trim();
+	bool bValidLogSize = !text.IsEmpty() && text.GetLength() >= m_ProjectProperties.nMinLogSize;
 	bool bAmendOrSelectFilesOrMerge = m_ListCtrl.GetSelected() > 0 || (m_bCommitAmend && m_bAmendDiffToLastCommit) || CTGitPath(g_Git.m_CurrentDir).IsMergeActive();
 
 	DialogEnableWindow(IDOK, bValidLogSize && (m_bCommitMessageOnly || bAmendOrSelectFilesOrMerge));
@@ -2191,6 +2267,24 @@ LRESULT CCommitDlg::DefWindowProc(UINT message, WPARAM wParam, LPARAM lParam)
 		{
 			SPC_NMHDR* pHdr = (SPC_NMHDR*) lParam;
 			DoSize(pHdr->delta);
+		}
+		break;
+	case WM_COMMAND:
+		if (m_hAccelOkButton && LOWORD(wParam) >= WM_USER && LOWORD(wParam) <= WM_USER + m_accellerators.size())
+		{
+			for (const auto& entry : m_accellerators)
+			{
+				if (entry.second.wmid != LOWORD(wParam))
+					continue;
+				if (entry.second.id == -1)
+					m_ctrlOkButton.PostMessage(WM_KEYDOWN, VK_F4, NULL);
+				else
+				{
+					m_ctrlOkButton.SetCurrentEntry(entry.second.id);
+					OnOK();
+				}
+				return 0;
+			}
 		}
 		break;
 	}

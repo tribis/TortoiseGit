@@ -190,15 +190,11 @@ UINT CCheckForUpdatesDlg::CheckThread()
 #endif
 			if (checkPreview)
 			{
-				sCheckURL = _T("://versioncheck.tortoisegit.org/version-preview.txt");
+				sCheckURL = _T("https://versioncheck.tortoisegit.org/version-preview.txt");
 				SetDlgItemText(IDC_SOURCE, _T("Using preview release channel"));
 			}
 			else
-				sCheckURL = _T("://versioncheck.tortoisegit.org/version.txt");
-			if (SysInfo::Instance().IsVistaOrLater()) // we need SNI support
-				sCheckURL = _T("https") + sCheckURL;
-			else
-				sCheckURL = _T("http") + sCheckURL;
+				sCheckURL = _T("https://versioncheck.tortoisegit.org/version.txt");
 		}
 	}
 
@@ -537,7 +533,7 @@ void CCheckForUpdatesDlg::FillChangelog(CAutoConfig& versioncheck, bool official
 	CStdioFile file;
 	if (file.Open(tempchangelogfile, CFile::modeRead | CFile::typeBinary))
 	{
-		std::unique_ptr<BYTE[]> buf(new BYTE[(UINT)file.GetLength()]);
+		auto buf = std::make_unique<BYTE[]>((UINT)file.GetLength());
 		UINT read = file.Read(buf.get(), (UINT)file.GetLength());
 		bool skipBom = read >= 3 && buf[0] == 0xEF && buf[1] == 0xBB && buf[2] == 0xBF;
 		CGit::StringAppend(&temp, buf.get() + (skipBom ? 3 : 0), CP_UTF8, read - (skipBom ? 3 : 0));
@@ -800,33 +796,13 @@ CString CCheckForUpdatesDlg::GetDownloadsDirectory()
 {
 	CString folder;
 
-	if (SysInfo::Instance().IsVistaOrLater())
+	PWSTR wcharPtr = nullptr;
+	if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_Downloads, KF_FLAG_CREATE, nullptr, &wcharPtr)))
 	{
-		CAutoLibrary hShell = AtlLoadSystemLibraryUsingFullPath(_T("shell32.dll"));
-		if (hShell)
-		{
-			typedef HRESULT STDAPICALLTYPE SHGetKnownFolderPathFN(__in REFKNOWNFOLDERID rfid, __in DWORD dwFlags, __in_opt HANDLE hToken, __deref_out PWSTR *ppszPath);
-			SHGetKnownFolderPathFN *pfnSHGetKnownFolderPath = (SHGetKnownFolderPathFN*)GetProcAddress(hShell, "SHGetKnownFolderPath");
-			if (pfnSHGetKnownFolderPath)
-			{
-				wchar_t * wcharPtr = 0;
-				HRESULT hr = pfnSHGetKnownFolderPath(FOLDERID_Downloads, KF_FLAG_CREATE, NULL, &wcharPtr);
-				if (SUCCEEDED(hr))
-				{
-					folder = wcharPtr;
-					CoTaskMemFree(static_cast<void*>(wcharPtr));
-					return folder.TrimRight(_T("\\")) + _T("\\");
-				}
-			}
-		}
+		folder = wcharPtr;
+		CoTaskMemFree(wcharPtr);
+		return folder.TrimRight(_T("\\")) + _T("\\");
 	}
-
-	TCHAR szPath[MAX_PATH] = {0};
-	if (SUCCEEDED(SHGetFolderPath(NULL, CSIDL_PERSONAL | CSIDL_FLAG_CREATE, NULL, SHGFP_TYPE_CURRENT, szPath)))
-		folder = szPath;
-	CString downloads = folder.TrimRight(_T("\\")) + _T("\\Downloads\\");
-	if ((PathFileExists(downloads) && PathIsDirectory(downloads)) || (!PathFileExists(downloads) && CreateDirectory(downloads, NULL)))
-		return downloads;
 
 	return folder;
 }
@@ -862,8 +838,7 @@ CString CCheckForUpdatesDlg::GetWinINetError(DWORD err)
 	CString readableError = CFormatMessageWrapper(err);
 	if (readableError.IsEmpty())
 	{
-		static const CString modules[] = { _T("wininet.dll"), _T("urlmon.dll") };
-		for (const auto& module : modules)
+		for (const CString& module : { _T("wininet.dll"), _T("urlmon.dll") })
 		{
 			LPTSTR buffer;
 			FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_FROM_HMODULE, GetModuleHandle(module), err, 0, (LPTSTR)&buffer, 0, NULL);

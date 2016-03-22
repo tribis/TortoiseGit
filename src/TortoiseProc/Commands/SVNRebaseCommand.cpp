@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2009-2013, 2015 - TortoiseGit
+// Copyright (C) 2009-2013, 2015-2016 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -47,7 +47,7 @@ bool SVNRebaseCommand::Execute()
 			if (g_Git.Run(cmd, &out, CP_UTF8))
 			{
 				sysProgressDlg.Stop();
-				CMessageBox::Show(NULL,out,_T("TortoiseGit"),MB_OK);
+				MessageBox(hwndExplorer, out, _T("TortoiseGit"), MB_OK | MB_ICONERROR);
 				return false;
 			}
 			sysProgressDlg.Stop();
@@ -102,11 +102,7 @@ bool SVNRebaseCommand::Execute()
 	progress.m_AutoClose = AUTOCLOSE_IF_NO_ERRORS;
 
 	if(progress.DoModal()!=IDOK)
-	{
-		::DeleteFile(g_Git.m_CurrentDir + _T("\\sys$command"));
 		return false;
-	}
-	::DeleteFile(g_Git.m_CurrentDir + _T("\\sys$command"));
 
 	if(progress.m_GitStatus)
 		return false;
@@ -120,7 +116,7 @@ bool SVNRebaseCommand::Execute()
 	//everything updated
 	if(UpStreamNewHash==HeadHash)
 	{
-		CMessageBox::Show(NULL, g_Git.m_CurrentDir + _T("\r\n") + CString(MAKEINTRESOURCE(IDS_PROC_EVERYTHINGUPDATED)), _T("TortoiseGit"), MB_OK);
+		MessageBox(hwndExplorer, g_Git.m_CurrentDir + _T("\r\n") + CString(MAKEINTRESOURCE(IDS_PROC_EVERYTHINGUPDATED)), _T("TortoiseGit"), MB_OK | MB_ICONQUESTION);
 		if(isStash)
 			askIfUserWantsToStashPop();
 
@@ -139,7 +135,7 @@ bool SVNRebaseCommand::Execute()
 			return false;
 		else
 		{
-			MessageBox(NULL, g_Git.m_CurrentDir + _T("\r\n") + CString(MAKEINTRESOURCE(IDS_PROC_FASTFORWARD)) + _T(":\n") + progressReset.m_LogText, _T("TortoiseGit"), MB_OK);
+			MessageBox(hwndExplorer, g_Git.m_CurrentDir + _T("\r\n") + CString(MAKEINTRESOURCE(IDS_PROC_FASTFORWARD)) + _T(":\n") + progressReset.m_LogText, _T("TortoiseGit"), MB_OK | MB_ICONQUESTION);
 			if(isStash)
 				askIfUserWantsToStashPop();
 

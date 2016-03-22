@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2016 - TortoiseGit
 // Copyright (C) 2003-2008, 2013-2015 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -121,7 +121,7 @@ HRESULT STDMETHODCALLTYPE CIShellFolderHook::GetUIObjectOf(HWND hwndOwner, UINT 
 			nLength += 1; // '\0' separator
 		}
 		int nBufferSize = sizeof(DROPFILES) + ((nLength + 5)*sizeof(TCHAR));
-		std::unique_ptr<char[]> pBuffer(new char[nBufferSize]);
+		auto pBuffer = std::make_unique<char[]>(nBufferSize);
 		SecureZeroMemory(pBuffer.get(), nBufferSize);
 		DROPFILES* df = (DROPFILES*)pBuffer.get();
 		df->pFiles = sizeof(DROPFILES);
@@ -276,8 +276,6 @@ CGitStatusListCtrl::CGitStatusListCtrl() : CListCtrl()
 	, m_dwContextMenus(0)
 	, m_nIconFolder(0)
 	, m_nRestoreOvl(0)
-	, pfnSHCreateDefaultContextMenu(nullptr)
-	, pfnAssocCreateForClasses(nullptr)
 	, m_pContextMenu(nullptr)
 	, m_hShellMenu(nullptr)
 {
@@ -287,12 +285,6 @@ CGitStatusListCtrl::CGitStatusListCtrl() : CListCtrl()
 	m_bIsRevertTheirMy = false;
 	m_bNoAutoselectMissing = CRegDWORD(L"Software\\TortoiseGit\\AutoselectMissingFiles", FALSE) == TRUE;
 	this->m_nLineAdded =this->m_nLineDeleted =0;
-	m_ShellDll = AtlLoadSystemLibraryUsingFullPath(_T("Shell32.dll"));
-	if (m_ShellDll)
-	{
-		pfnSHCreateDefaultContextMenu = (FNSHCreateDefaultContextMenu)::GetProcAddress(m_ShellDll, "SHCreateDefaultContextMenu");
-		pfnAssocCreateForClasses = (FNAssocCreateForClasses)::GetProcAddress(m_ShellDll, "AssocCreateForClasses");
-	}
 }
 
 CGitStatusListCtrl::~CGitStatusListCtrl()
@@ -388,6 +380,8 @@ BOOL CGitStatusListCtrl::GetStatus ( const CTGitPathList* pathList
 	m_bBusy = true;
 	m_bEmpty = false;
 	Invalidate();
+
+	m_bIsRevertTheirMy = g_Git.IsRebaseRunning() > 0;
 
 	Locker lock(m_critSec);
 	int mask= CGitStatusListCtrl::FILELIST_MODIFY;
@@ -2002,7 +1996,7 @@ void CGitStatusListCtrl::OnContextMenuList(CWnd * pWnd, CPoint point)
 			}
 
 			m_hShellMenu = nullptr;
-			if (pfnSHCreateDefaultContextMenu && pfnAssocCreateForClasses && GetSelectedCount() > 0 && !(wcStatus & (CTGitPath::LOGACTIONS_DELETED | CTGitPath::LOGACTIONS_MISSING)) && m_bHasWC && (this->m_CurrentVersion.IsEmpty() || this->m_CurrentVersion == GIT_REV_ZERO) && shellMenu.CreatePopupMenu())
+			if (GetSelectedCount() > 0 && !(wcStatus & (CTGitPath::LOGACTIONS_DELETED | CTGitPath::LOGACTIONS_MISSING)) && m_bHasWC && (this->m_CurrentVersion.IsEmpty() || this->m_CurrentVersion == GIT_REV_ZERO) && shellMenu.CreatePopupMenu())
 			{
 				// insert the shell context menu
 				popup.AppendMenu(MF_SEPARATOR);
@@ -2321,6 +2315,7 @@ void CGitStatusListCtrl::OnContextMenuList(CWnd * pWnd, CPoint point)
 				{
 					if (CMessageBox::Show(m_hWnd, IDS_PROC_RESOLVE, IDS_APPNAME, MB_ICONQUESTION | MB_YESNO)==IDYES)
 					{
+						bool needsFullRefresh = false;
 						POSITION pos = GetFirstSelectedItemPosition();
 						while (pos != 0)
 						{
@@ -2335,14 +2330,16 @@ void CGitStatusListCtrl::OnContextMenuList(CWnd * pWnd, CPoint point)
 								resolveWith = CAppUtils::RESOLVE_WITH_THEIRS;
 							else if (((!this->m_bIsRevertTheirMy) && cmd == IDGITLC_RESOLVEMINE) || ((this->m_bIsRevertTheirMy) && cmd == IDGITLC_RESOLVETHEIRS))
 								resolveWith = CAppUtils::RESOLVE_WITH_MINE;
-							if (CAppUtils::ResolveConflict(*fentry, resolveWith) == 0 && fentry->m_Action & CTGitPath::LOGACTIONS_UNMERGED && CRegDWORD(_T("Software\\TortoiseGit\\RefreshFileListAfterResolvingConflict"), TRUE) == TRUE)
-							{
-								CWnd* pParent = GetLogicalParent();
-								if (pParent && pParent->GetSafeHwnd())
-									pParent->SendMessage(GITSLNM_NEEDSREFRESH);
-								SetRedraw(TRUE);
-								break;
-							}
+							if (CAppUtils::ResolveConflict(*fentry, resolveWith) == 0 && fentry->m_Action & CTGitPath::LOGACTIONS_UNMERGED)
+								needsFullRefresh = true;
+						}
+						if (needsFullRefresh && CRegDWORD(_T("Software\\TortoiseGit\\RefreshFileListAfterResolvingConflict"), TRUE) == TRUE)
+						{
+							CWnd* pParent = GetLogicalParent();
+							if (pParent && pParent->GetSafeHwnd())
+								pParent->SendMessage(GITSLNM_NEEDSREFRESH);
+							SetRedraw(TRUE);
+							break;
 						}
 						Show(m_dwShow, 0, m_bShowFolders,0,true);
 					}
@@ -3443,7 +3440,7 @@ void CGitStatusListCtrl::PreSubclassWindow()
 void CGitStatusListCtrl::OnPaint()
 {
 	LRESULT defres = Default();
-	if ((m_bBusy)||(m_bEmpty))
+	if ((m_bBusy) || (m_bEmpty))
 	{
 		CString str;
 		if (m_bBusy)
@@ -3469,8 +3466,7 @@ void CGitStatusListCtrl::OnPaint()
 
 		CRect rc;
 		GetClientRect(&rc);
-		CHeaderCtrl* pHC;
-		pHC = GetHeaderCtrl();
+		CHeaderCtrl* pHC = GetHeaderCtrl();
 		if (pHC != NULL)
 		{
 			CRect rcH;
@@ -3483,7 +3479,7 @@ void CGitStatusListCtrl::OnPaint()
 
 			memDC.SetTextColor(clrText);
 			memDC.SetBkColor(clrTextBk);
-			memDC.FillSolidRect(rc, clrTextBk);
+			memDC.BitBlt(rc.left, rc.top, rc.Width(), rc.Height(), pDC, rc.left, rc.top, SRCCOPY);
 			rc.top += 10;
 			CGdiObject * oldfont = memDC.SelectStockObject(DEFAULT_GUI_FONT);
 			memDC.DrawText(str, rc, DT_CENTER | DT_VCENTER |
@@ -3578,7 +3574,7 @@ void CGitStatusListCtrl::OnBeginDrag(NMHDR* /*pNMHDR*/, LRESULT* pResult)
 			{
 				CString out;
 				out.Format(IDS_STATUSLIST_CHECKOUTFILEFAILED, (LPCTSTR)path->GetGitPathString(), (LPCTSTR)version, (LPCTSTR)tempFile);
-				CMessageBox::Show(nullptr, g_Git.GetGitLastErr(out, CGit::GIT_CMD_GETONEFILE), _T("TortoiseGit"), MB_OK);
+				MessageBox(g_Git.GetGitLastErr(out, CGit::GIT_CMD_GETONEFILE), _T("TortoiseGit"), MB_OK | MB_ICONERROR);
 				return;
 			}
 		}
@@ -4024,7 +4020,7 @@ int CGitStatusListCtrl::UpdateUnRevFileList(CTGitPathList *List)
 	CString err;
 	if (m_UnRevFileList.FillUnRev(CTGitPath::LOGACTIONS_UNVER, List, &err))
 	{
-		CMessageBox::Show(NULL, _T("Failed to get UnRev file list\n") + err, _T("TortoiseGit"), MB_OK);
+		CMessageBox::Show(GetSafeHwnd(), _T("Failed to get UnRev file list\n") + err, _T("TortoiseGit"), MB_OK | MB_ICONERROR);
 		return -1;
 	}
 
@@ -4042,7 +4038,7 @@ int CGitStatusListCtrl::UpdateIgnoreFileList(CTGitPathList *List)
 	CString err;
 	if (m_IgnoreFileList.FillUnRev(CTGitPath::LOGACTIONS_IGNORE, List, &err))
 	{
-		CMessageBox::Show(NULL, _T("Failed to get Ignore file list\n") + err, _T("TortoiseGit"), MB_OK);
+		CMessageBox::Show(GetSafeHwnd(), _T("Failed to get Ignore file list\n") + err, _T("TortoiseGit"), MB_OK | MB_ICONERROR);
 		return -1;
 	}
 
@@ -4057,7 +4053,7 @@ int CGitStatusListCtrl::UpdateIgnoreFileList(CTGitPathList *List)
 
 int CGitStatusListCtrl::UpdateLocalChangesIgnoredFileList(CTGitPathList *list)
 {
-	m_LocalChangesIgnoredFileList.FillBasedOnIndexFlags(GIT_IDXENTRY_VALID | GIT_IDXENTRY_SKIP_WORKTREE, list);
+	m_LocalChangesIgnoredFileList.FillBasedOnIndexFlags(GIT_IDXENTRY_VALID, GIT_IDXENTRY_SKIP_WORKTREE, list);
 	for (int i = 0; i < m_LocalChangesIgnoredFileList.GetCount(); ++i)
 	{
 		CTGitPath * gitpatch = (CTGitPath*)&m_LocalChangesIgnoredFileList[i];
@@ -4484,7 +4480,7 @@ void CGitStatusListCtrl::DeleteSelectedFiles()
 	}
 	filelist += _T("|");
 	int len = filelist.GetLength();
-	std::unique_ptr<TCHAR[]> buf(new TCHAR[len + 2]);
+	auto buf = std::make_unique<TCHAR[]>(len + 2);
 	_tcscpy_s(buf.get(), len + 2, filelist);
 	CStringUtils::PipesToNulls(buf.get(), len + 2);
 	SHFILEOPSTRUCT fileop;
@@ -4546,7 +4542,7 @@ BOOL CGitStatusListCtrl::OnWndMsg(UINT message, WPARAM wParam, LPARAM lParam, LR
 	case WM_INITMENUPOPUP:
 	{
 		HMENU hMenu = (HMENU)wParam;
-		if (pfnSHCreateDefaultContextMenu && pfnAssocCreateForClasses && (hMenu == m_hShellMenu) && (GetMenuItemCount(hMenu) == 0))
+		if ((hMenu == m_hShellMenu) && (GetMenuItemCount(hMenu) == 0))
 		{
 			// the shell submenu is populated only on request, i.e. right
 			// before the submenu is shown
@@ -4586,14 +4582,14 @@ BOOL CGitStatusListCtrl::OnWndMsg(UINT message, WPARAM wParam, LPARAM lParam, LR
 				PIDLIST_RELATIVE pidl = nullptr;
 
 				int bufsize = 1024;
-				std::unique_ptr<WCHAR[]> filepath(new WCHAR[bufsize]);
+				auto filepath = std::make_unique<WCHAR[]>(bufsize);
 				for (int i = 0; i < nItems; i++)
 				{
 					CString fullPath = g_Git.CombinePath(targetList[i].GetWinPath());
 					if (bufsize < fullPath.GetLength())
 					{
 						bufsize = fullPath.GetLength() + 3;
-						filepath = std::unique_ptr<WCHAR[]>(new WCHAR[bufsize]);
+						filepath = std::make_unique<WCHAR[]>(bufsize);
 					}
 					wcscpy_s(filepath.get(), bufsize, fullPath);
 					if (SUCCEEDED(g_psfDesktopFolder->ParseDisplayName(nullptr, 0, filepath.get(), nullptr, &pidl, nullptr)))
@@ -4620,7 +4616,7 @@ BOOL CGitStatusListCtrl::OnWndMsg(UINT message, WPARAM wParam, LPARAM lParam, LR
 						{ ASSOCCLASS_FOLDER, NULL, NULL },
 					};
 					IQueryAssociations* pIQueryAssociations = nullptr;
-					if (FAILED(pfnAssocCreateForClasses(rgAssocItem, ARRAYSIZE(rgAssocItem), IID_IQueryAssociations, (void**)&pIQueryAssociations)))
+					if (FAILED(AssocCreateForClasses(rgAssocItem, ARRAYSIZE(rgAssocItem), IID_IQueryAssociations, (void**)&pIQueryAssociations)))
 						pIQueryAssociations = nullptr; // not a problem, it works without this
 
 					g_pFolderhook = new CIShellFolderHook(g_psfDesktopFolder, targetList);
@@ -4632,7 +4628,7 @@ BOOL CGitStatusListCtrl::OnWndMsg(UINT message, WPARAM wParam, LPARAM lParam, LR
 					dcm.cidl = g_pidlArrayItems;
 					dcm.apidl = (PCUITEMID_CHILD_ARRAY)g_pidlArray;
 					dcm.punkAssociationInfo = pIQueryAssociations;
-					if (SUCCEEDED(pfnSHCreateDefaultContextMenu(&dcm, IID_IContextMenu, (void**)&icm1)))
+					if (SUCCEEDED(SHCreateDefaultContextMenu(&dcm, IID_IContextMenu, (void**)&icm1)))
 					{
 						int iMenuType = 0;  // to know which version of IContextMenu is supported
 						if (icm1)

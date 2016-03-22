@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2014 - TortoiseGit
+// Copyright (C) 2008-2016 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -76,6 +76,7 @@ public:
 
 typedef std::vector<PostCmd> PostCmdList;
 typedef std::function<void(DWORD status, PostCmdList&)> PostCmdCallback;
+typedef std::function<void(DWORD& exitCode, CString& extraMsg)> PostExecCallback;
 
 class CProgressDlg : public CResizableStandAloneDialog
 {
@@ -94,8 +95,10 @@ public:
 	CString					m_GitCmd;
 	PostCmdCallback			m_PostCmdCallback;
 	std::vector<CString>	m_GitCmdList;
+	PostExecCallback		m_PostExecCallback; // After executing command line, this callback can modify exit code / display extra message
 	STRING_VECTOR			m_GitDirList;
 	CString					m_PreText;		// optional text to show in log window before running command
+	CString					m_PreFailText;	// optional fail text to show in log window
 	bool					m_bShowCommand;	// whether to display the command in the log window (default true)
 	CString					m_LogFile;
 	bool					m_bBufferAll;	// Buffer All to improve speed when there are many file add at commit
@@ -119,9 +122,9 @@ private:
 	CStatic					m_CurrentWork;
 	CWinThread*				m_pThread;
 
-	bool					m_bAbort;
+	volatile bool			m_bAbort;
 	bool					m_bDone;
-	DWORD					m_startTick;
+	ULONGLONG				m_startTick;
 
 	virtual void			DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
 	static UINT				ProgressThreadEntry(LPVOID pVoid);
@@ -164,7 +167,7 @@ public:
 	/**
 	 *@param dirlist if empty, the current directory of param git is used; otherwise each entry in param cmdlist uses the corresponding entry in param dirlist
 	 */
-	static UINT	RunCmdList(CWnd* pWnd, STRING_VECTOR& cmdlist, STRING_VECTOR& dirlist, bool bShowCommand, CString* pfilename, bool* bAbort, CGitGuardedByteArray* pdata, CGit* git = &g_Git);
+	static UINT	RunCmdList(CWnd* pWnd, STRING_VECTOR& cmdlist, STRING_VECTOR& dirlist, bool bShowCommand, CString* pfilename, volatile bool* bAbort, CGitGuardedByteArray* pdata, CGit* git = &g_Git);
 
 	static void KillProcessTree(DWORD dwProcessId, unsigned int depth = 0);
 
@@ -175,6 +178,15 @@ private:
 	afx_msg void OnBnClickedButton1();
 
 	virtual BOOL PreTranslateMessage(MSG* pMsg);
+
+	typedef struct {
+		int id;
+		int cnt;
+		int wmid;
+	} ACCELLERATOR;
+	std::map<TCHAR, ACCELLERATOR>	m_accellerators;
+	HACCEL							m_hAccel;
+	virtual LRESULT DefWindowProc(UINT message, WPARAM wParam, LPARAM lParam);
 };
 
 class CCommitProgressDlg:public CProgressDlg

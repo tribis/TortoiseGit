@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2016 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -26,6 +26,7 @@
 #include "Git.h"
 #include "AppUtils.h"
 #include "BrowseRefsDlg.h"
+#include "MessageBox.h"
 // CPullFetchDlg dialog
 
 IMPLEMENT_DYNAMIC(CPullFetchDlg, CHorizontalResizableStandAloneDialog)
@@ -40,6 +41,7 @@ CPullFetchDlg::CPullFetchDlg(CWnd* pParent /*=NULL*/)
 	m_regRebase = false;
 	m_bNoFF = false;
 	m_bRebase = FALSE;
+	m_bRebasePreserveMerges = false;
 	m_bSquash = false;
 	m_bNoCommit = false;
 	m_nDepth = 1;
@@ -47,7 +49,7 @@ CPullFetchDlg::CPullFetchDlg(CWnd* pParent /*=NULL*/)
 	m_bFFonly = false;
 	m_bFetchTags = 2;
 	m_bAllRemotes = FALSE;
-	m_bPrune = CAppUtils::GetMsysgitVersion() >= 0x01080500 ? 2 : FALSE;
+	m_bPrune = BST_INDETERMINATE;
 }
 
 CPullFetchDlg::~CPullFetchDlg()
@@ -82,7 +84,6 @@ BEGIN_MESSAGE_MAP(CPullFetchDlg, CHorizontalResizableStandAloneDialog)
 	ON_STN_CLICKED(IDC_REMOTE_MANAGE, &CPullFetchDlg::OnStnClickedRemoteManage)
 	ON_BN_CLICKED(IDC_BUTTON_BROWSE_REF, &CPullFetchDlg::OnBnClickedButtonBrowseRef)
 	ON_BN_CLICKED(IDC_CHECK_DEPTH, OnBnClickedCheckDepth)
-	ON_BN_CLICKED(IDC_CHECK_FETCHTAGS, OnBnClickedCheckFetchtags)
 	ON_BN_CLICKED(IDC_CHECK_FFONLY, OnBnClickedCheckFfonly)
 	ON_BN_CLICKED(IDC_CHECK_NOFF, OnBnClickedCheckFfonly)
 END_MESSAGE_MAP()
@@ -164,6 +165,26 @@ BOOL CPullFetchDlg::OnInitDialog()
 		{
 			if (config.GetBOOL(_T("pull.rebase"), rebase) == GIT_ENOTFOUND)
 				break;
+			else if (CRegDWORD(L"Software\\TortoiseGit\\PullRebaseBehaviorLike1816", FALSE) == FALSE)
+			{
+				CString value;
+				config.GetString(_T("pull.rebase"), value);
+				if (value == _T("preserve"))
+				{
+					rebase = TRUE;
+					m_bRebasePreserveMerges = true;
+				}
+			}
+		}
+		else if (CRegDWORD(L"Software\\TortoiseGit\\PullRebaseBehaviorLike1816", FALSE) == FALSE)
+		{
+			CString value;
+			config.GetString(_T("branch.") + g_Git.GetCurrentBranch() + _T(".rebase"), value);
+			if (value == _T("preserve"))
+			{
+				rebase = TRUE;
+				m_bRebasePreserveMerges = true;
+			}
 		}
 		if (!rebase)
 			break;
@@ -171,7 +192,7 @@ BOOL CPullFetchDlg::OnInitDialog()
 		// Since rebase = true in config, means that "git.exe pull" will ALWAYS rebase without "--rebase".
 		// So, lock it, then let Fetch Rebase do the rest things.
 		m_bRebase = TRUE;
-		m_bRebaseActivatedInConfigForPull = true;
+		m_bRebaseActivatedInConfigForPull = (CRegDWORD(L"Software\\TortoiseGit\\PullRebaseBehaviorLike1816", FALSE) == FALSE);
 	} while (0);
 
 	this->UpdateData(FALSE);
@@ -301,21 +322,17 @@ void CPullFetchDlg::OnCbnSelchangeRemote()
 	if (tagopt == "--no-tags")
 		tagopt.LoadString(IDS_NONE);
 	else if (tagopt == "--tags")
-		tagopt.LoadString(CAppUtils::GetMsysgitVersion() < 0x01090000 ? IDS_FETCH_TAGS_ONLY : IDS_ALL);
+		tagopt.LoadString(IDS_ALL);
 	else
 		tagopt.LoadString(IDS_FETCH_REACHABLE);
 	CString value;
 	value.Format(_T("%s: %s"), (LPCTSTR)CString(MAKEINTRESOURCE(IDS_DEFAULT)), (LPCTSTR)tagopt);
 	GetDlgItem(IDC_STATIC_TAGOPT)->SetWindowText(value);
 
-	CString prune;
-	if (CAppUtils::GetMsysgitVersion() >= 0x01080500)
-	{
-		key.Format(_T("remote.%s.prune"), (LPCTSTR)remote);
-		prune = g_Git.GetConfigValue(key);
-		if (prune.IsEmpty())
-			prune = g_Git.GetConfigValue(_T("fetch.prune"));
-	}
+	key.Format(_T("remote.%s.prune"), (LPCTSTR)remote);
+	CString prune = g_Git.GetConfigValue(key);
+	if (prune.IsEmpty())
+		prune = g_Git.GetConfigValue(_T("fetch.prune"));
 	if (!prune.IsEmpty())
 	{
 		value.Format(_T("%s: %s"), (LPCTSTR)CString(MAKEINTRESOURCE(IDS_DEFAULT)), (LPCTSTR)prune);
@@ -387,6 +404,12 @@ void CPullFetchDlg::OnBnClickedOk()
 		m_Other.SaveHistory();
 	}
 
+	if (m_bRebase && m_RemoteBranch.GetString().IsEmpty() && m_IsPull)
+	{
+		CMessageBox::Show(GetSafeHwnd(), IDS_PROC_PULL_EMPTYBRANCH, IDS_APPNAME, MB_ICONEXCLAMATION);
+		return;
+	}
+
 	m_RemoteReg = m_Remote.GetString();
 
 	m_RemoteBranch.SaveHistory();
@@ -430,17 +453,6 @@ void CPullFetchDlg::OnBnClickedCheckDepth()
 {
 	UpdateData(TRUE);
 	GetDlgItem(IDC_EDIT_DEPTH)->EnableWindow(m_bDepth);
-}
-
-void CPullFetchDlg::OnBnClickedCheckFetchtags()
-{
-	if (CAppUtils::GetMsysgitVersion() < 0x01090000)
-	{
-		UpdateData();
-		if (m_bFetchTags == TRUE)
-			m_bFetchTags = 2;
-		UpdateData(FALSE);
-	}
 }
 
 void CPullFetchDlg::OnBnClickedCheckFfonly()

@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2009-2015 - TortoiseGit
+// Copyright (C) 2009-2016 - TortoiseGit
 // Copyright (C) 2003-2013 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -29,7 +29,6 @@
 #include "UnicodeUtils.h"
 #include "SysImageList.h"
 #include <sys/stat.h>
-#include "SysInfo.h"
 #include "registry.h"
 #include "PathUtils.h"
 #include "StringUtils.h"
@@ -220,11 +219,8 @@ BOOL CRepositoryBrowser::OnInitDialog()
 	CAppUtils::SetListCtrlBackgroundImage(m_RepoList.GetSafeHwnd(), IDI_REPOBROWSER_BKG);
 
 	m_RepoTree.SetImageList(&SYS_IMAGE_LIST(), TVSIL_NORMAL);
-	if (SysInfo::Instance().IsVistaOrLater())
-	{
-		exStyle = TVS_EX_FADEINOUTEXPANDOS | TVS_EX_AUTOHSCROLL | TVS_EX_DOUBLEBUFFER;
-		m_RepoTree.SetExtendedStyle(exStyle, exStyle);
-	}
+	exStyle = TVS_EX_FADEINOUTEXPANDOS | TVS_EX_AUTOHSCROLL | TVS_EX_DOUBLEBUFFER;
+	m_RepoTree.SetExtendedStyle(exStyle, exStyle);
 
 	m_nExternalOvl = SYS_IMAGE_LIST().AddIcon((HICON)LoadImage(AfxGetResourceHandle(), MAKEINTRESOURCE(IDI_EXTERNALOVL), IMAGE_ICON, 0, 0, LR_DEFAULTSIZE));
 	m_nExecutableOvl = SYS_IMAGE_LIST().AddIcon((HICON)LoadImage(AfxGetResourceHandle(), MAKEINTRESOURCE(IDI_EXECUTABLEOVL), IMAGE_ICON, 0, 0, LR_DEFAULTSIZE));
@@ -812,7 +808,7 @@ void CRepositoryBrowser::ShowContextMenu(CPoint point, TShadowFilesTreeList &sel
 	case eCmd_ViewLogSubmodule:
 		{
 			CString sCmd;
-			sCmd.Format(_T("/command:log /path:\"%s\\%s\""), (LPCTSTR)g_Git.m_CurrentDir, (LPCTSTR)selectedLeafs.at(0)->GetFullName());
+			sCmd.Format(_T("/command:log /path:\"%s\""), (LPCTSTR)g_Git.CombinePath(selectedLeafs.at(0)->GetFullName()));
 			if (cmd == eCmd_ViewLog && selectedLeafs.at(0)->m_bSubmodule)
 				sCmd += _T(" /submodule");
 			CAppUtils::RunTortoiseGitProc(sCmd);
@@ -949,8 +945,7 @@ void CRepositoryBrowser::OnBnClickedButtonRevision()
 		dlg.SingleSelection(true);
 		if (dlg.DoModal() == IDOK)
 		{
-			// get selected hash if any
-			m_sRevision = dlg.GetSelectedHash();
+			m_sRevision = dlg.GetSelectedHash().at(0).ToString();
 			Refresh();
 		}
 }

@@ -69,9 +69,6 @@
     <ClCompile Include="..\Utils\StringUtils.cpp">
       <Filter>Utils</Filter>
     </ClCompile>
-    <ClCompile Include="..\Utils\SysInfo.cpp">
-      <Filter>Utils</Filter>
-    </ClCompile>
     <ClCompile Include="..\Utils\TaskbarUUID.cpp">
       <Filter>Utils</Filter>
     </ClCompile>
@@ -230,9 +227,6 @@
     <ClInclude Include="..\Utils\StringUtils.h">
       <Filter>Utils</Filter>
     </ClInclude>
-    <ClInclude Include="..\Utils\SysInfo.h">
-      <Filter>Utils</Filter>
-    </ClInclude>
     <ClInclude Include="..\Utils\TaskbarUUID.h">
       <Filter>Utils</Filter>
     </ClInclude>
@@ -282,9 +276,6 @@
       <Filter>TortoiseGitProc</Filter>
     </ClInclude>
     <ClInclude Include="..\TortoiseProc\GitLogListBase.h">
-      <Filter>TortoiseGitProc</Filter>
-    </ClInclude>
-    <ClInclude Include="GitBlameLogList.h">
       <Filter>TortoiseGitProc</Filter>
     </ClInclude>
     <ClInclude Include="..\TortoiseProc\lanes.h">
@@ -337,6 +328,9 @@
     </ClInclude>
     <ClInclude Include="..\Resources\LoglistCommonResource.h">
       <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GitBlameLogList.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -252,7 +252,7 @@ void CImportPatchDlg::OnBnClickedButtonAdd()
 					OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT|OFN_ALLOWMULTISELECT,
 					CString(MAKEINTRESOURCE(IDS_PATCHFILEFILTER)));
 	dlg.m_ofn.nMaxFile = 65536;
-	std::unique_ptr<TCHAR[]> path(new TCHAR[dlg.m_ofn.nMaxFile]);
+	auto path = std::make_unique<TCHAR[]>(dlg.m_ofn.nMaxFile);
 	SecureZeroMemory(path.get(), dlg.m_ofn.nMaxFile);
 	dlg.m_ofn.lpstrFile = path.get();
 	INT_PTR ret = dlg.DoModal();
@@ -312,8 +312,7 @@ void CImportPatchDlg::OnBnClickedButtonDown()
 	POSITION pos;
 	pos = m_cList.GetFirstSelectedItemPosition();
 	// use an array to store all selected item indexes; the user won't select too much items
-	int* indexes = NULL;
-	indexes = new int[m_cList.GetSelectedCount()];
+	auto indexes = std::make_unique<int[]>(m_cList.GetSelectedCount());
 	int i = 0;
 	while(pos)
 	{
@@ -337,8 +336,6 @@ void CImportPatchDlg::OnBnClickedButtonDown()
 			m_cList.SetItemState(index, 0, LVIS_SELECTED);
 		}
 	}
-	delete [] indexes;
-	indexes = NULL;
 }
 
 void CImportPatchDlg::OnBnClickedButtonRemove()

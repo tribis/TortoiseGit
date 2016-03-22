@@ -1,7 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
 // Copyright (C) 2003-2009, 2015 - TortoiseSVN
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2016 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -75,7 +75,18 @@ CLogDlg::CLogDlg(CWnd* pParent /*=NULL*/)
 
 	m_regbAllBranch=CRegDWORD(str,FALSE);
 
-	m_bAllBranch=m_regbAllBranch;
+	m_AllBranchType = (AllBranchType)(DWORD)m_regbAllBranch;
+	switch (m_AllBranchType)
+	{
+	case AllBranchType::None:
+		m_bAllBranch = FALSE;
+		break;
+	case AllBranchType::AllBranches:
+		m_bAllBranch = TRUE;
+		break;
+	default:
+		m_bAllBranch = BST_INDETERMINATE;
+	}
 
 	str = g_Git.m_CurrentDir;
 	str.Replace(_T(":"),_T("_"));
@@ -100,7 +111,7 @@ CLogDlg::CLogDlg(CWnd* pParent /*=NULL*/)
 CLogDlg::~CLogDlg()
 {
 
-	m_regbAllBranch = m_bAllBranch;
+	m_regbAllBranch = (DWORD)m_AllBranchType;
 	m_regbShowTags = m_bShowTags;
 	m_regbShowLocalBranches = m_bShowLocalBranches;
 	m_regbShowRemoteBranches = m_bShowRemoteBranches;
@@ -213,7 +224,10 @@ void CLogDlg::SetParams(const CTGitPath& orgPath, const CTGitPath& path, CString
 		range = _T("HEAD");
 
 	if (!(range.IsEmpty() || range == _T("HEAD")))
+	{
 		m_bAllBranch = BST_UNCHECKED;
+		m_AllBranchType = AllBranchType::None;
+	}
 
 	SetRange(range);
 
@@ -321,10 +335,12 @@ BOOL CLogDlg::OnInitDialog()
 	SetFilterCueText();
 
 	m_LogList.m_ShowMask &= ~CGit::LOG_INFO_LOCAL_BRANCHES;
-	if (m_bAllBranch == BST_CHECKED)
+	if (m_AllBranchType == AllBranchType::AllBranches)
 		m_LogList.m_ShowMask|=CGit::LOG_INFO_ALL_BRANCH;
-	else if (m_bAllBranch == BST_INDETERMINATE)
+	else if (m_AllBranchType == AllBranchType::AllLocalBranches)
 		m_LogList.m_ShowMask |= CGit::LOG_INFO_LOCAL_BRANCHES;
+	else if (m_AllBranchType == AllBranchType::AllBasicRefs)
+		m_LogList.m_ShowMask |= CGit::LOG_INFO_BASIC_REFS;
 	else
 		m_LogList.m_ShowMask&=~CGit::LOG_INFO_ALL_BRANCH;
 
@@ -522,7 +538,7 @@ LRESULT CLogDlg::OnLogListLoading(WPARAM wParam, LPARAM /*lParam*/)
 
 		DialogEnableWindow(IDC_WHOLE_PROJECT, !m_bFollowRenames && !m_path.IsEmpty());
 
-		DialogEnableWindow(IDC_STATBUTTON, !(m_LogList.m_arShownList.IsEmpty() || m_LogList.m_arShownList.GetCount() == 1 && m_LogList.m_bShowWC));
+		DialogEnableWindow(IDC_STATBUTTON, !(m_LogList.m_arShownList.empty() || m_LogList.m_arShownList.size() == 1 && m_LogList.m_bShowWC));
 		DialogEnableWindow(IDC_REFRESH, TRUE);
 		DialogEnableWindow(IDC_VIEW, TRUE);
 		DialogEnableWindow(IDC_WALKBEHAVIOUR, TRUE);
@@ -760,14 +776,14 @@ void CLogDlg::FillLogMessageCtrl(bool bShow /* = true*/)
 		// with the corresponding log message, and also fill the changed files
 		// list fully.
 		POSITION pos = m_LogList.GetFirstSelectedItemPosition();
-		int selIndex = m_LogList.GetNextSelectedItem(pos);
-		if (selIndex >= m_LogList.m_arShownList.GetCount())
+		size_t selIndex = m_LogList.GetNextSelectedItem(pos);
+		if (selIndex >= m_LogList.m_arShownList.size())
 		{
 //			InterlockedExchange(&m_bNoDispUpdates, FALSE);
 			m_ChangedFileListCtrl.SetRedraw(TRUE);
 			return;
 		}
-		GitRevLoglist* pLogEntry = reinterpret_cast<GitRevLoglist*>(m_LogList.m_arShownList.SafeGetAt(selIndex));
+		GitRevLoglist* pLogEntry = m_LogList.m_arShownList.SafeGetAt(selIndex);
 
 		{
 			m_gravatar.LoadGravatar(pLogEntry->GetAuthorEmail());
@@ -965,7 +981,7 @@ void CLogDlg::FillPatchView(bool onlySetTimer)
 		return; // nothing is selected, get out of here
 	}
 
-	GitRev * pLogEntry = reinterpret_cast<GitRev* >(m_LogList.m_arShownList.SafeGetAt(m_LogList.GetNextSelectedItem(posLogList)));
+	GitRev* pLogEntry = m_LogList.m_arShownList.SafeGetAt(m_LogList.GetNextSelectedItem(posLogList));
 	if (pLogEntry == nullptr || m_LogList.GetNextSelectedItem(posLogList) != -1)
 	{
 		m_patchViewdlg.ClearView();
@@ -977,9 +993,7 @@ void CLogDlg::FillPatchView(bool onlySetTimer)
 
 	if (pos == nullptr)
 	{
-		int diffContext = 0;
-		if (CAppUtils::GetMsysgitVersion() > 0x01080100)
-			diffContext = g_Git.GetConfigValueInt32(_T("diff.context"), -1);
+		int diffContext = g_Git.GetConfigValueInt32(_T("diff.context"), -1);
 		CStringA outA;
 		CString rev1 = pLogEntry->m_CommitHash.IsEmpty() ? _T("HEAD") : (pLogEntry->m_CommitHash.ToString() + _T("~1"));
 		CString rev2 = pLogEntry->m_CommitHash.IsEmpty() ? GIT_REV_ZERO : pLogEntry->m_CommitHash.ToString();
@@ -1116,9 +1130,9 @@ void CLogDlg::GoBackForward(bool select, bool bForward)
 	if (bForward ? m_LogList.m_selectionHistory.GoForward(gotoHash) : m_LogList.m_selectionHistory.GoBack(gotoHash))
 	{
 		int i;
-		for (i = 0; i < m_LogList.m_arShownList.GetCount(); ++i)
+		for (i = 0; i < (int)m_LogList.m_arShownList.size(); ++i)
 		{
-			GitRev *rev = (GitRev *)m_LogList.m_arShownList.SafeGetAt(i);
+			GitRev* rev = m_LogList.m_arShownList.SafeGetAt(i);
 			if (!rev) continue;
 			if (rev->m_CommitHash == gotoHash)
 			{
@@ -1145,7 +1159,7 @@ void CLogDlg::GoBackForward(bool select, bool bForward)
 				return;
 			}
 		}
-		if (i == m_LogList.m_arShownList.GetCount())
+		if (i == (int)m_LogList.m_arShownList.size())
 		{
 			CString msg;
 			msg.Format(IDS_LOG_NOT_VISIBLE, (LPCTSTR)gotoHash.ToString());
@@ -1292,6 +1306,8 @@ void CLogDlg::OnContextMenu(CWnd* pWnd, CPoint point)
 		popup.EnableMenuItem(cnt, fetchHead.IsEmpty());
 		popup.AppendMenuIcon(++cnt, IDS_ALL);
 		popup.EnableMenuItem(cnt, m_bFollowRenames);
+		popup.AppendMenuIcon(++cnt, IDS_PROC_LOG_SELECT_BASIC_REFS);
+		popup.EnableMenuItem(cnt, m_bFollowRenames);
 		popup.AppendMenuIcon(++cnt, IDS_PROC_LOG_SELECT_LOCAL_BRANCHES);
 		popup.EnableMenuItem(cnt, m_bFollowRenames);
 		int offset = ++cnt;
@@ -1316,8 +1332,9 @@ void CLogDlg::OnContextMenu(CWnd* pWnd, CPoint point)
 			return;
 		}
 
-		m_LogList.m_ShowMask &= ~(CGit::LOG_INFO_ALL_BRANCH | CGit::LOG_INFO_LOCAL_BRANCHES);
+		m_LogList.m_ShowMask &= ~(CGit::LOG_INFO_ALL_BRANCH | CGit::LOG_INFO_BASIC_REFS | CGit::LOG_INFO_LOCAL_BRANCHES);
 		m_bAllBranch = BST_UNCHECKED;
+		m_AllBranchType = AllBranchType::None;
 		if (cmd == 2)
 		{
 			SetRange(g_Git.GetCurrentBranch(true));
@@ -1329,11 +1346,19 @@ void CLogDlg::OnContextMenu(CWnd* pWnd, CPoint point)
 		else if (cmd == 4)
 		{
 			m_bAllBranch = BST_CHECKED;
+			m_AllBranchType = AllBranchType::AllBranches;
 			m_LogList.m_ShowMask |= CGit::LOG_INFO_ALL_BRANCH;
 		}
 		else if (cmd == 5)
 		{
 			m_bAllBranch = BST_INDETERMINATE;
+			m_AllBranchType = AllBranchType::AllBasicRefs;
+			m_LogList.m_ShowMask |= CGit::LOG_INFO_BASIC_REFS;
+		}
+		else if (cmd == 6)
+		{
+			m_bAllBranch = BST_INDETERMINATE;
+			m_AllBranchType = AllBranchType::AllLocalBranches;
 			m_LogList.m_ShowMask |= CGit::LOG_INFO_LOCAL_BRANCHES;
 		}
 		else if (cmd >= offset)
@@ -1415,7 +1440,9 @@ void CLogDlg::OnContextMenu(CWnd* pWnd, CPoint point)
 		if (pos)
 			selIndex = m_LogList.GetNextSelectedItem(pos);
 
-		GitRevLoglist* pRev = ((GitRevLoglist*)m_LogList.m_arShownList[selIndex]);
+		GitRevLoglist* pRev = nullptr;
+		if (selIndex >= 0)
+			pRev = m_LogList.m_arShownList.SafeGetAt(selIndex);
 
 		if ((point.x == -1) && (point.y == -1))
 		{
@@ -1438,9 +1465,12 @@ void CLogDlg::OnContextMenu(CWnd* pWnd, CPoint point)
 			popup.AppendMenu(MF_SEPARATOR);
 			sMenuItemText.LoadString(IDS_STATUSLIST_CONTEXT_COPYEXT);
 			popup.AppendMenuIcon(EM_SETSEL, sMenuItemText, IDI_COPYCLIP);
-			popup.AppendMenu(MF_SEPARATOR, NULL);
-			sMenuItemText.LoadString(IDS_EDIT_NOTES);
-			popup.AppendMenuIcon( CGitLogList::ID_EDITNOTE, sMenuItemText, IDI_EDIT);
+			if (pRev && !pRev->m_CommitHash.IsEmpty())
+			{
+				popup.AppendMenu(MF_SEPARATOR, NULL);
+				sMenuItemText.LoadString(IDS_EDIT_NOTES);
+				popup.AppendMenuIcon(CGitLogList::ID_EDITNOTE, sMenuItemText, IDI_EDIT);
+			}
 
 			int cmd = popup.TrackPopupMenu(TPM_RETURNCMD | TPM_LEFTALIGN | TPM_NONOTIFY, point.x, point.y, this, 0);
 			switch (cmd)
@@ -1485,19 +1515,15 @@ void CLogDlg::OnOK()
 		m_LogList.SafeTerminateThread();
 	}
 	UpdateData();
-	// check that one and only one row is selected
-	if (m_LogList.GetSelectedCount() == 1)
+	// get the selected row(s)
+	POSITION pos = m_LogList.GetFirstSelectedItemPosition();
+	while (pos)
 	{
-		// get the selected row
-		POSITION pos = m_LogList.GetFirstSelectedItemPosition();
 		int selIndex = m_LogList.GetNextSelectedItem(pos);
-		if (selIndex < m_LogList.m_arShownList.GetCount())
-		{
-			// all ok, pick up the revision
-			GitRev* pLogEntry = reinterpret_cast<GitRev *>(m_LogList.m_arShownList.SafeGetAt(selIndex));
-			// extract the hash
-			m_sSelectedHash = pLogEntry->m_CommitHash;
-		}
+		GitRev* pLogEntry = m_LogList.m_arShownList.SafeGetAt(selIndex);
+		if (!pLogEntry)
+			continue;
+		m_sSelectedHash.push_back(pLogEntry->m_CommitHash);
 	}
 	UpdateData(FALSE);
 	SaveSplitterPos();
@@ -1617,9 +1643,9 @@ void CLogDlg::OnPasteGitHash()
 
 void CLogDlg::JumpToGitHash(CString& hash)
 {
-	for (int i = 0; i < m_LogList.m_arShownList.GetCount(); ++i)
+	for (int i = 0; i < (int)m_LogList.m_arShownList.size(); ++i)
 	{
-		GitRev* rev = (GitRev*)m_LogList.m_arShownList.SafeGetAt(i);
+		GitRev* rev = m_LogList.m_arShownList.SafeGetAt(i);
 		if (!rev) continue;
 		if (rev->m_CommitHash.ToString().Left(hash.GetLength()) != hash)
 			continue;
@@ -1672,7 +1698,7 @@ BOOL CLogDlg::PreTranslateMessage(MSG* pMsg)
 	}
 	else if (pMsg->message == WM_KEYDOWN && ((pMsg->wParam == 'V' && GetKeyState(VK_CONTROL) < 0) || (pMsg->wParam == VK_INSERT && GetKeyState(VK_SHIFT) < 0 && GetKeyState(VK_CONTROL) >= 0)) && GetKeyState(VK_MENU) >= 0)
 	{
-		if (GetFocus() != GetDlgItem(IDC_SEARCHEDIT))
+		if (GetFocus() != GetDlgItem(IDC_SEARCHEDIT) && GetFocus() != GetDlgItem(IDC_FILTER))
 		{
 			OnPasteGitHash();
 			return TRUE;
@@ -1738,13 +1764,13 @@ void CLogDlg::OnLvnItemchangedLoglist(NMHDR *pNMHDR, LRESULT *pResult)
 			m_LogList.Invalidate();
 		}
 		this->m_LogList.m_nSearchIndex = pNMLV->iItem;
-		GitRev* pLogEntry = reinterpret_cast<GitRev *>(m_LogList.m_arShownList.SafeGetAt(pNMLV->iItem));
+		GitRev* pLogEntry = m_LogList.m_arShownList.SafeGetAt(pNMLV->iItem);
 		if (pLogEntry == nullptr)
 			return;
 		m_LogList.m_lastSelectedHash = pLogEntry->m_CommitHash;
 		if (pNMLV->iSubItem != 0)
 			return;
-		if ((pNMLV->iItem == m_LogList.m_arShownList.GetCount()))
+		if (pNMLV->iItem == (int)m_LogList.m_arShownList.size())
 		{
 			// remove the selected state
 			if (pNMLV->uChanged & LVIF_STATE)
@@ -1774,11 +1800,15 @@ void CLogDlg::OnLvnItemchangedLoglist(NMHDR *pNMHDR, LRESULT *pResult)
 		UpdateData(FALSE);
 	}
 	EnableOKButton();
+	if (pNMLV->iItem < 0)
+		return;
 	UpdateLogInfoLabel();
 }
 
 void CLogDlg::OnLvnItemchangedLogmsg(NMHDR * /*pNMHDR*/, LRESULT * /*pResult*/)
 {
+	if (m_ChangedFileListCtrl.IsBusy())
+		return;
 	UpdateLogInfoLabel();
 }
 
@@ -1840,7 +1870,7 @@ void CLogDlg::OnBnClickedStatbutton()
 {
 	if (this->IsThreadRunning())
 		return;
-	if (m_LogList.m_arShownList.IsEmpty() || m_LogList.m_arShownList.GetCount() == 1 && m_LogList.m_bShowWC)
+	if (m_LogList.m_arShownList.empty() || m_LogList.m_arShownList.size() == 1 && m_LogList.m_bShowWC)
 		return;		// nothing or just the working copy changes are shown, so no statistics.
 	// the statistics dialog expects the log entries to be sorted by date
 	SortByColumn(3, false);
@@ -2355,7 +2385,7 @@ void CLogDlg::OnTimer(UINT_PTR nIDEvent)
 		KillTimer(FILEFILTER_TIMER);
 		FillLogMessageCtrl();
 	}
-	DialogEnableWindow(IDC_STATBUTTON, !(((this->IsThreadRunning())||(m_LogList.m_arShownList.IsEmpty() || m_LogList.m_arShownList.GetCount() == 1 && m_LogList.m_bShowWC))));
+	DialogEnableWindow(IDC_STATBUTTON, !(((this->IsThreadRunning())||(m_LogList.m_arShownList.empty() || m_LogList.m_arShownList.size() == 1 && m_LogList.m_bShowWC))));
 	__super::OnTimer(nIDEvent);
 }
 
@@ -2451,7 +2481,7 @@ void CLogDlg::OnBnClickedJumpUp()
 		index = m_LogList.GetNextSelectedItem(pos);
 		if (index == 0) return;
 
-		GitRev* data = (GitRev*)m_LogList.m_arShownList.SafeGetAt(index);
+		GitRev* data = m_LogList.m_arShownList.SafeGetAt(index);
 		if (jumpType == JumpType_AuthorEmail)
 			strValue = data->GetAuthorEmail();
 		else if (jumpType == JumpType_CommitterEmail)
@@ -2480,7 +2510,7 @@ void CLogDlg::OnBnClickedJumpUp()
 	for (int i = index - 1; i >= 0; i--)
 	{
 		bool found = false;
-		GitRev* data = (GitRev*)m_LogList.m_arShownList.SafeGetAt(i);
+		GitRev* data = m_LogList.m_arShownList.SafeGetAt(i);
 		if (jumpType == JumpType_AuthorEmail)
 			found = strValue == data->GetAuthorEmail();
 		else if (jumpType == JumpType_CommitterEmail)
@@ -2560,7 +2590,7 @@ void CLogDlg::OnBnClickedJumpDown()
 		index = m_LogList.GetNextSelectedItem(pos);
 		if (index == 0) return;
 
-		GitRev* data = (GitRev*)m_LogList.m_arShownList.SafeGetAt(index);
+		GitRev* data = m_LogList.m_arShownList.SafeGetAt(index);
 		if (jumpType == JumpType_AuthorEmail)
 			strValue = data->GetAuthorEmail();
 		else if (jumpType == JumpType_CommitterEmail)
@@ -2599,7 +2629,7 @@ void CLogDlg::OnBnClickedJumpDown()
 	for (int i = index + 1; i < m_LogList.GetItemCount(); ++i)
 	{
 		bool found = false;
-		GitRev* data = (GitRev*)m_LogList.m_arShownList.SafeGetAt(i);
+		GitRev* data = m_LogList.m_arShownList.SafeGetAt(i);
 		if (jumpType == JumpType_AuthorEmail)
 			found = strValue == data->GetAuthorEmail();
 		else if (jumpType == JumpType_CommitterEmail)
@@ -2788,16 +2818,16 @@ void CLogDlg::UpdateLogInfoLabel()
 	CGitHash rev2 ;
 	long selectedrevs = 0;
 	long selectedfiles = 0;
-	int count = (int)m_LogList.m_arShownList.GetCount();
+	int count = (int)m_LogList.m_arShownList.size();
 	int start = 0;
 	if (count)
 	{
-		rev1 = (reinterpret_cast<GitRev*>(m_LogList.m_arShownList.SafeGetAt(0)))->m_CommitHash;
+		rev1 = m_LogList.m_arShownList.SafeGetAt(0)->m_CommitHash;
 		if(this->m_LogList.m_bShowWC && rev1.IsEmpty()&&(count>1))
 			start = 1;
-		rev1 = (reinterpret_cast<GitRev*>(m_LogList.m_arShownList.SafeGetAt(start)))->m_CommitHash;
+		rev1 = m_LogList.m_arShownList.SafeGetAt(start)->m_CommitHash;
 		//pLogEntry = reinterpret_cast<PLOGENTRYDATA>(m_arShownList.SafeGetAt(m_arShownList.GetCount()-1));
-		rev2 =  (reinterpret_cast<GitRev*>(m_LogList.m_arShownList.SafeGetAt(count-1)))->m_CommitHash;
+		rev2 = m_LogList.m_arShownList.SafeGetAt(count - 1)->m_CommitHash;
 		selectedrevs = m_LogList.GetSelectedCount();
 		if (selectedrevs)
 			selectedfiles = m_ChangedFileListCtrl.GetSelectedCount();
@@ -2823,7 +2853,7 @@ void CLogDlg::OnDtnDropdownDatefrom(NMHDR * /*pNMHDR*/, LRESULT *pResult)
 	// the date control should not show the "today" button
 	CMonthCalCtrl * pCtrl = m_DateFrom.GetMonthCalCtrl();
 	if (pCtrl)
-		SetWindowLongPtr(pCtrl->GetSafeHwnd(), GWL_STYLE, LONG_PTR(pCtrl->GetStyle() | MCS_NOTODAY));
+		pCtrl->ModifyStyle(0, MCS_NOTODAY);
 	*pResult = 0;
 }
 
@@ -2951,7 +2981,7 @@ void CLogDlg::OnEnChangeSearchedit()
 		GetDlgItem(IDC_SEARCHEDIT)->ShowWindow(SW_HIDE);
 		GetDlgItem(IDC_SEARCHEDIT)->ShowWindow(SW_SHOW);
 		GetDlgItem(IDC_SEARCHEDIT)->SetFocus();
-		DialogEnableWindow(IDC_STATBUTTON, !(((this->IsThreadRunning())||(m_LogList.m_arShownList.IsEmpty()))));
+		DialogEnableWindow(IDC_STATBUTTON, !(this->IsThreadRunning() || m_LogList.m_arShownList.empty()));
 		return;
 	}
 	if (Validate(m_LogList.m_sFilterText))
@@ -2965,22 +2995,24 @@ void CLogDlg::OnBnClickedAllBranch()
 {
 	// m_bAllBranch is not auto-toggled by MFC, we have to handle it manually (in order to prevent the indeterminate state)
 
-	m_LogList.m_ShowMask &=~ (CGit::LOG_INFO_LOCAL_BRANCHES | CGit::LOG_INFO_ALL_BRANCH);
+	m_LogList.m_ShowMask &=~ (CGit::LOG_INFO_LOCAL_BRANCHES | CGit::LOG_INFO_BASIC_REFS | CGit::LOG_INFO_ALL_BRANCH);
 
 	if (m_bAllBranch)
 	{
 		m_bAllBranch = BST_UNCHECKED;
+		m_AllBranchType = AllBranchType::None;
 		m_ChangedFileListCtrl.m_sDisplayedBranch = m_LogList.GetRange();
 	}
 	else
 	{
 		m_bAllBranch = BST_CHECKED;
+		m_AllBranchType = AllBranchType::AllBranches;
 		m_LogList.m_ShowMask|=CGit::LOG_INFO_ALL_BRANCH;
 		m_ChangedFileListCtrl.m_sDisplayedBranch.Empty();
 	}
 
 	// need to save value here, so that log dialogs started from now on also have AllBranch activated
-	m_regbAllBranch = m_bAllBranch;
+	m_regbAllBranch = (DWORD)m_AllBranchType;
 
 	UpdateData(FALSE);
 
@@ -2995,10 +3027,12 @@ void CLogDlg::OnBnClickedFollowRenames()
 	{
 		m_LogList.m_ShowMask |= CGit::LOG_INFO_FOLLOW;
 		m_LogList.m_ShowMask &=~ CGit::LOG_INFO_LOCAL_BRANCHES;
+		m_LogList.m_ShowMask &= ~CGit::LOG_INFO_BASIC_REFS;
 		if (m_bAllBranch)
 		{
 
 			m_bAllBranch = FALSE;
+			m_AllBranchType = AllBranchType::None;
 			m_LogList.m_ShowMask &=~ CGit::LOG_INFO_ALL_BRANCH;
 		}
 
@@ -3060,8 +3094,9 @@ void CLogDlg::OnBnClickedBrowseRef()
 
 	SetRange(newRef);
 
-	m_LogList.m_ShowMask &= ~(CGit::LOG_INFO_ALL_BRANCH | CGit::LOG_INFO_LOCAL_BRANCHES);
+	m_LogList.m_ShowMask &= ~(CGit::LOG_INFO_ALL_BRANCH | CGit::LOG_INFO_BASIC_REFS | CGit::LOG_INFO_LOCAL_BRANCHES);
 	m_bAllBranch = BST_UNCHECKED;
+	m_AllBranchType = AllBranchType::None;
 	UpdateData(FALSE);
 
 	OnRefresh();
@@ -3073,12 +3108,16 @@ void CLogDlg::ShowStartRef()
 	//Show ref name on top
 	if(!::IsWindow(m_hWnd))
 		return;
-	if (m_LogList.m_ShowMask & (CGit::LOG_INFO_ALL_BRANCH | CGit::LOG_INFO_LOCAL_BRANCHES))
+	if (m_LogList.m_ShowMask & (CGit::LOG_INFO_ALL_BRANCH | CGit::LOG_INFO_BASIC_REFS | CGit::LOG_INFO_LOCAL_BRANCHES))
 	{
-		switch (m_LogList.m_ShowMask & (CGit::LOG_INFO_ALL_BRANCH | CGit::LOG_INFO_LOCAL_BRANCHES))
+		switch (m_LogList.m_ShowMask & (CGit::LOG_INFO_ALL_BRANCH | CGit::LOG_INFO_BASIC_REFS | CGit::LOG_INFO_LOCAL_BRANCHES))
 		{
 		case CGit::LOG_INFO_ALL_BRANCH:
 			m_staticRef.SetWindowText(CString(MAKEINTRESOURCE(IDS_PROC_LOG_ALLBRANCHES)));
+			break;
+
+		case CGit::LOG_INFO_BASIC_REFS:
+			m_staticRef.SetWindowText(CString(MAKEINTRESOURCE(IDS_PROC_LOG_BASIC_REFS)));
 			break;
 
 		case CGit::LOG_INFO_LOCAL_BRANCHES:
@@ -3250,7 +3289,7 @@ void CLogDlg::OnBnClickedView()
 					int moreSel = m_LogList.GetNextSelectedItem(pos);
 					if (moreSel < 0)
 					{
-						GitRev* pLogEntry = reinterpret_cast<GitRev *>(m_LogList.m_arShownList.SafeGetAt(selIndex));
+						GitRev* pLogEntry = m_LogList.m_arShownList.SafeGetAt(selIndex);
 						if (pLogEntry)
 							email = pLogEntry->GetAuthorEmail();
 					}

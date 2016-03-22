@@ -1,7 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
 // Copyright (C) 2012, 2015 - TortoiseGit
-// Copyright (C) 2010-2012 - TortoiseSVN
+// Copyright (C) 2010-2012, 2016 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -65,7 +65,7 @@ void EnsureGitLibrary(bool bCreate /* = true*/)
             return;
     }
 
-    if (SUCCEEDED(pLibrary->SetFolderType(FOLDERTYPEID_GITWC)))
+    if (SUCCEEDED(pLibrary->SetFolderType(SysInfo::Instance().IsWin8OrLater() ? FOLDERTYPEID_Documents : FOLDERTYPEID_GITWC)))
     {
         // create the path for the icon
         CString path;
@@ -100,15 +100,13 @@ HRESULT OpenShellLibrary(LPWSTR pwszLibraryName, IShellLibrary** ppShellLib)
     HRESULT hr;
     *ppShellLib = NULL;
 
-    IShellItem2* pShellItem = NULL;
+    CComPtr<IShellItem2> pShellItem = NULL;
     hr = GetShellLibraryItem(pwszLibraryName, &pShellItem);
     if (FAILED(hr))
         return hr;
 
     // Get the shell library object from the shell item with a read and write permissions
     hr = SHLoadLibraryFromItem(pShellItem, STGM_READWRITE, IID_PPV_ARGS(ppShellLib));
-
-    pShellItem->Release();
 
     return hr;
 }
@@ -127,23 +125,11 @@ HRESULT OpenShellLibrary(LPWSTR pwszLibraryName, IShellLibrary** ppShellLib)
  */
 HRESULT GetShellLibraryItem(LPWSTR pwszLibraryName, IShellItem2** ppShellItem)
 {
-    HRESULT hr = E_NOINTERFACE;
     *ppShellItem = NULL;
 
     // Create the real library file name
     WCHAR wszRealLibraryName[MAX_PATH] = {0};
     swprintf_s(wszRealLibraryName, L"%s%s", pwszLibraryName, L".library-ms");
 
-    typedef HRESULT STDAPICALLTYPE SHCreateItemInKnownFolderFN(REFKNOWNFOLDERID kfid, DWORD dwKFFlags, __in_opt PCWSTR pszItem, REFIID riid, __deref_out void **ppv);
-    CAutoLibrary hShell = AtlLoadSystemLibraryUsingFullPath(_T("shell32.dll"));
-    if (hShell)
-    {
-        SHCreateItemInKnownFolderFN *pfnSHCreateItemInKnownFolder = (SHCreateItemInKnownFolderFN*)GetProcAddress(hShell, "SHCreateItemInKnownFolder");
-        if (pfnSHCreateItemInKnownFolder)
-        {
-            hr = pfnSHCreateItemInKnownFolder(FOLDERID_UsersLibraries, KF_FLAG_DEFAULT_PATH | KF_FLAG_NO_ALIAS, wszRealLibraryName, IID_PPV_ARGS(ppShellItem));
-        }
-    }
-
-    return hr;
+    return SHCreateItemInKnownFolder(FOLDERID_UsersLibraries, KF_FLAG_DEFAULT_PATH | KF_FLAG_NO_ALIAS, wszRealLibraryName, IID_PPV_ARGS(ppShellItem));
 }

@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2012-2015 - TortoiseGit
+// Copyright (C) 2012-2016 - TortoiseGit
 // Copyright (C) 2009-2011, 2013 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -106,6 +106,10 @@ CSettingsAdvanced::CSettingsAdvanced()
 	settings[i].type	= CSettingsAdvanced::SettingTypeNumber;
 	settings[i++].def.l	= 10;
 
+	settings[i].sName	= L"PullRebaseBehaviorLike1816";
+	settings[i].type	= CSettingsAdvanced::SettingTypeBoolean;
+	settings[i++].def.b	= false;
+	
 	settings[i].sName	= L"ReaddUnselectedAddedFilesAfterCommit";
 	settings[i].type	= CSettingsAdvanced::SettingTypeBoolean;
 	settings[i++].def.b	= true;
@@ -139,10 +143,6 @@ CSettingsAdvanced::CSettingsAdvanced()
 	settings[i++].def.b	= true;
 
 	settings[i].sName	= L"StyleCommitMessages";
-	settings[i].type	= CSettingsAdvanced::SettingTypeBoolean;
-	settings[i++].def.b	= true;
-
-	settings[i].sName	= L"TGitCacheCheckContent";
 	settings[i].type	= CSettingsAdvanced::SettingTypeBoolean;
 	settings[i++].def.b	= true;
 
@@ -190,7 +190,7 @@ BOOL CSettingsAdvanced::OnInitDialog()
 	ISettingsPropPage::OnInitDialog();
 
 	m_ListCtrl.DeleteAllItems();
-	int c = ((CHeaderCtrl*)(m_ListCtrl.GetDlgItem(0)))->GetItemCount() - 1;
+	int c = m_ListCtrl.GetHeaderCtrl()->GetItemCount() - 1;
 	while (c >= 0)
 		m_ListCtrl.DeleteColumn(c--);
 
@@ -235,7 +235,7 @@ BOOL CSettingsAdvanced::OnInitDialog()
 	}
 
 	int mincol = 0;
-	int maxcol = ((CHeaderCtrl*)(m_ListCtrl.GetDlgItem(0)))->GetItemCount() - 1;
+	int maxcol = m_ListCtrl.GetHeaderCtrl()->GetItemCount() - 1;
 	int col;
 	for (col = mincol; col <= maxcol; ++col)
 	{

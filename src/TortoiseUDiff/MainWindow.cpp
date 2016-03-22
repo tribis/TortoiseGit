@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2012-2014 - TortoiseGit
+// Copyright (C) 2012-2015 - TortoiseGit
 // Copyright (C) 2003-2014 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -24,7 +24,6 @@
 #include "StringUtils.h"
 #include "TaskbarUUID.h"
 #include "CreateProcessHelper.h"
-#include "SysInfo.h"
 #include "UDiffColors.h"
 #include "registry.h"
 
@@ -527,7 +526,7 @@ std::wstring CMainWindow::GetAppDirectory()
 	do
 	{
 		bufferlen += MAX_PATH;		// MAX_PATH is not the limit here!
-		std::unique_ptr<TCHAR[]> pBuf(new TCHAR[bufferlen]);
+		auto pBuf = std::make_unique<TCHAR[]>(bufferlen);
 		len = GetModuleFileName(NULL, pBuf.get(), bufferlen);
 		path = std::wstring(pBuf.get(), len);
 	} while(len == bufferlen);
@@ -592,8 +591,7 @@ bool CMainWindow::Initialize()
 	SendEditor(SCI_SETSELFORE, TRUE, ::GetSysColor(COLOR_HIGHLIGHTTEXT));
 	SendEditor(SCI_SETSELBACK, TRUE, ::GetSysColor(COLOR_HIGHLIGHT));
 	SendEditor(SCI_SETCARETFORE, ::GetSysColor(COLOR_WINDOWTEXT));
-	CRegStdDWORD used2d(L"Software\\TortoiseGit\\ScintillaDirect2D", FALSE);
-	if (SysInfo::Instance().IsWin7OrLater() && DWORD(used2d))
+	if (CRegStdDWORD(L"Software\\TortoiseGit\\ScintillaDirect2D", FALSE) != FALSE)
 	{
 		SendEditor(SCI_SETTECHNOLOGY, SC_TECHNOLOGY_DIRECTWRITERETAIN);
 		SendEditor(SCI_SETBUFFEREDDRAW, 0);
@@ -712,7 +710,7 @@ bool CMainWindow::SaveFile(LPCTSTR filename)
 		return false;
 
 	LRESULT len = SendEditor(SCI_GETTEXT, 0, 0);
-	std::unique_ptr<char[]> data (new char[len+1]);
+	auto data = std::make_unique<char[]>(len + 1);
 	SendEditor(SCI_GETTEXT, len, reinterpret_cast<LPARAM>(static_cast<char *>(data.get())));
 	fwrite(data.get(), sizeof(char), len-1, fp);
 	fclose(fp);
@@ -725,7 +723,7 @@ bool CMainWindow::SaveFile(LPCTSTR filename)
 void CMainWindow::SetTitle(LPCTSTR title)
 {
 	size_t len = _tcslen(title);
-	std::unique_ptr<TCHAR[]> pBuf(new TCHAR[len + 40]);
+	auto pBuf = std::make_unique<TCHAR[]>(len + 40);
 	_stprintf_s(pBuf.get(), len + 40, _T("%s - TortoiseGitUDiff"), title);
 	SetWindowTitle(std::wstring(pBuf.get()));
 }

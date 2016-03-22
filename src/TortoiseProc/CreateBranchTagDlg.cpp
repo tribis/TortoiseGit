@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2016 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -112,8 +112,8 @@ BOOL CCreateBranchTagDlg::OnInitDialog()
 	{
 		sWindowTitle = CString(MAKEINTRESOURCE(IDS_PROGS_TITLE_CREATEBRANCH));
 		this->GetDlgItem(IDC_LABEL_BRANCH)->SetWindowText(CString(MAKEINTRESOURCE(IDS_PROC_BRANCH)));
-		this->GetDlgItem(IDC_EDIT_MESSAGE)->EnableWindow(FALSE);
 		this->GetDlgItem(IDC_CHECK_SIGN)->ShowWindow(SW_HIDE);
+		GetDlgItem(IDC_GROUP_MESSAGE)->SetWindowText(CString(MAKEINTRESOURCE(IDS_DESCRIPTION)));
 	}
 
 	CAppUtils::SetWindowTitle(m_hWnd, g_Git.m_CurrentDir, sWindowTitle);
@@ -143,7 +143,7 @@ void CCreateBranchTagDlg::OnBnClickedOk()
 
 	if(this->m_bSign && this->m_Message.IsEmpty())
 	{
-		CMessageBox::Show(NULL, IDS_COMMITDLG_NOMESSAGE, IDS_APPNAME, MB_OK);
+		CMessageBox::Show(GetSafeHwnd(), IDS_COMMITDLG_NOMESSAGE, IDS_APPNAME, MB_OK | MB_ICONEXCLAMATION);
 		return;
 	}
 

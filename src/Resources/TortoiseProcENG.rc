@@ -258,7 +258,7 @@ BEGIN
     CONTROL         "Set au&thor",IDC_COMMIT_SETAUTHOR,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,139,102,10
     EDITTEXT        IDC_COMMIT_AUTHORDATA,123,137,119,13,ES_AUTOHSCROLL | NOT WS_VISIBLE
     PUSHBUTTON      "Add &Signed-off-by",IDC_SIGNOFF,258,137,86,13
-    CONTROL         "",IDC_SPLITTER,"Static",SS_OWNERDRAW,6,157,346,5,WS_EX_TRANSPARENT
+    CONTROL         "",IDC_SPLITTER,"Static",SS_BLACKFRAME,6,157,346,5,WS_EX_TRANSPARENT
     LTEXT           "Check:",IDC_SELECTLABEL,14,172,41,8
     LTEXT           "&All",IDC_CHECKALL,55,172,14,8
     LTEXT           "&None",IDC_CHECKNONE,72,172,18,8
@@ -276,16 +276,16 @@ BEGIN
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,260,147,10
     RTEXT           "View Patch>>",IDC_VIEW_PATCH,259,260,76,8
     CONTROL         "Show &Whole Project",IDC_WHOLE_PROJECT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,277,109,10
-    ICON            IDI_WARNING_GENERAL,IDC_EXTERNALWARNING,323,257,20,20,SS_NOTIFY | SS_REALSIZEIMAGE | NOT WS_VISIBLE | WS_DISABLED,WS_EX_TRANSPARENT
+    ICON            IDI_WARNING_GENERAL,IDC_EXTERNALWARNING,323,257,21,20,SS_NOTIFY | SS_REALSIZEIMAGE | NOT WS_VISIBLE | WS_DISABLED,WS_EX_TRANSPARENT
     CONTROL         "Keep changelists",IDC_KEEPLISTS,"Button",BS_AUTOCHECKBOX | NOT WS_VISIBLE | WS_DISABLED | WS_TABSTOP,150,289,111,10
-    CONTROL         "Message onl&y",IDC_COMMIT_MESSAGEONLY,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,289,135,10
-    PUSHBUTTON      "&OK",IDOK,190,285,50,14,WS_DISABLED
+    CONTROL         "Message onl&y",IDC_COMMIT_MESSAGEONLY,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,289,107,10
+    PUSHBUTTON      "C&ommit",IDOK,171,285,69,14,WS_DISABLED
     PUSHBUTTON      "Cancel",IDCANCEL,247,285,50,14
     PUSHBUTTON      "Help",IDHELP,302,285,50,14
     GROUPBOX        "&Message:",IDC_MESSAGEGROUP,6,19,346,135
     GROUPBOX        "Changes made (double-click on file for diff):",IDC_LISTGROUP,6,162,346,113
     LTEXT           "",IDC_TEXT_INFO,299,105,45,8,0,WS_EX_RIGHT
-    ICON            IDI_MERGEACTIVE,IDC_MERGEACTIVE,167,285,21,20,SS_NOTIFY | SS_REALSIZEIMAGE | NOT WS_VISIBLE,WS_EX_TRANSPARENT
+    ICON            IDI_MERGEACTIVE,IDC_MERGEACTIVE,147,285,21,20,SS_NOTIFY | SS_REALSIZEIMAGE | NOT WS_VISIBLE,WS_EX_TRANSPARENT
 END
 
 IDD_PROMPT DIALOGEX 0, 0, 241, 54
@@ -828,16 +828,18 @@ FONT 8, "MS Shell Dlg", 0, 0, 0x0
 BEGIN
     LTEXT           "URL history",IDC_URLHISTORY,7,20,226,8
     PUSHBUTTON      "Clear",IDC_URLHISTCLEAR,243,18,50,14
-    LTEXT           "Log messages (Input dialog)",IDC_LOGHISTORY,7,45,226,8
-    PUSHBUTTON      "Clear",IDC_LOGHISTCLEAR,243,43,50,14
-    LTEXT           "Log messages (Show log dialog)",IDC_REPOLOG,7,70,226,8
-    PUSHBUTTON      "Clear",IDC_REPOLOGCLEAR,243,68,50,14
-    LTEXT           "Dialog sizes and positions",IDC_RESIZABLEHISTORY,7,95,226,8
-    PUSHBUTTON      "Clear",IDC_RESIZABLEHISTCLEAR,243,93,50,14
-    LTEXT           "Authentication data",IDC_AUTHHISTORY,7,120,226,8
-    PUSHBUTTON      "Clear",IDC_AUTHHISTCLEAR,243,118,50,14
-    LTEXT           "Temp files (including Gravatar images)",IDC_STATIC,7,148,286,30
-    PUSHBUTTON      "Clear",IDC_TEMPFILESCLEAR,243,146,50,14
+    LTEXT           "Log messages (Input dialog)",IDC_LOGHISTORY,7,42,226,8
+    PUSHBUTTON      "Clear",IDC_LOGHISTCLEAR,243,40,50,14
+    LTEXT           "Log messages (Show log dialog)",IDC_REPOLOG,7,64,226,8
+    PUSHBUTTON      "Clear",IDC_REPOLOGCLEAR,243,62,50,14
+    LTEXT           "Dialog sizes and positions",IDC_RESIZABLEHISTORY,7,86,226,8
+    PUSHBUTTON      "Clear",IDC_RESIZABLEHISTCLEAR,243,84,50,14
+    LTEXT           "Authentication data",IDC_AUTHHISTORY,7,108,226,8
+    PUSHBUTTON      "Clear",IDC_AUTHHISTCLEAR,243,106,50,14
+    LTEXT           "Temp files (including Gravatar images)",IDC_STATIC,7,130,226,10
+    PUSHBUTTON      "Clear",IDC_TEMPFILESCLEAR,243,128,50,14
+    LTEXT           "Stored decisions",IDC_STOREDDECISIONS,7,151,226,10
+    PUSHBUTTON      "Clear",IDC_STOREDDECISIONSCLEAR,243,149,50,14
     GROUPBOX        "Action log",IDC_STATIC,7,173,286,30
     LTEXT           "Max. lines in action log",IDC_STATIC,13,185,120,16
     EDITTEXT        IDC_MAXLINES,139,183,40,14,ES_RIGHT | ES_AUTOHSCROLL
@@ -1068,7 +1070,7 @@ CAPTION "Advanced"
 FONT 8, "MS Shell Dlg", 400, 0, 0x0
 BEGIN
     CONTROL         "",IDC_CONFIG,"SysListView32",LVS_REPORT | LVS_EDITLABELS | LVS_ALIGNLEFT | WS_BORDER | WS_TABSTOP,7,7,286,145
-    LTEXT           "WARNING:\r\nOnly change these settings if you are absolutely sure what you are doing!\r\nTo set the values to their default, delete the value text.",IDC_STATIC,7,160,286,50
+    LTEXT           "WARNING:\nOnly change these settings if you are absolutely sure what you are doing!\nTo set the values to their default, delete the value text.",IDC_STATIC,7,160,286,50
 END
 
 IDD_CLONE DIALOGEX 0, 0, 359, 218
@@ -1118,7 +1120,7 @@ EXSTYLE WS_EX_WINDOWEDGE | WS_EX_APPWINDOW
 CAPTION "Git Command Progress"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    DEFPUSHBUTTON   "&Close",IDOK,200,168,50,14,WS_DISABLED
+    DEFPUSHBUTTON   "Close",IDOK,200,168,50,14,WS_DISABLED
     PUSHBUTTON      "Abort",IDCANCEL,266,168,50,14,WS_DISABLED
     CONTROL         "",IDC_TITLE_ANIMATE,"SysAnimate32",ACS_TRANSPARENT | ACS_AUTOPLAY | WS_TABSTOP,6,7,318,38,WS_EX_TRANSPARENT
     CONTROL         "",IDC_RUN_PROGRESS,"msctls_progress32",PBS_SMOOTH | WS_BORDER,6,63,318,14
@@ -1305,14 +1307,14 @@ BEGIN
     CONTROL         "&ignore space change",IDC_CHECK_IGNORE_SPACE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,73,108,82,10
     CONTROL         "Add ""&Signed-off-by""",IDC_SIGN_OFF,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,166,108,87,10
     CONTROL         "&Keep CR",IDC_KEEP_CR,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,258,108,43,10
-    CONTROL         "",IDC_AM_SPLIT,"Static",SS_OWNERDRAW,7,121,362,6,WS_EX_TRANSPARENT
+    CONTROL         "",IDC_AM_SPLIT,"Static",SS_BLACKFRAME,7,121,362,6,WS_EX_TRANSPARENT
     PUSHBUTTON      "Dumy Group For locat TabCtr",IDC_AM_DUMY_TAB,7,130,362,109,NOT WS_VISIBLE
     DEFPUSHBUTTON   "A&pply",IDOK,202,244,50,14
     PUSHBUTTON      "&Cancel",IDCANCEL,259,244,50,14
     PUSHBUTTON      "Help",IDHELP,319,244,50,14
 END
 
-IDD_FORMAT_PATCH DIALOGEX 0, 0, 321, 178
+IDD_FORMAT_PATCH DIALOGEX 0, 0, 321, 193
 STYLE DS_SETFONT | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
 CAPTION "Format Patch"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
@@ -1336,10 +1338,11 @@ BEGIN
     CONTROL         "",IDC_COMBOBOXEX_TO,"ComboBoxEx32",CBS_DROPDOWN | CBS_AUTOHSCROLL | CBS_SORT | WS_VSCROLL | WS_TABSTOP,94,119,186,68
     PUSHBUTTON      "...",IDC_BUTTON_TO,287,118,15,14
     CONTROL         "Send Mail after create",IDC_CHECK_SENDMAIL,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,145,166,10
-    PUSHBUTTON      "Save unified diff since HEAD",IDC_BUTTON_UNIFIEDDIFF,16,157,117,14
-    DEFPUSHBUTTON   "OK",IDOK,159,157,50,14
-    PUSHBUTTON      "Cancel",IDCANCEL,211,157,50,14
-    PUSHBUTTON      "Help",IDHELP,264,157,50,14
+    CONTROL         "No a/ and b/ prefixes",IDC_CHECK_NOPREFIX,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,159,298,10
+    PUSHBUTTON      "Save unified diff since HEAD",IDC_BUTTON_UNIFIEDDIFF,16,172,117,14
+    DEFPUSHBUTTON   "OK",IDOK,159,172,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,211,172,50,14
+    PUSHBUTTON      "Help",IDHELP,264,172,50,14
 END
 
 IDD_MERGE DIALOGEX 0, 0, 328, 260
@@ -1473,14 +1476,16 @@ BEGIN
     PUSHBUTTON      "Button1",IDC_SPLITALLOPTIONS,7,113,102,14
     PUSHBUTTON      "Up",IDC_BUTTON_UP2,116,113,33,14
     PUSHBUTTON      "Down",IDC_BUTTON_DOWN2,156,113,33,14
+    CONTROL         "&Preserve merges",IDC_REBASE_CHECK_PRESERVEMERGES,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,195,115,96,10
     CONTROL         "&Force Rebase",IDC_REBASE_CHECK_FORCE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,293,115,116,10
-    CONTROL         "add ""cherry picked from""",IDC_CHECK_CHERRYPICKED_FROM,
+    CONTROL         "&add ""cherry picked from""",IDC_CHECK_CHERRYPICKED_FROM,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,293,115,116,9
-    CONTROL         "",IDC_REBASE_SPLIT,"Static",SS_OWNERDRAW,7,129,402,6,WS_EX_TRANSPARENT
+    CONTROL         "",IDC_REBASE_SPLIT,"Static",SS_BLACKFRAME,7,129,402,6,WS_EX_TRANSPARENT
     PUSHBUTTON      "Dumy Group For locat TabCtr",IDC_REBASE_DUMY_TAB,7,137,402,64,NOT WS_VISIBLE
     CONTROL         "",IDC_REBASE_PROGRESS,"msctls_progress32",WS_BORDER,7,204,402,7
     LTEXT           "",IDC_STATUS_STATIC,7,215,201,8
-    CONTROL         "Edit/Split commit",IDC_REBASE_SPLIT_COMMIT,"Button",BS_AUTOCHECKBOX | NOT WS_VISIBLE | WS_TABSTOP,122,219,91,10
+    CONTROL         "&Edit/Split commit",IDC_REBASE_SPLIT_COMMIT,"Button",BS_AUTOCHECKBOX | NOT WS_VISIBLE | WS_TABSTOP,122,219,91,10
     DEFPUSHBUTTON   "Continue",IDC_REBASE_CONTINUE,213,217,63,14
     PUSHBUTTON      "Abort",IDC_REBASE_ABORT,285,217,57,14
     PUSHBUTTON      "Help",IDHELP,351,217,58,14
@@ -3238,7 +3243,7 @@ END
 
 STRINGTABLE
 BEGIN
-    IDS_PROC_LOG_STATS      "Showing %ld revision(s), from revision %s to revision %s - %ld revision(s) selected, %ld file(s) selected\r\n"
+    IDS_PROC_LOG_STATS      "Showing %ld revision(s), from revision %s to revision %s - %ld revision(s) selected, %ld file(s) selected"
     IDS_PROC_LOG_ALLBRANCHES "<All Branches>"
     IDS_PROC_LOG_NOBRANCH   "<No branch>"
     IDS_SETTINGS_CREATELIB_TT 
@@ -3382,7 +3387,7 @@ BEGIN
     IDS_SETTINGS_SELECTDIFFVIEWER "Select viewer for diff-files"
     IDS_SETTINGS_SELECTMERGE "Select merge application"
     IDS_SETTINGS_SELECTSSH  "Select SSH client"
-    IDS_SETTINGS_EXTDIFF_TT "An external diff program used\r\nfor comparing different revisions of files\r\n\r\nYou can specify the following parameters to the path:\r\n%base: the base file\r\n%mine: the modified file"
+    IDS_SETTINGS_EXTDIFF_TT "An external diff program used\nfor comparing different revisions of files\n\nYou can specify the following parameters to the path:\n%base: the base file\n%mine: the modified file"
     IDS_SETTINGS_EXTDIFFBROWSE_TT "Browse for the external diff program"
     IDS_PROC_BROWSEREFS_FETCHFROM "Fetch from ""%s"""
 END
@@ -3392,10 +3397,10 @@ BEGIN
     IDS_MSYSGIT_PATH_TT     "Git Install Path"
     IDS_PROC_BROWSEREFS_COMPAREREFS "Compare selected refs"
     IDS_SETTINGS_EXTMERGE_TT 
-                            "An external merge program used\r\nto resolve conflicted files.\r\n\r\nYou can specify the following parameters to the path:\r\n%merged: the conflicted file, where to save\r\n%theirs: the file as it is in the repository\r\n%mine: your own file, with your changes\r\n%base: the original file without your changes"
+                            "An external merge program used\nto resolve conflicted files.\n\nYou can specify the following parameters to the path:\n%merged: the conflicted file, where to save\n%theirs: the file as it is in the repository\n%mine: your own file, with your changes\n%base: the original file without your changes"
     IDS_SETTINGS_PROXYSERVER_TT "Either the name or IP of the proxy server"
     IDS_SETTINGS_DIFFVIEWER_TT 
-                            "A viewer program for GNU diff files (patch files).\r\nIf you don't have one use NotePad."
+                            "A viewer program for GNU diff files (patch files).\nIf you don't have one use NotePad."
     IDS_SETTINGS_AUTOCLOSE_TT 
                             "Select the behaviour of the progress dialog at the end of the operation."
     IDS_PROC_BROWSEREFS_RENAME "Rename"
@@ -3500,7 +3505,7 @@ BEGIN
     IDS_PROC_TASKS          "Tasks"
     IDS_STATUSLIST_CONTEXT_COMPARETWOFILES "Compare two files"
     IDS_B_T_INVALID         "Branch/Tag name is invalid."
-    IDS_B_T_LOCALEMPTY      "The local branch/tag name is empty. This results in a remote removal.\r\nContinue?"
+    IDS_B_T_LOCALEMPTY      "The local branch/tag name is empty. This results in a remote removal.\nContinue?"
     IDS_B_T_BOTHEMPTY       "The local branch name and the remote branch name are empty.\nContinue?"
 END
 
@@ -3562,10 +3567,10 @@ BEGIN
                             "To avoid fetching wrong tags, if this is not an official remote,\nyou are advised to disable tag fetching for this remote.\nDisable tag fetching?"
     IDS_COMMITDLG_POPUP_PICKCOMMITHASH "Pick commit &hash"
     IDS_COMMITDLG_POPUP_PICKCOMMITMESSAGE "Pick commit &message"
-    IDS_REPOBROWSE_INFO     "%1!s!\r\nShowing %2!d! files, %3!d! submodules and %4!d! folders, %5!d! items in total"
-    IDS_REPOBROWSE_INFOEXT  "Submodule ""%1!s!""\r\nRevision %2!s!"
+    IDS_REPOBROWSE_INFO     "%1!s!\nShowing %2!d! files, %3!d! submodules and %4!d! folders, %5!d! items in total"
+    IDS_REPOBROWSE_INFOEXT  "Submodule ""%1!s!""\nRevision %2!s!"
     IDS_REPOBROWSE_INFODIR  "%1!s!"
-    IDS_REPOBROWSE_INFOFILE "%1!s!\r\nSize %2!s!"
+    IDS_REPOBROWSE_INFOFILE "%1!s!\nSize %2!s!"
     IDS_REPOBROWSE_INFOMULTI "%1!d! items selected"
     IDS_SETTINGS_ENABLEGRAVATAR_TT 
                             "Enable showing Gravatar image in Log Dialog"
@@ -3613,7 +3618,7 @@ END
 
 STRINGTABLE
 BEGIN
-    IDS_ABOUTVERSION        "TortoiseGit %d.%d.%d.%d %s \r\n%s \r\n"
+    IDS_ABOUTVERSION        "TortoiseGit %d.%d.%d.%d %s\n%s\n"
     IDS_ABOUTVERSIONBOX     "TortoiseGit %d.%d.%d, Build %d - %s, %s"
 END
 
@@ -3672,7 +3677,7 @@ BEGIN
     IDS_ERR_COPYITSELF      "Can't copy \n%s\nto\n%s"
     IDS_ERR_INVALIDREV      "Invalid revision number!"
     IDS_SUBMODULE_EMPTYDIFF "No differences found! Submodule may not be updated. Update submodule now?"
-    IDS_ERR_NOTHINGTOADD    "There is nothing to add. All the files and folders are either under version control, have been ignored or the global ignore configuration setting."
+    IDS_ERR_NOTHINGTOADD    "There is nothing to add.\nAll the files and folders are either under version control,\nhave been ignored or the global ignore configuration setting."
     IDS_ERR_ERROR           "Error"
     IDS_ERR_NOVALIDPATH     "This is not a valid path!\nA valid path must not contain '<<>|""?*:' or one of the following device names:\ncom1-com9, lpt1-lpt9, prn, aux, con, nul, clock$"
     IDS_ERR_FAILEDUNIGNOREPROPERTY "Could not remove %s from the ignore list"
@@ -3713,7 +3718,7 @@ BEGIN
     IDS_COMMIT_MESSAGEONLY_TT 
                             "Allows to create an empty commit which only has a commit message and no files (cf. git commit --allow-empty)."
     IDS_DISABLEUPDATECHECKSBUTTON "Disable update checks"
-    IDS_DISABLEUPDATECHECKS "Do you really want to disable automatic update checks for TortoiseGit?\r\n\r\nAutomatic update checks can be re-enabled in TortoiseGit settings on the General page."
+    IDS_DISABLEUPDATECHECKS "Do you really want to disable automatic update checks for TortoiseGit?\n\nAutomatic update checks can be re-enabled in TortoiseGit settings on the General page."
     IDS_SETTINGS_DELFILE    "Deleting file"
     IDS_REMINDMELATER       "&Remind me later"
     IDS_SETTINGS_DELCACHE   "Deleting cached data"
@@ -3816,7 +3821,7 @@ BEGIN
     IDS_SETTINGS_MENULAYOUT_TT 
                             "Check those menu entries you want to appear in the top context menu instead of the TortoiseGit submenu"
     IDS_SETTINGS_EXCLUDELIST_TT 
-                            "A newline separated list of paths for which no icon overlays are shown.\r\nIf you add an '*' char at the end of a path, then all files and subdirs inside that path are excluded too.\r\nAn empty list will allow overlays on all paths."
+                            "A newline separated list of paths for which no icon overlays are shown.\nIf you add an '*' char at the end of a path, then all files and subdirs inside that path are excluded too.\nAn empty list will allow overlays on all paths."
 END
 
 STRINGTABLE
@@ -3856,8 +3861,8 @@ BEGIN
     IDS_STATUSLIST_COLREVISION "Revision"
     IDS_STATUSLIST_COLMODIFICATIONDATE "Modification date"
     IDS_STATUSLIST_COLFILENAME "Filename"
-    IDS_STATUSLIST_COPYFROM "copied from\r\n%s - revision %ld"
-    IDS_STATUSLIST_SWITCHEDTO "switched to\r\n%s"
+    IDS_STATUSLIST_COPYFROM "copied from\n%s - revision %ld"
+    IDS_STATUSLIST_SWITCHEDTO "switched to\n%s"
 END
 
 STRINGTABLE
@@ -3876,19 +3881,19 @@ END
 STRINGTABLE
 BEGIN
     IDS_SETTINGS_INCLUDELIST_TT 
-                            "A newline separated list of paths for which icon overlays are shown.\r\nIf you add an '*' char at the end of a path, then all files and subdirs inside that path are included too."
+                            "A newline separated list of paths for which icon overlays are shown.\nIf you add an '*' char at the end of a path, then all files and subdirs inside that path are included too."
     IDS_SETTINGS_CLEARAUTH_TT 
-                            "Clears the stored authentication.\r\nYou will have to enter your username/password again for all repositories."
+                            "Clears the stored authentication.\nYou will have to enter your username/password again for all repositories."
     IDS_SETTINGS_ICONSETCHANGED 
                             "You've changed the icon set from <i>%s</i> to <i>%s</i>.\nThat change won't take effect until you restart your computer or logoff and logon again!"
     IDS_SETTINGS_READONLYNAME "assume-valid"
     IDS_SETTINGS_LOCKEDNAME "skip-worktree"
     IDS_SETTINGS_AUTOCOMPLETION_TT 
-                            "Auto-complete suggests words (usually class or member names)\r\nfrom the files that you have changed as you type a log message."
+                            "Auto-complete suggests words (usually class or member names)\nfrom the files that you have changed as you type a log message."
     IDS_SETTINGS_AUTOCOMPLETIONTIMEOUT_TT 
-                            "The time in seconds after which the parsing of the selected files stops.\r\nA lower value will make the auto-completion list available sooner,\r\nbut maybe not scan all files."
+                            "The time in seconds after which the parsing of the selected files stops.\nA lower value will make the auto-completion list available sooner,\nbut maybe not scan all files."
     IDS_SETTINGS_RECURSIVE_TT 
-                            "Disable this option if you have really big working trees and experience\r\ntoo much disk access when browsing the working tree."
+                            "Disable this option if you have really big working trees and experience\ntoo much disk access when browsing the working tree."
 END
 
 STRINGTABLE
@@ -4063,7 +4068,7 @@ END
 STRINGTABLE
 BEGIN
     IDS_SETTINGS_UNVERSIONEDRECURSE_TT 
-                            "If set, files inside unversioned folders can be shown in the status control.\r\nThe status control is used for example in the commit dialog."
+                            "If set, files inside unversioned folders can be shown in the status control.\nThe status control is used for example in the commit dialog."
     IDS_SETTINGS_MAXHISTORY_TT 
                             "Specifies how many items you want to keep in the most recent log messages dialog."
     IDS_SETTINGS_CACHEDEFAULT_TT 
@@ -4083,9 +4088,9 @@ BEGIN
     IDS_SETTINGS_RESTARTSYSTEM 
                             "You must restart your system for the changes to take effect."
     IDS_SETTINGS_UNVERSIONEDASMODIFIED_TT 
-                            "If set, then unversioned files will mark the status of the parent directory as modified\r\ni.e. they get the modified overlay icon."
+                            "If set, then unversioned files will mark the status of the parent directory as modified\ni.e. they get the modified overlay icon."
     IDS_SETTINGS_COMMITREOPEN_TT 
-                            "If checked, the commit dialog will be started again automatically after an error,\r\nwhile preserving your last selection and log message."
+                            "If checked, the commit dialog will be started again automatically after an error,\nwhile preserving your last selection and log message."
 END
 
 STRINGTABLE
@@ -4109,7 +4114,7 @@ STRINGTABLE
 BEGIN
     IDS_LOG_FILTER_BUGIDS   "Bug-IDs"
     IDS_LOG_FILTER_CASESENSITIVE "Case-sensitive"
-    IDS_LOG_FILTER_REGEX_TT "Regular expressions filter:\r\n.   : any character\r\nc+   : match character c one or more times\r\nc*   : match character c zero or more times\r\n^   : start of line\r\n$   : end of line\r\n(string){n} : match string n times\r\n(abcd)   : subexpression\r\n[aei0-9]   : match a,e,i and 0..9\r\n[^aei0-9] : anything but a,e,i and 0..9\r\n\r\n\\w   : matches a-z,A-Z,0-9 and _\r\n\\W   : any non-alphanumeric character\r\n\\d   : digits 0-9\r\n\\s   : whitespaces"
+    IDS_LOG_FILTER_REGEX_TT "Regular expressions filter:\n.   : any character\nc+   : match character c one or more times\nc*   : match character c zero or more times\n^   : start of line\n$   : end of line\n(string){n} : match string n times\n(abcd)   : subexpression\n[aei0-9]   : match a,e,i and 0..9\n[^aei0-9] : anything but a,e,i and 0..9\n\n\\w   : matches a-z,A-Z,0-9 and _\n\\W   : any non-alphanumeric character\n\\d   : digits 0-9\n\\s   : whitespaces"
 END
 
 STRINGTABLE
@@ -4117,7 +4122,7 @@ BEGIN
     IDS_PROC_CHERRYPICKFAILED "Cherry Pick failed"
     IDS_PROC_NOPARENT       "Parent %d does not exist"
     IDS_PROC_NOPREVIOUSVERSION "No previous version."
-    IDS_PROC_CANNOTCOMBINE  "Cannot combine commits now.\r\nMake sure you are viewing the log of your current branch and no filters are applied."
+    IDS_PROC_CANNOTCOMBINE  "Cannot combine commits now.\nMake sure you are viewing the log of your current branch and no filters are applied."
     IDS_PROC_COMBINE_ERRORSTEP1 
                             "Could not reset to first commit (first step). Aborting..."
     IDS_PROC_COMBINE_ERRORSTEP2 
@@ -4125,7 +4130,7 @@ BEGIN
     IDS_REG_ERROR           "Error while reading/writing the registry key %s\n%s"
     IDS_PROC_COMBINE_ERRORRESETHEAD "Could not reset to original HEAD."
     IDS_PROC_DELETENREFS    "Do you really want to permanently delete the %d selected refs? It can <ct=0x0000FF><b>NOT</b></ct> be recovered!"
-    IDS_PROC_DELETEREF      "Warning: ""%s"" will be permanently deleted. It can <ct=0x0000FF><b>NOT</b></ct> be recovered!\r\n\r\nDo you really want to continue?"
+    IDS_PROC_DELETEREF      "Warning: ""%s"" will be permanently deleted. It can <ct=0x0000FF><b>NOT</b></ct> be recovered!\n\nDo you really want to continue?"
     IDS_DELETEBUTTON        "&Delete"
     IDS_PROC_DELETEREMOTEBRANCH 
                             "The branch ""%s"" is a <i>remote</i> branch.\n\nDo you really want to <ct=0x0000FF>delete</ct> it?"
@@ -4201,7 +4206,7 @@ BEGIN
     IDS_SETTINGS_USERECYCLEBIN_TT 
                             "Moves the modified files to the recycle bin first before reverting"
     IDS_SETTINGS_EXCLUDECONTEXTLIST_TT 
-                            "A newline separated list of paths for which no context menu is shown.\r\nIf you add an '*' char at the end of a path, then all files and subdirs inside that path are excluded too.\r\nAn empty list will allow the context menu on all paths."
+                            "A newline separated list of paths for which no context menu is shown.\nIf you add an '*' char at the end of a path, then all files and subdirs inside that path are excluded too.\nAn empty list will allow the context menu on all paths."
     IDS_SETTINGS_CACHESHELLEXT_TT 
                             "Status cache for only one folder, with full status and recursive overlays"
     IDS_SETTINGS_HOOKS_SELECTFOLDERPATH "Select folder to run script for"
@@ -4327,16 +4332,16 @@ BEGIN
     IDS_ERROR_NOTHING_COMMIT "Nothing to commit"
     IDS_COMMIT_FINISH       "Commit Finish"
     IDS_COMMITDLG_POPUP_LOGHISTORY "Paste r&ecent message..."
-    IDS_REBASE_UPTODATE_FMT "Current branch %s is up to date\r\n\r\n If you want to force the rebase even if the current branch is a descendant of the commit you are rebasing onto, please check below ""Force Rebase"" checkbox."
-    IDS_REBASE_FORCE_TT     "Force the rebase even if the current branch is a descendant of the commit you are rebasing onto. \r\nNormally the command will exit with the message ""Current branch is up to date"" in such a situation."
+    IDS_REBASE_UPTODATE_FMT "Current branch %s is up to date\n\nIf you want to force the rebase even if the current branch is a descendant of the commit you are rebasing onto, please check below ""Force Rebase"" checkbox."
+    IDS_REBASE_FORCE_TT     "Force the rebase even if the current branch is a descendant of the commit you are rebasing onto.\nNormally the command will exit with the message ""Current branch is up to date"" in such a situation."
     IDS_REBASE_ABORT_TT     "Recover to the status before rebase"
 END
 
 STRINGTABLE
 BEGIN
     IDS_REBASE_FASTFORWARD_FMT 
-                            "Branch %s behind %s\r\n%s will fastforward to %s"
-    IDS_REBASE_EQUAL_FMT    "Nothing need rebase\r\n%s equal %s"
+                            "Branch %s behind %s\n%s will fastforward to %s"
+    IDS_REBASE_EQUAL_FMT    "Nothing need rebase\n%s equal %s"
     IDS_CLONE_DEPTH_TT      "Create a shallow clone with a history truncated to the specified number of revisions. A shallow repository has a number of limitations (you cannot clone or fetch from it, nor push from nor into it), but is adequate if you are only interested in the recent history of a large project with a long history, and would want to send in fixes as patches."
     IDS_HOOKTYPE_PREPUSH    "Pre-Push Hook"
     IDS_HOOKTYPE_POSTPUSH   "Post-Push Hook"
@@ -4360,7 +4365,7 @@ BEGIN
     IDS_MENUCREATERESTORE   "Restore after commit"
     IDS_PROC_SUBMODULESUPDATE "Update Submodules"
     IDS_NOWORKINGCOPY       "No working directory found."
-    IDS_PROCEXPORTERRFOLDER "You selected a folder.\r\nExports are only possible to a (zip) file."
+    IDS_PROCEXPORTERRFOLDER "You selected a folder.\nExports are only possible to a (zip) file."
     IDS_PROC_NOZIPFILE      "You must select a filename for the zip-file!"
     IDS_PROC_KEEPFILELOCAL  "Keep file locally?"
     IDS_PROC_FILESREMOVED   "%d files removed."
@@ -4443,7 +4448,7 @@ BEGIN
     IDS_PROC_COMMIT_RECOMMIT "&ReCommit"
     IDS_PROC_STASHFAILED    "<ct=0x0000FF>Stash failed!!!</ct>"
     IDS_PROC_STASHSUCCESS   "<ct=0xff0000>Stash Success</ct>"
-    IDS_PROC_NOUSERDATA     "User name and email must be set before commit.\r\n Do you want to set these now?"
+    IDS_PROC_NOUSERDATA     "User name and email must be set before commit.\nDo you want to set these now?"
     IDS_PROC_PREVIOUSVERSION "Previous Version"
     IDS_PROC_REFINVALID     """%s"" is invalid."
     IDS_IGNOREBUTTON        "&Ignore"
@@ -4726,6 +4731,22 @@ STRINGTABLE
 BEGIN
     IDS_GLOBAL_GCM          "manager - current Windows user"
     IDS_SYSTEM_GCM          "manager - all Windows users"
+    IDS_COMMIT_MERGE_HINT   "The commit you are composing is a special commit. It is a merge commit and, thus contains your changes as well as the changes of a merged branch.\n\nYou should NOT uncheck files unless you know what you are doing.\n\nWhile merging conflicts can occur which need to be resolved manually (i.e., integrate your changes into a file which was also modified on another branch).\n\nSee help for more information."
+    IDS_REBASE_PRESERVEMERGES_TT 
+                            "This preserves merge commits, however, it has known bugs as re-ordering commits is not working properly (same limitation as for vanilla git rebase), see help."
+    IDS_PROC_LOG_BASIC_REFS "<Basic Refs>"
+    IDS_PROC_LOG_SELECT_BASIC_REFS "All basic refs"
+    IDS_CHERRYPICK_MERGECOMMIT 
+                            """%s"" - ""%s""\nis a merge commit.\n\nWhich parent do you want to pick?"
+    IDS_COMMIT_COMMIT       "C&ommit"
+    IDS_COMMIT_RECOMMIT     "&ReCommit"
+    IDS_COMMIT_COMMITPUSH   "Commit && &Push"
+    IDS_DROPONESTASH        "Drop one stash"
+    IDS_PROC_PULL_EMPTYBRANCH 
+                            "You asked to pull, but did not specify a remote branch."
+    IDS_PROC_SYNC_FETCHALL  "Fetch all refs"
+    IDS_NOTYET_SETTRACKEDBRANCH 
+                            "For the current branch ""%s"" no tracked branch is configured.\nDo you want to set the selected branch ""%s"" as tracked branch?\nThis will automatically select it for push and pull in the future."
 END
 
 #endif    // English (U.S.) resources

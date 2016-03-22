@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2016 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -51,6 +51,7 @@ CCloneDlg::CCloneDlg(CWnd* pParent /*=NULL*/)
 
 	m_regBrowseUrl = CRegDWORD(_T("Software\\TortoiseGit\\TortoiseProc\\CloneBrowse"),0);
 	m_regCloneDir = CRegString(_T("Software\\TortoiseGit\\TortoiseProc\\CloneDir"));
+	m_regCloneRecursive = CRegDWORD(_T("Software\\TortoiseGit\\TortoiseProc\\CloneRecursive"), FALSE);
 	m_regUseSSHKey = CRegDWORD(_T("Software\\TortoiseGit\\TortoiseProc\\CloneUseSSHKey"), TRUE);
 	m_nSVNFrom = 0;
 
@@ -149,6 +150,7 @@ BOOL CCloneDlg::OnInitDialog()
 		if (SUCCEEDED(SHGetFolderPath(NULL, CSIDL_PERSONAL | CSIDL_FLAG_CREATE, NULL, SHGFP_TYPE_CURRENT, szPath)))
 			m_Directory = szPath;
 	}
+	m_bRecursive = m_regCloneRecursive;
 	UpdateData(FALSE);
 
 	m_URLCombo.SetCaseSensitive(TRUE);
@@ -221,7 +223,7 @@ void CCloneDlg::OnOK()
 	UpdateData(TRUE);
 	if(m_URL.IsEmpty() || m_Directory.IsEmpty())
 	{
-		CMessageBox::Show(NULL, IDS_PROC_CLONE_URLDIREMPTY, IDS_APPNAME, MB_OK);
+		CMessageBox::Show(GetSafeHwnd(), IDS_PROC_CLONE_URLDIREMPTY, IDS_APPNAME, MB_OK | MB_ICONEXCLAMATION);
 		m_bSaving = false;
 		return;
 	}
@@ -244,6 +246,7 @@ void CCloneDlg::OnOK()
 	m_PuttyKeyCombo.SaveHistory();
 	m_regCloneDir = m_Directory;
 	m_regUseSSHKey = m_bAutoloadPuttyKeyFile;
+	m_regCloneRecursive = m_bRecursive;
 
 	this->m_PuttyKeyCombo.GetWindowText(m_strPuttyKeyFile);
 	CResizableDialog::OnOK();
@@ -272,7 +275,7 @@ void CCloneDlg::OnBnClickedCloneBrowseUrl()
 		str.Trim();
 		if (str.IsEmpty())
 		{
-			CMessageBox::Show(GetSafeHwnd(), IDS_PROC_CLONE_URLDIREMPTY, IDS_APPNAME, MB_ICONERROR);
+			CMessageBox::Show(GetSafeHwnd(), IDS_PROC_CLONE_URLDIREMPTY, IDS_APPNAME, MB_ICONEXCLAMATION);
 			return;
 		}
 		if (CAppUtils::ExploreTo(GetSafeHwnd(), str) && (INT_PTR)ShellExecute(nullptr, _T("open"), str, nullptr, nullptr, SW_SHOW) <= 32)

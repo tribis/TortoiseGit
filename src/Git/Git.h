@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2016 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -209,7 +209,7 @@ public:
 	CString GetGitGlobalXDGConfigPath() const;
 	CString GetGitGlobalXDGConfig() const;
 	CString GetGitSystemConfig() const;
-	git_repository * GetGitRepository() const;
+	CAutoRepository GetGitRepository() const;
 	static CStringA GetGitPathStringA(const CString &path);
 	static CString ms_LastMsysGitDir;	// the last msysgitdir added to the path, blank if none
 	static CString ms_MsysGitRootDir;
@@ -244,7 +244,7 @@ private:
 		HANDLE fileHandle;
 		CGitCall* pcall;
 	} ASYNCREADSTDERRTHREADARGS, *PASYNCREADSTDERRTHREADARGS;
-	CString GetUnifiedDiffCmd(const CTGitPath& path, const git_revnum_t& rev1, const git_revnum_t& rev2, bool bMerge, bool bCombine, int diffContext);
+	CString GetUnifiedDiffCmd(const CTGitPath& path, const git_revnum_t& rev1, const git_revnum_t& rev2, bool bMerge, bool bCombine, int diffContext, bool bNoPrefix = false);
 
 public:
 	int RunAsync(CString cmd, PROCESS_INFORMATION *pi, HANDLE* hRead, HANDLE *hErrReadOut, CString *StdioFile = NULL);
@@ -335,12 +335,14 @@ public:
 		LOG_INFO_FULL_DIFF = 0x2000,
 		LOG_INFO_SIMPILFY_BY_DECORATION = 0x4000, 
 		LOG_INFO_LOCAL_BRANCHES = 0x8000,
+		LOG_INFO_BASIC_REFS = 0x10000,
 	}LOG_INFO_MASK;
 
 	typedef enum
 	{
 		LOCAL_BRANCH,
 		REMOTE_BRANCH,
+		ANNOTATED_TAG,
 		TAG,
 		STASH,
 		BISECT_GOOD,
@@ -386,6 +388,8 @@ public:
 	int HasWorkingTreeConflicts();
 	/** Returns 0 if no conflict, if a conflict was found and -1 in case of a failure */
 	int HasWorkingTreeConflicts(git_repository* repo);
+	int IsRebaseRunning();
+	void GetBisectTerms(CString* good, CString* bad);
 	int GetRefList(STRING_VECTOR &list);
 
 	int RefreshGitIndex();
@@ -429,7 +433,7 @@ public:
 
 	int GetShortHASHLength() const;
 
-	static BOOL GetShortName(const CString &ref, CString &shortname, CString prefix)
+	static BOOL GetShortName(const CString& ref, CString& shortname, const CString& prefix)
 	{
 		//TRACE(_T("%s %s\r\n"),ref,prefix);
 		if (ref.Left(prefix.GetLength()) ==  prefix)
@@ -446,10 +450,12 @@ public:
 
 	static bool LoadTextFile(const CString &filename, CString &msg);
 
-	int GetUnifiedDiff(const CTGitPath& path, const git_revnum_t& rev1, const git_revnum_t& rev2, CString patchfile, bool bMerge, bool bCombine, int diffContext);
+	int GetUnifiedDiff(const CTGitPath& path, const git_revnum_t& rev1, const git_revnum_t& rev2, CString patchfile, bool bMerge, bool bCombine, int diffContext, bool bNoPrefix = false);
 	int GetUnifiedDiff(const CTGitPath& path, const git_revnum_t& rev1, const git_revnum_t& rev2, CStringA * buffer, bool bMerge, bool bCombine, int diffContext);
 
 	int GitRevert(int parent, const CGitHash &hash);
+
+	int GetGitVersion(CString* versiondebug, CString* errStr);
 
 	CString CombinePath(const CString &path) const
 	{

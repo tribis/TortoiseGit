@@ -1,5 +1,6 @@
-// TortoiseSVN - a Windows shell extension for easy version control
+// TortoiseGit - a Windows shell extension for easy version control
 
+// Copyright (C) 2012, 2014-2016 - TortoiseGit
 // Copyright (C) 2003-2006, 2009, 2015 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -22,6 +23,7 @@
 #include "CacheInterface.h"
 #include <WinInet.h>
 #include ".\cachedlg.h"
+#include <random>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -125,32 +127,35 @@ UINT CCacheDlg::TestThread()
 	CTime starttime = CTime::GetCurrentTime();
 	GetDlgItem(IDC_STARTTIME)->SetWindowText(starttime.Format(_T("%H:%M:%S")));
 
-	DWORD startticks = GetTickCount();
+	ULONGLONG startticks = GetTickCount64();
 
 	CString sNumber;
-	srand(GetTickCount());
+	std::random_device rd;
+	std::mt19937 mt(rd());
+	std::uniform_int_distribution<int> dist(0, max(0, m_filelist.GetCount() - 1));
+	std::uniform_int_distribution<int> dist2(0, 9);
 	for (int i=0; i < 1; ++i)
 	{
 		CString filepath;
 		//do {
-			filepath = m_filelist.GetAt(rand() % m_filelist.GetCount());
+			filepath = m_filelist.GetAt(dist(mt));
 		//}while(filepath.Find(_T(".git"))>=0);
 		GetDlgItem(IDC_FILEPATH)->SetWindowText(filepath);
 		GetStatusFromRemoteCache(CTGitPath(filepath), true);
 		sNumber.Format(_T("%d"), i);
 		GetDlgItem(IDC_DONE)->SetWindowText(sNumber);
-		if ((GetTickCount()%10)==1)
+		if ((GetTickCount64()%10)==1)
 			Sleep(10);
-		if ((rand()%10)==3)
+		if (dist2(mt) == 3)
 			RemoveFromCache(filepath);
 	}
 	CTime endtime = CTime::GetCurrentTime();
 	CString sEnd = endtime.Format(_T("%H:%M:%S"));
 
-	DWORD endticks = GetTickCount();
+	ULONGLONG endticks = GetTickCount64();
 
 	CString sEndText;
-	sEndText.Format(_T("%s  - %ld ms"), sEnd, endticks-startticks);
+	sEndText.Format(_T("%s  - %I64u ms"), sEnd, endticks - startticks);
 
 	GetDlgItem(IDC_ENDTIME)->SetWindowText(sEndText);
 
@@ -257,10 +262,10 @@ bool CCacheDlg::GetStatusFromRemoteCache(const CTGitPath& Path, bool bRecursive)
 		sCachePath.ReleaseBuffer();
 
 		// Wait for the cache to open
-		long endTime = (long)GetTickCount()+1000;
+		ULONGLONG endTime = GetTickCount64()+1000;
 		while(!EnsurePipeOpen())
 		{
-			if(((long)GetTickCount() - endTime) > 0)
+			if((GetTickCount64() - endTime) > 0)
 			{
 				return false;
 			}
@@ -412,15 +417,17 @@ UINT CCacheDlg::WatchTestThread()
 	CTime starttime = CTime::GetCurrentTime();
 	GetDlgItem(IDC_STARTTIME)->SetWindowText(starttime.Format(_T("%H:%M:%S")));
 
-	DWORD startticks = GetTickCount();
+	ULONGLONG startticks = GetTickCount64();
 
 	CString sNumber;
-	srand(GetTickCount());
-	filepath = m_filelist.GetAt(rand() % m_filelist.GetCount());
+	std::random_device rd;
+	std::mt19937 mt(rd());
+	std::uniform_int_distribution<int> dist(0, max(0, m_filelist.GetCount() - 1));
+	filepath = m_filelist.GetAt(dist(mt));
 	GetStatusFromRemoteCache(CTGitPath(m_sRootPath), false);
 	for (int i=0; i < 10000; ++i)
 	{
-		filepath = m_filelist.GetAt(rand() % m_filelist.GetCount());
+		filepath = m_filelist.GetAt(dist(mt));
 		GetDlgItem(IDC_FILEPATH)->SetWindowText(filepath);
 		TouchFile(filepath);
 		CopyRemoveCopy(filepath);
@@ -453,10 +460,10 @@ UINT CCacheDlg::WatchTestThread()
 	CTime endtime = CTime::GetCurrentTime();
 	CString sEnd = endtime.Format(_T("%H:%M:%S"));
 
-	DWORD endticks = GetTickCount();
+	ULONGLONG endticks = GetTickCount64();
 
 	CString sEndText;
-	sEndText.Format(_T("%s  - %ld ms"), sEnd, endticks-startticks);
+	sEndText.Format(_T("%s  - %I64u ms"), sEnd, endticks - startticks);
 
 	GetDlgItem(IDC_ENDTIME)->SetWindowText(sEndText);
 

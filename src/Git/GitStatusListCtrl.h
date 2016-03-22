@@ -24,7 +24,6 @@
 #include "Colors.h"
 #include "LoglistCommonResource.h"
 #include "HintListCtrl.h"
-#include "SmartHandle.h"
 
 #define GIT_WC_ENTRY_WORKING_SIZE_UNKNOWN (-1)
 
@@ -955,14 +954,13 @@ public:
 
 	CString						m_sDisplayedBranch; ///< When on LogDialog, what is the current displayed branch
 
-	bool						m_bIsRevertTheirMy;	///< at rebase case, Their and My version is revert.
-
 	CWnd						*m_hwndLogicalParent;
 
 	DECLARE_MESSAGE_MAP()
 
 public:
 	void SetBusy(bool b) {m_bBusy = b; Invalidate();}
+	bool IsBusy() const { return m_bBusy; }
 	void SetHasCheckboxes(bool bHasCheckboxes)
 	{
 		m_bHasCheckboxes = bHasCheckboxes;
@@ -987,6 +985,9 @@ private:
 
 	CString m_sMarkForDiffFilename;
 	CString m_sMarkForDiffVersion;
+
+	/* while rebasing, Their and My versios are swapped. */
+	bool						m_bIsRevertTheirMy;
 
 	enum
 	{
@@ -1152,12 +1153,6 @@ private:
 	std::map<CString,bool>		m_mapFilenameToChecked; ///< Remember de-/selected items
 	std::map<CString,bool>		m_mapDirectFiles;
 	CComCriticalSection			m_critSec;
-
-	CAutoLibrary				m_ShellDll;
-	typedef HRESULT(WINAPI* FNSHCreateDefaultContextMenu) (const DEFCONTEXTMENU *pdcm, REFIID riid, void **ppv);
-	FNSHCreateDefaultContextMenu	pfnSHCreateDefaultContextMenu;
-	typedef HRESULT(WINAPI* FNAssocCreateForClasses) (const ASSOCIATIONELEMENT *rgClasses, ULONG cClasses, REFIID riid, void **ppv);
-	FNAssocCreateForClasses			pfnAssocCreateForClasses;
 
 	friend class CGitStatusListCtrlDropTarget;
 public:

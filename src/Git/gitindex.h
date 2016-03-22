@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2016 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -29,7 +29,8 @@ class CGitIndex
 public:
 	CString    m_FileName;
 	__time64_t	m_ModifyTime;
-	unsigned short m_Flags;
+	uint16_t	m_Flags;
+	uint16_t	m_FlagsExtended;
 	CGitHash	m_IndexHash;
 	__int64		m_Size;
 
@@ -53,7 +54,6 @@ public:
 	FRIEND_TEST(GitIndexCBasicGitWithTestRepoFixture, GetFileStatus);
 #endif
 protected:
-	bool m_bCheckContent;
 	__int64 m_iMaxCheckSize;
 	CComCriticalSection m_critRepoSec;
 	CAutoRepository repository;
@@ -323,7 +323,7 @@ private:
 	// core.excludesfile stuff
 	std::map<CString, CString> m_CoreExcludesfiles;
 	CString m_sGitSystemConfigPath;
-	DWORD m_dGitSystemConfigPathLastChecked;
+	ULONGLONG m_dGitSystemConfigPathLastChecked;
 	CReaderWriterLock	m_coreExcludefilesSharedMutex;
 	// checks if the msysgit path has changed and return true/false
 	// if the path changed, the cache is update

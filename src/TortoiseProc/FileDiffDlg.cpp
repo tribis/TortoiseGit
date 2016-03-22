@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2016 - TortoiseGit
 // Copyright (C) 2003-2008 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -211,7 +211,7 @@ BOOL CFileDiffDlg::OnInitDialog()
 	if (!m_sFilter.IsEmpty())
 		m_cFilter.SetWindowText(m_sFilter);
 
-	int c = ((CHeaderCtrl*)(m_cFileList.GetDlgItem(0)))->GetItemCount()-1;
+	int c = m_cFileList.GetHeaderCtrl()->GetItemCount() - 1;
 	while (c>=0)
 		m_cFileList.DeleteColumn(c--);
 
@@ -228,7 +228,7 @@ BOOL CFileDiffDlg::OnInitDialog()
 	m_cFileList.InsertColumn(4, temp);
 
 	int mincol = 0;
-	int maxcol = ((CHeaderCtrl*)(m_cFileList.GetDlgItem(0)))->GetItemCount()-1;
+	int maxcol = m_cFileList.GetHeaderCtrl()->GetItemCount() - 1;
 	int col;
 	for (col = mincol; col <= maxcol; col++)
 	{
@@ -364,7 +364,7 @@ LRESULT CFileDiffDlg::OnDiffFinished(WPARAM, LPARAM)
 	}
 
 	int mincol = 0;
-	int maxcol = ((CHeaderCtrl*)(m_cFileList.GetDlgItem(0)))->GetItemCount()-1;
+	int maxcol = m_cFileList.GetHeaderCtrl()->GetItemCount() - 1;
 	int col;
 	for (col = mincol; col <= maxcol; ++col)
 	{
@@ -557,10 +557,16 @@ void CFileDiffDlg::OnContextMenu(CWnd* pWnd, CPoint point)
 		popup.AppendMenu(MF_SEPARATOR, NULL);
 		if (!m_bIsBare)
 		{
-			menuText.Format(IDS_FILEDIFF_POPREVERTTOREV, (LPCTSTR)m_rev1.m_CommitHash.ToString().Left(g_Git.GetShortHASHLength()));
-			popup.AppendMenuIcon(ID_REVERT1, menuText, IDI_REVERT);
-			menuText.Format(IDS_FILEDIFF_POPREVERTTOREV, (LPCTSTR)m_rev2.m_CommitHash.ToString().Left(g_Git.GetShortHASHLength()));
-			popup.AppendMenuIcon(ID_REVERT2, menuText, IDI_REVERT);
+			if (!m_rev1.m_CommitHash.IsEmpty())
+			{
+				menuText.Format(IDS_FILEDIFF_POPREVERTTOREV, (LPCTSTR)m_rev1.m_CommitHash.ToString().Left(g_Git.GetShortHASHLength()));
+				popup.AppendMenuIcon(ID_REVERT1, menuText, IDI_REVERT);
+			}
+			if (!m_rev2.m_CommitHash.IsEmpty())
+			{
+				menuText.Format(IDS_FILEDIFF_POPREVERTTOREV, (LPCTSTR)m_rev2.m_CommitHash.ToString().Left(g_Git.GetShortHASHLength()));
+				popup.AppendMenuIcon(ID_REVERT2, menuText, IDI_REVERT);
+			}
 			popup.AppendMenu(MF_SEPARATOR, NULL);
 		}
 		popup.AppendMenuIcon(ID_LOG, IDS_FILEDIFF_LOG, IDI_LOG);
@@ -1046,14 +1052,13 @@ void CFileDiffDlg::ClickRevButton(CMenuButton *button, GitRev *rev, CACEdit *edi
 		dlg.SetSelect(true);
 		if(dlg.DoModal() == IDOK)
 		{
-			if( dlg.GetSelectedHash().IsEmpty() )
+			if (dlg.GetSelectedHash().empty())
 				return;
 
-			if(FillRevFromString(rev,dlg.GetSelectedHash()))
+			if (FillRevFromString(rev, dlg.GetSelectedHash().at(0).ToString()))
 				return;
 
-			edit->SetWindowText(dlg.GetSelectedHash());
-
+			edit->SetWindowText(dlg.GetSelectedHash().at(0).ToString());
 		}
 		else
 			return;

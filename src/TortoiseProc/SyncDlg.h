@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2009,2012-2015 - TortoiseGit
+// Copyright (C) 2008-2009,2012-2016 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -92,6 +92,7 @@ protected:
 	CGitLogList			m_OutLogList;
 	CGitLogList			m_InLogList;
 	CGitProgressList	m_GitProgressList;
+	std::unique_ptr<ProgressCommand>	progressCommand;
 
 	CGitStatusListCtrl	m_OutChangeFileList;
 	CGitStatusListCtrl	m_InChangeFileList;
@@ -142,9 +143,9 @@ protected:
 
 	std::vector<CString> m_GitCmdList;
 
-	bool			m_bAbort;
+	volatile bool	m_bAbort;
 	bool			m_bDone;
-	DWORD			m_startTick;
+	ULONGLONG		m_startTick;
 	bool			m_bWantToExit;
 
 	int				m_GitCmdStatus;
@@ -186,6 +187,7 @@ protected:
 		return;
 	}
 
+	void ShowInCommits(const CString& friendname);
 	void PullComplete();
 	void FetchComplete();
 	void StashComplete();
@@ -199,8 +201,6 @@ public:
 	int				m_seq;
 
 protected:
-	int				m_Gitverion;
-
 	static UINT		ProgressThreadEntry(LPVOID pVoid){ return ((CSyncDlg*)pVoid) ->ProgressThread(); };
 	UINT			ProgressThread();
 
@@ -214,6 +214,7 @@ protected:
 	CProgressCtrl	m_ctrlProgress;
 	CAnimateCtrl	m_ctrlAnimate;
 	CStatic			m_ctrlProgLabel;
+	int				m_iPullRebase;
 
 	void EnableControlButton(bool bEnabled=true);
 	afx_msg void OnBnClickedButtonCommit();
@@ -221,6 +222,7 @@ protected:
 	virtual void OnOK();
 	void	OnCancel();
 	void	Refresh();
+	bool	AskSetTrackedBranch();
 
 	afx_msg void OnBnClickedButtonSubmodule();
 	afx_msg void OnBnClickedButtonStash();

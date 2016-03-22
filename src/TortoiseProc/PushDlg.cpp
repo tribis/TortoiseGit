@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2016 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -194,6 +194,13 @@ BOOL CPushDlg::OnInitDialog()
 	m_tooltips.AddTool(IDC_FORCE, IDS_FORCE_TT);
 	m_tooltips.AddTool(IDC_FORCE_WITH_LEASE, IDS_FORCE_WITH_LEASE_TT);
 
+	CString recurseSubmodules = g_Git.GetConfigValue(_T("push.recurseSubmodules"));
+	if (recurseSubmodules == _T("check"))
+		m_RecurseSubmodules = 1;
+	else if (recurseSubmodules == _T("on-demand"))
+		m_RecurseSubmodules = 2;
+	else
+		m_RecurseSubmodules = 0;
 	m_regRecurseSubmodules = CRegDWORD(
 		CString(_T("Software\\TortoiseGit\\History\\PushRecurseSubmodules\\")) + WorkingDir, m_RecurseSubmodules);
 	m_RecurseSubmodules = m_regRecurseSubmodules;
@@ -201,9 +208,6 @@ BOOL CPushDlg::OnInitDialog()
 	m_RecurseSubmodulesCombo.AddString(CString(MAKEINTRESOURCE(IDS_RECURSE_SUBMODULES_CHECK)));
 	m_RecurseSubmodulesCombo.AddString(CString(MAKEINTRESOURCE(IDS_RECURSE_SUBMODULES_ONDEMAND)));
 	m_RecurseSubmodulesCombo.SetCurSel(m_RecurseSubmodules);
-
-	if (CAppUtils::GetMsysgitVersion() < 0x01080500)
-		GetDlgItem(IDC_FORCE_WITH_LEASE)->EnableWindow(FALSE);
 
 	Refresh();
 
@@ -404,7 +408,7 @@ void CPushDlg::OnBnClickedOk()
 		m_URL=m_Remote.GetString();
 		if (m_URL.IsEmpty())
 		{
-			CMessageBox::Show(NULL, IDS_PROC_GITCONFIG_REMOTEEMPTY, IDS_APPNAME, MB_OK);
+			CMessageBox::Show(GetSafeHwnd(), IDS_PROC_GITCONFIG_REMOTEEMPTY, IDS_APPNAME, MB_OK | MB_ICONEXCLAMATION);
 			return;
 		}
 		m_bPushAllRemotes = (m_Remote.GetCurSel() == 0 && m_Remote.GetCount() > 1);
@@ -431,7 +435,7 @@ void CPushDlg::OnBnClickedOk()
 		}
 		else if (!m_BranchRemoteName.IsEmpty() && !g_Git.IsBranchNameValid(this->m_BranchRemoteName))
 		{
-			CMessageBox::Show(NULL, IDS_B_T_INVALID, IDS_APPNAME, MB_OK);
+			CMessageBox::Show(GetSafeHwnd(), IDS_B_T_INVALID, IDS_APPNAME, MB_OK | MB_ICONEXCLAMATION);
 			return;
 		}
 		else if (!m_BranchSourceName.IsEmpty() && !g_Git.IsBranchTagNameUnique(m_BranchSourceName))
@@ -475,13 +479,6 @@ void CPushDlg::OnBnClickedOk()
 	m_regThinPack = m_bPack;
 	this->m_regAutoLoad = m_bAutoLoad ;
 	m_RecurseSubmodules = m_RecurseSubmodulesCombo.GetCurSel();
-	if (m_RecurseSubmodules == 2 && CAppUtils::GetMsysgitVersion() < 0x01070b00)
-	{
-		CString gitver;
-		gitver.Format(IDS_GITVER_REQUIRED, _T("--recurse-submodules=on-demand"), _T("1.7.11"));
-		CMessageBox::Show(m_hWnd, gitver, _T("TortoiseGit"), MB_OK | MB_ICONERROR);
-		return;
-	}
 	m_regRecurseSubmodules = m_RecurseSubmodules;
 
 	CHorizontalResizableStandAloneDialog::OnOK();
@@ -513,10 +510,7 @@ void CPushDlg::OnBnClickedButtonBrowseSourceBranch()
 			dlg.SetSelect(true);
 			if(dlg.DoModal() == IDOK)
 			{
-				if (dlg.GetSelectedHash().IsEmpty())
-					return;
-
-				m_BranchSource.SetWindowText(dlg.GetSelectedHash());
+				m_BranchSource.SetWindowText(dlg.GetSelectedHash().at(0).ToString());
 				OnCbnSelchangeBranchSource();
 			}
 		}
@@ -589,8 +583,7 @@ void CPushDlg::OnBnClickedPushall()
 void CPushDlg::OnBnClickedForce()
 {
 	UpdateData();
-	if (CAppUtils::GetMsysgitVersion() >= 0x01080500)
-		GetDlgItem(IDC_FORCE_WITH_LEASE)->EnableWindow(m_bTags || m_bForce ? FALSE : TRUE);
+	GetDlgItem(IDC_FORCE_WITH_LEASE)->EnableWindow(m_bTags || m_bForce ? FALSE : TRUE);
 }
 
 void CPushDlg::OnBnClickedForceWithLease()

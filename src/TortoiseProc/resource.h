@@ -122,6 +122,7 @@
 #define IDD_RESET                       317
 #define IDD_REBASE                      318
 #define IDI_GITCONFIG                   319
+#define IDD_REBASECHERRYPICK            319
 #define IDI_GITREMOTE                   320
 #define IDD_SENDMAIL                    320
 #define IDD_SETTINGSMTP                 321
@@ -1239,16 +1240,29 @@
 #define IDC_BRANCH_CHECK                1586
 #define IDC_SMTP_USER                   1586
 #define IDC_PARAMSLABEL                 1586
+#define IDS_COMMIT_MERGE_HINT           1586
 #define IDC_SUBMODULE_BRANCH            1587
 #define IDC_CHECK_SENDMAIL              1587
+#define IDS_REBASE_PRESERVEMERGES_TT    1587
 #define IDD_REFLOG                      1588
 #define IDC_TREE_REF                    1588
+#define IDS_PROC_LOG_BASIC_REFS         1588
+#define IDC_CHECK_NOPREFIX              1588
 #define IDD_SUBMODULE_ADD               1589
 #define IDC_EDIT_NAME                   1589
+#define IDS_PROC_LOG_SELECT_BASIC_REFS  1589
+#define IDS_CHERRYPICK_MERGECOMMIT      1590
+#define IDS_COMMIT_COMMIT               1591
+#define IDS_COMMIT_RECOMMIT             1592
 #define IDC_BUGTRAQ_WARNINGIFNOISSUE    1593
+#define IDS_COMMIT_COMMITPUSH           1593
 #define IDC_BUGTRAQ_APPEND              1594
 #define IDC_WARN_NO_SIGNED_OFF_BY       1594
+#define IDS_DROPONESTASH                1594
 #define IDC_BUGTRAQ_NUMBER              1595
+#define IDS_PROC_PULL_EMPTYBRANCH       1595
+#define IDS_PROC_SYNC_FETCHALL          1596
+#define IDS_NOTYET_SETTRACKEDBRANCH     1597
 #define IDC_BUGTRAQ_URL                 1599
 #define IDS_REPOBROWSE_SAVEAS           1600
 #define IDC_BUGTRAQ_MESSAGE             1600
@@ -1264,6 +1278,7 @@
 #define IDC_REBASE_CHECK_FORCE          1607
 #define IDC_EDIT_DEPTH                  1607
 #define IDC_CHECK_SVN_FROM              1608
+#define IDC_REBASE_CHECK_PRESERVEMERGES 1608
 #define IDC_HANDLERHINT                 1609
 #define IDC_COMBOBOXEX_URL              1610
 #define IDC_BUTTON_PULL                 1611
@@ -1390,6 +1405,7 @@
 #define IDC_LOG_JUMPDOWN                1725
 #define IDC_TEMPFILESCLEAR              1726
 #define IDC_STATIC_TAGOPT               1727
+#define IDC_STOREDDECISIONSCLEAR        1727
 #define IDC_COMBO_TAGOPT                1728
 #define IDC_REV1BTN1                    1729
 #define IDC_CHECK_NORECYCLEBIN          1730
@@ -1516,6 +1532,7 @@
 #define IDC_INCLUDENESTEDREFS           1830
 #define IDC_DEFAULT_NUMBER_OF           1831
 #define IDC_DEFAULT_SCALE               1832
+#define IDC_STOREDDECISIONS             1833
 #define IDS_LOG_FILTER_BY               1850
 #define IDS_LOG_FILTER_PATHS            1851
 #define IDS_LOG_FILTER_AUTHORS          1852
@@ -1965,7 +1982,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        359
 #define _APS_NEXT_COMMAND_VALUE         32874
-#define _APS_NEXT_CONTROL_VALUE         1833
+#define _APS_NEXT_CONTROL_VALUE         1834
 #define _APS_NEXT_SYMED_VALUE           201
 #endif
 #endif

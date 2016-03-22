@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2009-2015 - TortoiseGit
+// Copyright (C) 2009-2016 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -156,6 +156,8 @@ CBrowseRefsDlg::CBrowseRefsDlg(CString cmdPath, CWnd* pParent /*=NULL*/)
 	m_cmdPath(cmdPath),
 	m_currSortCol(0),
 	m_currSortDesc(false),
+	m_regCurrSortCol(L"Software\\TortoiseGit\\RefBrowserSortCol", 0),
+	m_regCurrSortDesc(L"Software\\TortoiseGit\\RefBrowserSortDesc", FALSE),
 	m_initialRef(L"HEAD"),
 	m_pickRef_Kind(gPickRef_All),
 	m_pListCtrlRoot(NULL),
@@ -177,10 +179,15 @@ CBrowseRefsDlg::CBrowseRefsDlg(CString cmdPath, CWnd* pParent /*=NULL*/)
 	m_bRelativeTimes = (regRelativeTimes != 0);
 
 	m_regIncludeNestedRefs = CRegDWORD(_T("Software\\TortoiseGit\\RefBrowserIncludeNestedRefs"), TRUE);
+
+	m_currSortCol = m_regCurrSortCol;
+	m_currSortDesc = m_regCurrSortDesc == TRUE;
 }
 
 CBrowseRefsDlg::~CBrowseRefsDlg()
 {
+	m_regCurrSortCol = m_currSortCol;
+	m_regCurrSortDesc = m_currSortDesc;
 }
 
 void CBrowseRefsDlg::DoDataExchange(CDataExchange* pDX)
@@ -596,8 +603,9 @@ void CBrowseRefsDlg::FillListCtrlForShadowTree(CShadowTree* pTree, CString refNa
 			m_ListRefLeafs.SetItemText(indexItem,eCol_Msg, pTree->m_csSubject);
 			m_ListRefLeafs.SetItemText(indexItem,eCol_LastAuthor, pTree->m_csAuthor);
 			m_ListRefLeafs.SetItemText(indexItem,eCol_Hash, pTree->m_csRefHash);
-			int pos = 0;
-			m_ListRefLeafs.SetItemText(indexItem,eCol_Description, pTree->m_csDescription.Tokenize(_T("\n"), pos));
+			CString descrition = pTree->m_csDescription;
+			descrition.Replace(L"\n", L" ");
+			m_ListRefLeafs.SetItemText(indexItem, eCol_Description, descrition);
 		}
 	}
 	else
@@ -1090,23 +1098,23 @@ void CBrowseRefsDlg::ShowContextMenu(CPoint point, HTREEITEM hTreePos, VectorPSh
 	{
 	case eCmd_ViewLog:
 		{
-			CLogDlg dlg;
-			dlg.SetRange(g_Git.FixBranchName(selectedLeafs[0]->GetRefName()));
-			dlg.DoModal();
+			CString sCmd;
+			sCmd.Format(_T("/command:log /path:\"%s\" /range:\"%s\""), (LPCTSTR)g_Git.m_CurrentDir, (LPCTSTR)g_Git.FixBranchName(selectedLeafs[0]->GetRefName()));
+			CAppUtils::RunTortoiseGitProc(sCmd);
 		}
 		break;
 	case eCmd_ViewLogRange:
 		{
-			CLogDlg dlg;
-			dlg.SetRange(GetTwoSelectedRefs(selectedLeafs, m_sLastSelected, _T("..")));
-			dlg.DoModal();
+			CString sCmd;
+			sCmd.Format(_T("/command:log /path:\"%s\" /range:\"%s\""), (LPCTSTR)g_Git.m_CurrentDir, (LPCTSTR)GetTwoSelectedRefs(selectedLeafs, m_sLastSelected, _T("..")));
+			CAppUtils::RunTortoiseGitProc(sCmd);
 		}
 		break;
 	case eCmd_ViewLogRangeReachableFromOnlyOne:
 		{
-			CLogDlg dlg;
-			dlg.SetRange(GetTwoSelectedRefs(selectedLeafs, m_sLastSelected, _T("...")));
-			dlg.DoModal();
+			CString sCmd;
+			sCmd.Format(_T("/command:log /path:\"%s\" /range:\"%s\""), (LPCTSTR)g_Git.m_CurrentDir, (LPCTSTR)GetTwoSelectedRefs(selectedLeafs, m_sLastSelected, _T("...")));
+			CAppUtils::RunTortoiseGitProc(sCmd);
 		}
 		break;
 	case eCmd_RepoBrowser:
@@ -1233,14 +1241,7 @@ void CBrowseRefsDlg::ShowContextMenu(CPoint point, HTREEITEM hTreePos, VectorPSh
 			dlg.m_bUseLogWidth = true;
 			if(dlg.DoModal() == IDOK)
 			{
-				CString key;
-				key.Format(_T("branch.%s.description"), (LPCTSTR)selectedLeafs[0]->GetRefsHeadsName());
-				dlg.m_sInputText.Replace(_T("\r"), _T(""));
-				dlg.m_sInputText.Trim();
-				if (dlg.m_sInputText.IsEmpty())
-					g_Git.UnsetConfigValue(key);
-				else
-					g_Git.SetConfigValue(key, dlg.m_sInputText);
+				CAppUtils::UpdateBranchDescription(selectedLeafs[0]->GetRefsHeadsName(), dlg.m_sInputText);
 				Refresh();
 			}
 		}

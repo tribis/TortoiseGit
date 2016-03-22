@@ -48,7 +48,7 @@ CString GetCacheID()
 		GetTokenInformation(token, TokenStatistics, NULL, 0, &len);
 		if (len >= sizeof (TOKEN_STATISTICS))
 		{
-			std::unique_ptr<BYTE[]> data (new BYTE[len]);
+			auto data = std::make_unique<BYTE[]>(len);
 			GetTokenInformation(token, TokenStatistics, data.get(), len, &len);
 			LUID uid = ((PTOKEN_STATISTICS)data.get())->AuthenticationId;
 			t.Format(_T("-%08x%08x"), uid.HighPart, uid.LowPart);
@@ -61,10 +61,14 @@ bool SendCacheCommand(BYTE command, const WCHAR * path /* = NULL */)
 {
 	int retrycount = 2;
 	CAutoFile hPipe;
-	do
+	CString pipeName = GetCacheCommandPipeName();
+	for (int retry = 0; retry < 2; ++retry)
 	{
+		if (retry > 0)
+			WaitNamedPipe(pipeName, 50);
+
 		hPipe = CreateFile(
-			GetCacheCommandPipeName(),		// pipe name
+			pipeName,						// pipe name
 			GENERIC_READ |					// read and write access
 			GENERIC_WRITE,
 			0,								// no sharing
@@ -72,10 +76,16 @@ bool SendCacheCommand(BYTE command, const WCHAR * path /* = NULL */)
 			OPEN_EXISTING,					// opens existing pipe
 			FILE_FLAG_OVERLAPPED,			// default attributes
 			NULL);							// no template file
-		retrycount--;
-		if (!hPipe)
-			Sleep(10);
-	} while ((!hPipe) && (retrycount));
+
+		if (!hPipe && GetLastError() == ERROR_PIPE_BUSY)
+		{
+			// TGitCache is running but is busy connecting a different client.
+			// Do not give up immediately but wait for a few milliseconds until
+			// the server has created the next pipe instance
+			continue;
+		}
+		break;
+	}
 
 	if (!hPipe)
 	{
@@ -139,20 +149,32 @@ bool SendCacheCommand(BYTE command, const WCHAR * path /* = NULL */)
 }
 
 CBlockCacheForPath::CBlockCacheForPath(const WCHAR * aPath)
+	: m_bBlocked(false)
 {
 	wcsncpy_s(path, aPath, _countof(path) - 1);
 
-	SendCacheCommand(TGITCACHECOMMAND_BLOCK, path);
+	if (!SendCacheCommand(TGITCACHECOMMAND_BLOCK, path))
+		return;
+
 	// Wait a short while to make sure the cache has
 	// processed this command. Without this, we risk
 	// executing the svn command before the cache has
 	// blocked the path and already gets change notifications.
 	Sleep(20);
+	m_bBlocked = true;
 }
 
 CBlockCacheForPath::~CBlockCacheForPath()
 {
-	int retry = 3;
-	while (retry-- && !SendCacheCommand(TGITCACHECOMMAND_UNBLOCK, path))
-		Sleep(10);
+	if (!m_bBlocked)
+		return;
+
+	for (int retry = 0; retry < 3; ++retry)
+	{
+		if (retry > 0)
+			Sleep(10);
+
+		if (SendCacheCommand(TGITCACHECOMMAND_UNBLOCK, path))
+			break;
+	}
 }

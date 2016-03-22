@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2012-2015 - TortoiseGit
+// Copyright (C) 2009-2016 - TortoiseGit
 // Copyright (C) 2003-2008,2012-2015 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -24,7 +24,7 @@
 #include <string>
 #include "registry.h"
 #include "SciEdit.h"
-#include "SysInfo.h"
+#include "SmartHandle.h"
 #include "../../TortoiseUDiff/UDiffColors.h"
 
 void CSciEditContextMenuInterface::InsertMenuItems(CMenu&, int&) {return;}
@@ -71,8 +71,6 @@ IMPLEMENT_DYNAMIC(CSciEdit, CWnd)
 
 CSciEdit::CSciEdit(void) : m_DirectFunction(NULL)
 	, m_DirectPointer(NULL)
-	, pChecker(NULL)
-	, pThesaur(NULL)
 	, m_spellcodepage(0)
 	, m_separator(0)
 	, m_typeSeparator(1)
@@ -85,10 +83,6 @@ CSciEdit::CSciEdit(void) : m_DirectFunction(NULL)
 CSciEdit::~CSciEdit(void)
 {
 	m_personalDict.Save();
-	if (m_hModule)
-		::FreeLibrary(m_hModule);
-	delete pChecker;
-	delete pThesaur;
 }
 
 static std::unique_ptr<UINT[]> Icon2Image(HICON hIcon)
@@ -117,26 +111,20 @@ static std::unique_ptr<UINT[]> Icon2Image(HICON hIcon)
 	infoheader.bmiHeader.biCompression = BI_RGB;
 	infoheader.bmiHeader.biSizeImage = size;
 
-	std::unique_ptr<BYTE[]> ptrb(new BYTE[(size * 2 + height * width * 4)]);
+	auto ptrb = std::make_unique<BYTE[]>(size * 2 + height * width * 4);
 	LPBYTE pixelsIconRGB = ptrb.get();
 	LPBYTE alphaPixels = pixelsIconRGB + size;
 	HDC hDC = CreateCompatibleDC(nullptr);
+	SCOPE_EXIT { DeleteDC(hDC); };
 	HBITMAP hBmpOld = (HBITMAP)SelectObject(hDC, (HGDIOBJ)iconInfo.hbmColor);
 	if (!GetDIBits(hDC, iconInfo.hbmColor, 0, height, (LPVOID)pixelsIconRGB, &infoheader, DIB_RGB_COLORS))
-	{
-		DeleteDC(hDC);
 		return nullptr;
-	}
 
 	SelectObject(hDC, hBmpOld);
 	if (!GetDIBits(hDC, iconInfo.hbmMask, 0,height, (LPVOID)alphaPixels, &infoheader, DIB_RGB_COLORS))
-	{
-		DeleteDC(hDC);
 		return nullptr;
-	}
 
-	DeleteDC(hDC);
-	std::unique_ptr<UINT[]> imagePixels(new UINT[height * width]);
+	auto imagePixels = std::make_unique<UINT[]>(height * width);
 	int lsSrc = width * 3;
 	int vsDest = height - 1;
 	for (int y = 0; y < height; y++)
@@ -228,8 +216,7 @@ void CSciEdit::Init(LONG lLanguage)
 	Call(SCI_ASSIGNCMDKEY, SCK_END + (SCMOD_SHIFT << 16), SCI_LINEENDWRAPEXTEND);
 	Call(SCI_ASSIGNCMDKEY, SCK_HOME, SCI_HOMEWRAP);
 	Call(SCI_ASSIGNCMDKEY, SCK_HOME + (SCMOD_SHIFT << 16), SCI_HOMEWRAPEXTEND);
-	CRegStdDWORD used2d(L"Software\\TortoiseGit\\ScintillaDirect2D", FALSE);
-	if (SysInfo::Instance().IsWin7OrLater() && DWORD(used2d))
+	if (CRegStdDWORD(L"Software\\TortoiseGit\\ScintillaDirect2D", FALSE) != FALSE)
 	{
 		Call(SCI_SETTECHNOLOGY, SC_TECHNOLOGY_DIRECTWRITERETAIN);
 		Call(SCI_SETBUFFEREDDRAW, 0);
@@ -251,6 +238,8 @@ void CSciEdit::Init(const ProjectProperties& props)
 		Call(SCI_SETWRAPMODE, SC_WRAP_NONE);
 		Call(SCI_SETEDGEMODE, EDGE_LINE);
 		Call(SCI_SETEDGECOLUMN, props.nLogWidthMarker);
+		Call(SCI_SETSCROLLWIDTHTRACKING, TRUE);
+		Call(SCI_SETSCROLLWIDTH, 1);
 	}
 	else
 	{
@@ -276,7 +265,6 @@ BOOL CSciEdit::LoadDictionaries(LONG lLanguageID)
 {
 	//Setup the spell checker and thesaurus
 	TCHAR buf[6] = { 0 };
-	CString sFolder = CPathUtils::GetAppDirectory();
 	CString sFolderUp = CPathUtils::GetAppParentDirectory();
 	CString sFolderAppData = CPathUtils::GetAppDataDirectory();
 	CString sFile;
@@ -293,32 +281,12 @@ BOOL CSciEdit::LoadDictionaries(LONG lLanguageID)
 		if ((PathFileExists(sFolderAppData + _T("dic\\") + sFile + _T(".aff"))) &&
 			(PathFileExists(sFolderAppData + _T("dic\\") + sFile + _T(".dic"))))
 		{
-			pChecker = new Hunspell(CStringA(sFolderAppData + _T("dic\\") + sFile + _T(".aff")), CStringA(sFolderAppData + _T("dic\\") + sFile + _T(".dic")));
-		}
-		else if ((PathFileExists(sFolder + sFile + _T(".aff"))) &&
-			(PathFileExists(sFolder + sFile + _T(".dic"))))
-		{
-			pChecker = new Hunspell(CStringA(sFolder + sFile + _T(".aff")), CStringA(sFolder + sFile + _T(".dic")));
-		}
-		else if ((PathFileExists(sFolder + _T("dic\\") + sFile + _T(".aff"))) &&
-			(PathFileExists(sFolder + _T("dic\\") + sFile + _T(".dic"))))
-		{
-			pChecker = new Hunspell(CStringA(sFolder + _T("dic\\") + sFile + _T(".aff")), CStringA(sFolder + _T("dic\\") + sFile + _T(".dic")));
-		}
-		else if ((PathFileExists(sFolderUp + sFile + _T(".aff"))) &&
-			(PathFileExists(sFolderUp + sFile + _T(".dic"))))
-		{
-			pChecker = new Hunspell(CStringA(sFolderUp + sFile + _T(".aff")), CStringA(sFolderUp + sFile + _T(".dic")));
-		}
-		else if ((PathFileExists(sFolderUp + _T("dic\\") + sFile + _T(".aff"))) &&
-			(PathFileExists(sFolderUp + _T("dic\\") + sFile + _T(".dic"))))
-		{
-			pChecker = new Hunspell(CStringA(sFolderUp + _T("dic\\") + sFile + _T(".aff")), CStringA(sFolderUp + _T("dic\\") + sFile + _T(".dic")));
+			pChecker = std::make_unique<Hunspell>(CStringA(sFolderAppData + _T("dic\\") + sFile + _T(".aff")), CStringA(sFolderAppData + _T("dic\\") + sFile + _T(".dic")));
 		}
 		else if ((PathFileExists(sFolderUp + _T("Languages\\") + sFile + _T(".aff"))) &&
 			(PathFileExists(sFolderUp + _T("Languages\\") + sFile + _T(".dic"))))
 		{
-			pChecker = new Hunspell(CStringA(sFolderUp + _T("Languages\\") + sFile + _T(".aff")), CStringA(sFolderUp + _T("Languages\\") + sFile + _T(".dic")));
+			pChecker = std::make_unique<Hunspell>(CStringA(sFolderUp + _T("Languages\\") + sFile + _T(".aff")), CStringA(sFolderUp + _T("Languages\\") + sFile + _T(".dic")));
 		}
 	}
 #if THESAURUS
@@ -327,32 +295,12 @@ BOOL CSciEdit::LoadDictionaries(LONG lLanguageID)
 		if ((PathFileExists(sFolderAppData + _T("dic\\th_") + sFile + _T("_v2.idx"))) &&
 			(PathFileExists(sFolderAppData + _T("dic\\th_") + sFile + _T("_v2.dat"))))
 		{
-			pThesaur = new MyThes(CStringA(sFolderAppData + _T("dic\\th_") + sFile + _T("_v2.idx")), CStringA(sFolderAppData + _T("dic\\th_") + sFile + _T("_v2.dat")));
-		}
-		else if ((PathFileExists(sFolder + _T("th_") + sFile + _T("_v2.idx"))) &&
-			(PathFileExists(sFolder + _T("th_") + sFile + _T("_v2.dat"))))
-		{
-			pThesaur = new MyThes(CStringA(sFolder + sFile + _T("_v2.idx")), CStringA(sFolder + sFile + _T("_v2.dat")));
-		}
-		else if ((PathFileExists(sFolder + _T("dic\\th_") + sFile + _T("_v2.idx"))) &&
-			(PathFileExists(sFolder + _T("dic\\th_") + sFile + _T("_v2.dat"))))
-		{
-			pThesaur = new MyThes(CStringA(sFolder + _T("dic\\") + sFile + _T("_v2.idx")), CStringA(sFolder + _T("dic\\") + sFile + _T("_v2.dat")));
-		}
-		else if ((PathFileExists(sFolderUp + _T("th_") + sFile + _T("_v2.idx"))) &&
-			(PathFileExists(sFolderUp + _T("th_") + sFile + _T("_v2.dat"))))
-		{
-			pThesaur = new MyThes(CStringA(sFolderUp + _T("th_") + sFile + _T("_v2.idx")), CStringA(sFolderUp + _T("th_") + sFile + _T("_v2.dat")));
-		}
-		else if ((PathFileExists(sFolderUp + _T("dic\\th_") + sFile + _T("_v2.idx"))) &&
-			(PathFileExists(sFolderUp + _T("dic\\th_") + sFile + _T("_v2.dat"))))
-		{
-			pThesaur = new MyThes(CStringA(sFolderUp + _T("dic\\th_") + sFile + _T("_v2.idx")), CStringA(sFolderUp + _T("dic\\th_") + sFile + _T("_v2.dat")));
+			pThesaur = std::make_unique<MyThes>(CStringA(sFolderAppData + _T("dic\\th_") + sFile + _T("_v2.idx")), CStringA(sFolderAppData + _T("dic\\th_") + sFile + _T("_v2.dat")));
 		}
 		else if ((PathFileExists(sFolderUp + _T("Languages\\th_") + sFile + _T("_v2.idx"))) &&
 			(PathFileExists(sFolderUp + _T("Languages\\th_") + sFile + _T("_v2.dat"))))
 		{
-			pThesaur = new MyThes(CStringA(sFolderUp + _T("Languages\\th_") + sFile + _T("_v2.idx")), CStringA(sFolderUp + _T("Languages\\th_") + sFile + _T("_v2.dat")));
+			pThesaur = std::make_unique<MyThes>(CStringA(sFolderUp + _T("Languages\\th_") + sFile + _T("_v2.idx")), CStringA(sFolderUp + _T("Languages\\th_") + sFile + _T("_v2.dat")));
 		}
 	}
 #endif
@@ -417,6 +365,9 @@ void CSciEdit::SetText(const CString& sText)
 	CStringA sTextA = StringForControl(sText);
 	Call(SCI_SETTEXT, 0, (LPARAM)(LPCSTR)sTextA);
 
+	if (Call(SCI_GETSCROLLWIDTHTRACKING) != 0)
+		Call(SCI_SETSCROLLWIDTH, 1);
+
 	// Scintilla seems to have problems with strings that
 	// aren't terminated by a newline char. Once that char
 	// is there, it can be removed without problems.
@@ -452,7 +403,7 @@ CString CSciEdit::GetWordUnderCursor(bool bSelectWord)
 		return CString();
 	textrange.chrg.cpMax = (LONG)Call(SCI_WORDENDPOSITION, textrange.chrg.cpMin, TRUE);
 
-	std::unique_ptr<char[]> textbuffer(new char[textrange.chrg.cpMax - textrange.chrg.cpMin + 1]);
+	auto textbuffer = std::make_unique<char[]>(textrange.chrg.cpMax - textrange.chrg.cpMin + 1);
 	textrange.lpstrText = textbuffer.get();
 	Call(SCI_GETTEXTRANGE, 0, (LPARAM)&textrange);
 	if (bSelectWord)
@@ -578,7 +529,7 @@ void CSciEdit::CheckSpelling(int startpos, int endpos)
 			continue;
 		}
 		ATLASSERT(textrange.chrg.cpMax >= textrange.chrg.cpMin);
-		std::unique_ptr<char[]> textbuffer(new char[textrange.chrg.cpMax - textrange.chrg.cpMin + 2]);
+		auto textbuffer = std::make_unique<char[]>(textrange.chrg.cpMax - textrange.chrg.cpMin + 2);
 		SecureZeroMemory(textbuffer.get(), textrange.chrg.cpMax - textrange.chrg.cpMin + 2);
 		textrange.lpstrText = textbuffer.get();
 		textrange.chrg.cpMax++;
@@ -600,7 +551,7 @@ void CSciEdit::CheckSpelling(int startpos, int endpos)
 			TEXTRANGEA twoWords;
 			twoWords.chrg.cpMin = textrange.chrg.cpMin;
 			twoWords.chrg.cpMax = (LONG)Call(SCI_WORDENDPOSITION, textrange.chrg.cpMax + 1, TRUE);
-			std::unique_ptr<char[]> twoWordsBuffer(new char[twoWords.chrg.cpMax - twoWords.chrg.cpMin + 1]);
+			auto twoWordsBuffer = std::make_unique<char[]>(twoWords.chrg.cpMax - twoWords.chrg.cpMin + 1);
 			twoWords.lpstrText = twoWordsBuffer.get();
 			SecureZeroMemory(twoWords.lpstrText, twoWords.chrg.cpMax - twoWords.chrg.cpMin + 1);
 			Call(SCI_GETTEXTRANGE, 0, (LPARAM)&twoWords);
@@ -816,7 +767,7 @@ BOOL CSciEdit::OnChildNotify(UINT message, WPARAM wParam, LPARAM lParam, LRESULT
 				while (GetStyleAt(textrange.chrg.cpMax + 1) == style)
 					++textrange.chrg.cpMax;
 				++textrange.chrg.cpMax;
-				std::unique_ptr<char[]> textbuffer(new char[textrange.chrg.cpMax - textrange.chrg.cpMin + 1]);
+				auto textbuffer = std::make_unique<char[]>(textrange.chrg.cpMax - textrange.chrg.cpMin + 1);
 				textrange.lpstrText = textbuffer.get();
 				Call(SCI_GETTEXTRANGE, 0, (LPARAM)&textrange);
 				CString url;
@@ -1176,7 +1127,7 @@ bool CSciEdit::StyleEnteredText(int startstylepos, int endstylepos)
 	{
 		int offset = (int)Call(SCI_POSITIONFROMLINE, line_number);
 		int line_len = (int)Call(SCI_LINELENGTH, line_number);
-		std::unique_ptr<char[]> linebuffer(new char[line_len+1]);
+		auto linebuffer = std::make_unique<char[]>(line_len + 1);
 		Call(SCI_GETLINE, line_number, (LPARAM)linebuffer.get());
 		linebuffer[line_len] = 0;
 		int start = 0;
@@ -1316,7 +1267,7 @@ BOOL CSciEdit::MarkEnteredBugID(int startstylepos, int endstylepos)
 		end_pos = switchtemp;
 	}
 
-	std::unique_ptr<char[]> textbuffer(new char[end_pos - start_pos + 2]);
+	auto textbuffer = std::make_unique<char[]>(end_pos - start_pos + 2);
 	TEXTRANGEA textrange;
 	textrange.lpstrText = textbuffer.get();
 	textrange.chrg.cpMin = start_pos;
@@ -1421,7 +1372,7 @@ void CSciEdit::StyleURLs(int startstylepos, int endstylepos)
 	startstylepos = (int)Call(SCI_POSITIONFROMLINE, (WPARAM)line_number);
 
 	int len = endstylepos - startstylepos + 1;
-	std::unique_ptr<char[]> textbuffer(new char[len + 1]);
+	auto textbuffer = std::make_unique<char[]>(len + 1);
 	TEXTRANGEA textrange;
 	textrange.lpstrText = textbuffer.get();
 	textrange.chrg.cpMin = startstylepos;
@@ -1476,8 +1427,7 @@ bool CSciEdit::IsUrl(const CStringA& sText)
 {
 	if (!PathIsURLA(sText))
 		return false;
-	static const CStringA prefixes[] = { "http://", "https://", "git://", "ftp://", "file://", "mailto:" };
-	for (const auto& prefix : prefixes)
+	for (const CStringA& prefix : { "http://", "https://", "git://", "ftp://", "file://", "mailto:" })
 	{
 		if (sText.Find(prefix) == 0 && sText.GetLength() != prefix.GetLength())
 			return true;
@@ -1678,26 +1628,20 @@ void CSciEdit::SetUDiffStyle()
 
 int CSciEdit::LoadFromFile(CString &filename)
 {
-	FILE *fp = NULL;
-	_tfopen_s(&fp, filename, _T("rb"));
-	if (fp)
-	{
-		//SetTitle();
-				char data[4096] = { 0 };
-				size_t lenFile = fread(data, 1, sizeof(data), fp);
-				bool bUTF8 = IsUTF8(data, lenFile);
-				while (lenFile > 0)
-				{
-					Call(SCI_ADDTEXT, lenFile,
-						reinterpret_cast<LPARAM>(static_cast<char *>(data)));
-					lenFile = fread(data, 1, sizeof(data), fp);
-				}
-				fclose(fp);
-				Call(SCI_SETCODEPAGE, bUTF8 ? SC_CP_UTF8 : GetACP());
-				return 0;
-	}
-	else
+	CAutoFILE fp = _tfsopen(filename, _T("rb"), _SH_DENYWR);
+	if (!fp)
 		return -1;
+
+	char data[4096] = { 0 };
+	size_t lenFile = fread(data, 1, sizeof(data), fp);
+	bool bUTF8 = IsUTF8(data, lenFile);
+	while (lenFile > 0)
+	{
+		Call(SCI_ADDTEXT, lenFile, reinterpret_cast<LPARAM>(static_cast<char *>(data)));
+		lenFile = fread(data, 1, sizeof(data), fp);
+	}
+	Call(SCI_SETCODEPAGE, bUTF8 ? SC_CP_UTF8 : GetACP());
+	return 0;
 }
 
 void CSciEdit::RestyleBugIDs()

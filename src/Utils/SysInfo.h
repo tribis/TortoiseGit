@@ -1,5 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
+// Copyright (C) 2015 - TortoiseGit
 // Copyright (C) 2008 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -17,7 +18,10 @@
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 //
 #pragma once
-
+#include <VersionHelpers.h>
+#ifndef _WIN32_WINNT_WIN10
+#define _WIN32_WINNT_WIN10 0x0A00
+#endif
 
 /**
  * \ingroup Utils
@@ -28,19 +32,13 @@ class SysInfo
 private:
     SysInfo(void);
     ~SysInfo(void);
-	// prevent cloning
-	SysInfo(const SysInfo&);
-	SysInfo& operator=(const SysInfo&);
+    // prevent cloning
+    SysInfo(const SysInfo&) = delete;
+    SysInfo& operator=(const SysInfo&) = delete;
 public:
     static const SysInfo& Instance();
 
-    DWORD           GetFullVersion() const {return MAKEWORD(inf.dwMinorVersion, inf.dwMajorVersion);}
-    bool            IsXP() const {return (GetFullVersion() < 0x0600);} // cover Win5.1 and 5.2 alike
-    bool            IsVista() const {return (GetFullVersion() == 0x0600);}
-    bool            IsVistaOrLater() const {return (GetFullVersion() >= 0x0600);}
-    bool            IsWin7() const {return (GetFullVersion() == 0x0601);}
-    bool            IsWin7OrLater() const {return (GetFullVersion() >= 0x0601);}
-    bool            IsWin10() const { return (GetFullVersion() == 0xA00); }
-private:
-    OSVERSIONINFOEX         inf;
+	bool            IsWin7OrLater() const { return IsWindows7OrGreater(); }
+	bool            IsWin8OrLater() const { return IsWindows8OrGreater(); }
+	bool            IsWin10() const { return IsWindowsVersionOrGreater(HIBYTE(_WIN32_WINNT_WIN10), LOBYTE(_WIN32_WINNT_WIN10), 0); }
 };

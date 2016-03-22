@@ -1,6 +1,6 @@
 ﻿// TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2015 - TortoiseGit
+// Copyright (C) 2015-2016 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -44,6 +44,24 @@ TEST(CGit, RunGit)
 	CGit cgit;
 	ASSERT_EQ(0, cgit.Run(_T("git --version"), &output, CP_UTF8));
 	ASSERT_FALSE(output.IsEmpty());
+}
+
+TEST(CGit, RunGit_BashPipe)
+{
+	CString tmpfile = GetTempFile();
+	tmpfile.Replace(L"\\", L"/");
+	ASSERT_TRUE(CStringUtils::WriteStringToTextFile((LPCTSTR)tmpfile, L"testing piping..."));
+	SCOPE_EXIT{ ::DeleteFile(tmpfile); };
+	CString pipefile = GetTempFile();
+	pipefile.Replace(L"\\", L"/");
+	CString pipecmd;
+	pipecmd.Format(L"cat < %s", (LPCTSTR)tmpfile);
+	ASSERT_TRUE(CStringUtils::WriteStringToTextFile((LPCTSTR)pipefile, (LPCTSTR)pipecmd));
+	SCOPE_EXIT{ ::DeleteFile(pipefile); };
+	CString output;
+	CGit cgit;
+	ASSERT_EQ(0, cgit.Run(L"bash.exe " + pipefile, &output, CP_UTF8));
+	ASSERT_STREQ(L"testing piping...", output);
 }
 
 TEST(CGit, RunGit_Error)
@@ -126,7 +144,7 @@ TEST(CGit, GetFileModifyTime)
 	__int64 time2 = -1;
 	isDir = false;
 	size = -1;
-	LONG ticks = GetTickCount();
+	ULONGLONG ticks = GetTickCount64();
 	EXPECT_EQ(0, CGit::GetFileModifyTime(testFile, &time2, &isDir, &size));
 	EXPECT_EQ(time, time2);
 	EXPECT_FALSE(isDir);
@@ -142,7 +160,7 @@ TEST(CGit, GetFileModifyTime)
 	EXPECT_FALSE(isDir);
 	EXPECT_EQ(25, size);
 	EXPECT_TRUE(time3 >= time);
-	EXPECT_TRUE(time3 - time <= 1 + (GetTickCount() - ticks) / 1000);
+	EXPECT_TRUE(time3 - time <= 1 + (__int64)(GetTickCount64() - ticks) / 1000);
 }
 
 TEST(CGit, LoadTextFile)
@@ -220,6 +238,14 @@ TEST(CGit, GetShortName)
 	type = CGit::UNKNOWN;
 	EXPECT_STREQ(_T("releases/v1"), CGit::GetShortName(_T("refs/tags/releases/v1"), &type));
 	EXPECT_EQ(CGit::TAG, type);
+
+	type = CGit::UNKNOWN;
+	EXPECT_STREQ(_T("release2"), CGit::GetShortName(_T("refs/tags/release2^{}"), &type));
+	EXPECT_EQ(CGit::ANNOTATED_TAG, type);
+
+	type = CGit::UNKNOWN;
+	EXPECT_STREQ(_T("releases/v2"), CGit::GetShortName(_T("refs/tags/releases/v2^{}"), &type));
+	EXPECT_EQ(CGit::ANNOTATED_TAG, type);
 
 	type = CGit::UNKNOWN;
 	EXPECT_STREQ(_T("stash"), CGit::GetShortName(_T("refs/stash"), &type));
@@ -2085,4 +2111,36 @@ TEST_P(CBasicGitWithEmptyRepositoryFixture, GetWorkingTreeChanges)
 	EXPECT_EQ(CTGitPath::LOGACTIONS_ADDED, list[0].m_Action);
 	EXPECT_STREQ(_T("test.txt"), list[1].GetGitPathString());
 	EXPECT_EQ(CTGitPath::LOGACTIONS_ADDED, list[1].m_Action);
+}
+
+TEST_P(CBasicGitWithTestRepoFixture, GetBisectTerms)
+{
+	if (m_Git.ms_bCygwinGit)
+		return;
+
+	CString good, bad;
+	CString output;
+
+	EXPECT_EQ(0, m_Git.Run(_T("git.exe bisect start"), &output, CP_UTF8));
+	m_Git.GetBisectTerms(&good, &bad);
+	EXPECT_STREQ(_T("good"), good);
+	EXPECT_STREQ(_T("bad"), bad);
+
+	good.Empty();
+	bad.Empty();
+	m_Git.GetBisectTerms(&good, &bad);
+	EXPECT_STREQ(_T("good"), good);
+	EXPECT_STREQ(_T("bad"), bad);
+
+	EXPECT_EQ(0, m_Git.Run(_T("git.exe bisect reset"), &output, CP_UTF8));
+
+	if (m_Git.GetGitVersion(nullptr, nullptr) < 0x02070000)
+		return;
+
+	EXPECT_EQ(0, m_Git.Run(_T("git.exe bisect start --term-good=original --term-bad=changed"), &output, CP_UTF8));
+	m_Git.GetBisectTerms(&good, &bad);
+	EXPECT_STREQ(_T("original"), good);
+	EXPECT_STREQ(_T("changed"), bad);
+
+	EXPECT_EQ(0, m_Git.Run(_T("git.exe bisect reset"), &output, CP_UTF8));
 }

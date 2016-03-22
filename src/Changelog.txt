@@ -18,6 +18,60 @@ settings.
 
 ################################################################################
 
+= Release 2.0.0 =
+Released: 2016-02-29
+
+== Changes ==
+ * Custom dictionaries are no longer loaded when located in %PROGRAMFILES%\TortoiseGit or %PROGRAMFILES%\TortoiseGit\bin-directory
+   Must be in  %APPDATA%\TortoiseGit\dic or %PROGRAMFILES%\TortoiseGit\Languages folder (former has priority)
+ * Dropped TGitCacheCheckContent configuration setting, please use TGitCacheCheckContentMaxSize instead (settings will be automatically migrated)
+ * Pre- and post-push hooks do not get the path as first parameter any more
+ * Git for Windows 1.9.5 or newer is now required
+ * TortoiseGit now applies the same whitespace and new line sanitizing rules as git core for commit messages by default
+ * TortoiseGit now strips commented lines (starting with #) on commit messages by default
+ * We changed the version schema to X.Y.Z, where X is incremented for major changes, Y for every stable release, and Z!=0 represents preview releases
+
+== Features ==
+ * Fixed issue #2641: Commit: Pre-select first item from "Changes made" list
+ * Allow to reset stored decisions (cf. issue #2640)
+ * Fixed issue #2643: Set branch description on its creation
+ * Fixed issue #1629: Have the push dialog opened via right-click in log default to branch that was actually clicked on
+ * Update TortoiseGitPlink to version 0.66
+ * Fixed issue #943: Allow to use keyboard shortcuts in Git progress dialog (e.g., ALT+R for ReCommit after commit)
+ * Fixed issue #2314: Allow to preserve merges on rebase
+ * Fixed issue #2673: Display tracked remote URL in folder properties
+ * Fixed issue #2630: TGitBlame: Allow to blame files of different working trees w/o restarting
+ * Fixed issue #2679: Unnecessary horizontal scrollbar is shown in case logwidthmarker is set
+ * Rebase dialog now honors rebase.autostash=true
+ * Fixed issue #2270: Print a warning on a merge commit, so that changes are not unchecked unintentionally
+ * Fixed issue #2310: Add support for notes.rewrite.rebase
+ * Fixed issue #2629: "Browse References Dialog" save sort column + order
+ * Fixed issue #2678: Filter out special ref names in log graph
+ * Fixed issue #2692: Add support for pull.rebase and branch.name.rebase
+ * Fixed issue #2701: Add and Revert should respect Autoclose settings and not show any dialog boxes
+   Maybe we introduce finer grained auto close levels later.
+ * Fixed issue #1899: Support cherry-picking merge revisions 
+ * Fixed issue #2551: Allow to create patches w/o a/ and b/ prefixes
+ * Fixed issue #2302: One button to do Commit & push
+ * Fixed issue #527: Fix the dialog after commit for us to be able to continue committing
+ * Fixed issue #2697: Display "In Commits" and "In ChangeList" tabs for Fetch&Rebase in Sync dialog
+ * Fixed issue #2484: Recursive option is not remembered in clone dialog
+ * Fixed issue #2259: SyncDlg: Allow to fetch all remote references of a specific remote instead of a single branch (Fetch all refs)
+ * Fixed issue #1130: Sync dialog forgets the remote branch every time (ask whether to store a tracked branch)
+
+== Bug Fixes ==
+ * Fixed issue #2647: TortoiseGitBlame does not display files correctly with mixed line endings (such as CRCRLF)
+ * Fixed issue #2650: Empty ListViews drawing issue
+ * Fixed issue #2662: Border line in commit text boxes is shown 2 characters past the specified width
+ * Fixed issue #2660: No colors in git.exe progress dialog since 1.8.16
+ * Fixed issue #2646: Library broken in Windows 10
+ * Fixed issue #2670: LogDlg: cannot paste to "Filter paths"
+ * Fixed issue #2676: Swapped Theirs and Mine in Edit conflicts outside of rebase dialog on rebasing
+ * Fixed issue #2690: Failed to Show log from repository browser when that repository is located on a drive
+ * Fixed issue #2655: Resolve does not work on multiple selection during deleted-modifed conflict resolution
+ * Fixed issue #2668: TortoiseGit commit with git-lfs files, show me a error: ".git/index.lock" file exist
+ * Fixed issue #2638: TGitCache crashes on a broken repo (out of bounds read in libgit2)
+
 = Release 1.8.16.0 =
 Released: 2015-11-01
 

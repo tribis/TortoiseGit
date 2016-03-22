@@ -5,7 +5,7 @@
     <ProductVersion>3.5</ProductVersion>
     <ProjectGuid>{bdbf2bdf-5215-40cb-a06d-877833787a8d}</ProjectGuid>
     <SchemaVersion>2.0</SchemaVersion>
-    <OutputName>TortoiseGit-LanguagePack-it_IT</OutputName>
+    <OutputName>TortoiseGit-LanguagePack-it</OutputName>
     <OutputType>Package</OutputType>
     <WixTargetsPath Condition=" '$(WixTargetsPath)' == '' ">$(MSBuildExtensionsPath)\Microsoft\WiX\v3.x\Wix.targets</WixTargetsPath>
   </PropertyGroup>
@@ -19,7 +19,7 @@
     <IntermediateOutputPath>..\obj\$(OutputName)\$(Configuration)\</IntermediateOutputPath>
     <WixVariables>
     </WixVariables>
-    <DefineConstants>TSVNHelpFile=0;TMergeHelpFile=0;COUNTRYID=1040;LANGNATIVE=Italian (Italy);SPELL=1;</DefineConstants>
+    <DefineConstants>TSVNHelpFile=0;TMergeHelpFile=0;COUNTRYID=1040;LANGNATIVE=Italian;SPELL=1;</DefineConstants>
     <LinkerAdditionalOptions>-ext WixUIExtension</LinkerAdditionalOptions>
     <SuppressIces>ICE61;ICE82</SuppressIces>
     <Cultures>it-IT</Cultures>
@@ -35,7 +35,7 @@
     <IntermediateOutputPath>..\obj\$(OutputName)\$(Configuration)64\</IntermediateOutputPath>
     <WixVariables>
     </WixVariables>
-    <DefineConstants>TSVNHelpFile=0;TMergeHelpFile=0;COUNTRYID=1040;LANGNATIVE=Italian (Italy);SPELL=1;</DefineConstants>
+    <DefineConstants>TSVNHelpFile=0;TMergeHelpFile=0;COUNTRYID=1040;LANGNATIVE=Italian;SPELL=1;</DefineConstants>
     <LinkerAdditionalOptions>-ext WixUIExtension</LinkerAdditionalOptions>
     <SuppressIces>ICE61;ICE82</SuppressIces>
     <Cultures>it-IT</Cultures>

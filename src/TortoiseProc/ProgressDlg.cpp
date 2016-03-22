@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2016 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -34,6 +34,7 @@
 #include "MessageBox.h"
 #include "LogFile.h"
 #include "CmdLineParser.h"
+#include "StringUtils.h"
 
 // CProgressDlg dialog
 
@@ -44,9 +45,10 @@ CProgressDlg::CProgressDlg(CWnd* pParent /*=NULL*/)
 	, m_bShowCommand(true)
 	, m_bAbort(false)
 	, m_bDone(false)
-	, m_startTick(GetTickCount())
+	, m_startTick(GetTickCount64())
 	, m_BufStart(0)
 	, m_Git(&g_Git)
+	, m_hAccel(nullptr)
 {
 	m_pThread = NULL;
 	m_bBufferAll=false;
@@ -71,6 +73,8 @@ CProgressDlg::CProgressDlg(CWnd* pParent /*=NULL*/)
 
 CProgressDlg::~CProgressDlg()
 {
+	if (m_hAccel)
+		DestroyAcceleratorTable(m_hAccel);
 	delete m_pThread;
 }
 
@@ -146,6 +150,9 @@ BOOL CProgressDlg::OnInitDialog()
 	m_Log.SetWindowTextW(InitialText);
 	m_CurrentWork.SetWindowTextW(_T(""));
 
+	if (!m_PreFailText.IsEmpty())
+		InsertColorText(this->m_Log, m_PreFailText, RGB(255, 0, 0));
+
 	EnableSaveRestore(_T("ProgressDlg"));
 
 	m_pThread = AfxBeginThread(ProgressThreadEntry, this, THREAD_PRIORITY_NORMAL,0,CREATE_SUSPENDED);
@@ -191,22 +198,22 @@ UINT CProgressDlg::ProgressThreadEntry(LPVOID pVoid)
 }
 
 //static function, Share with SyncDialog
-UINT CProgressDlg::RunCmdList(CWnd* pWnd, STRING_VECTOR& cmdlist, STRING_VECTOR& dirlist, bool bShowCommand, CString* pfilename, bool* bAbort, CGitGuardedByteArray* pdata, CGit* git)
+UINT CProgressDlg::RunCmdList(CWnd* pWnd, STRING_VECTOR& cmdlist, STRING_VECTOR& dirlist, bool bShowCommand, CString* pfilename, volatile bool* bAbort, CGitGuardedByteArray* pdata, CGit* git)
 {
 	UINT ret=0;
 
 	std::vector<std::unique_ptr<CBlockCacheForPath>> cacheBlockList;
 	std::vector<std::unique_ptr<CGit>> gitList;
 	if (dirlist.empty())
-		cacheBlockList.push_back(std::unique_ptr<CBlockCacheForPath>(new CBlockCacheForPath(git->m_CurrentDir)));
+		cacheBlockList.push_back(std::make_unique<CBlockCacheForPath>(git->m_CurrentDir));
 	else
 	{
 		for (const auto& dir : dirlist)
 		{
-			CGit *pGit = new CGit;
+			auto pGit = std::make_unique<CGit>();
 			pGit->m_CurrentDir = dir;
-			gitList.push_back(std::unique_ptr<CGit>(pGit));
-			cacheBlockList.push_back(std::unique_ptr<CBlockCacheForPath>(new CBlockCacheForPath(dir)));
+			gitList.push_back(std::move(pGit));
+			cacheBlockList.push_back(std::make_unique<CBlockCacheForPath>(dir));
 		}
 	}
 
@@ -323,7 +330,7 @@ UINT CProgressDlg::ProgressThread()
 	else
 		pfilename=&m_LogFile;
 
-	m_startTick = GetTickCount();
+	m_startTick = GetTickCount64();
 	m_GitStatus = RunCmdList(this, m_GitCmdList, m_GitDirList, m_bShowCommand, pfilename, &m_bAbort, &this->m_Databuf, m_Git);
 	return 0;
 }
@@ -344,7 +351,7 @@ LRESULT CProgressDlg::OnProgressUpdateUI(WPARAM wParam,LPARAM lParam)
 	if(wParam == MSG_PROGRESSDLG_END || wParam == MSG_PROGRESSDLG_FAILED)
 	{
 		CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": got message: %d\n"), wParam);
-		DWORD tickSpent = GetTickCount() - m_startTick;
+		ULONGLONG tickSpent = GetTickCount64() - m_startTick;
 		CString strEndTime = CLoglistUtils::FormatDateAndTime(CTime::GetCurrentTime(), DATE_SHORTDATE, true, false);
 
 		if(m_bBufferAll)
@@ -377,6 +384,18 @@ LRESULT CProgressDlg::OnProgressUpdateUI(WPARAM wParam,LPARAM lParam)
 				m_GitStatus = (DWORD)-1;
 		}
 
+		if (m_PostExecCallback)
+		{
+			CString extraMsg;
+			m_PostExecCallback(m_GitStatus, extraMsg);
+			if (!extraMsg.IsEmpty())
+			{
+				int start = m_Log.GetTextLength();
+				m_Log.SetSel(start, start);
+				m_Log.ReplaceSel(extraMsg);
+			}
+		}
+
 		if(this->m_GitStatus)
 		{
 			if (m_pTaskbarList)
@@ -388,10 +407,10 @@ LRESULT CProgressDlg::OnProgressUpdateUI(WPARAM wParam,LPARAM lParam)
 			log.Format(IDS_PROC_PROGRESS_GITUNCLEANEXIT, m_GitStatus);
 			CString err;
 			if (CRegDWORD(_T("Software\\TortoiseGit\\ShowGitexeTimings"), TRUE))
-				err.Format(_T("\r\n\r\n%s (%lu ms @ %s)\r\n"), (LPCTSTR)log, tickSpent, (LPCTSTR)strEndTime);
+				err.Format(_T("\r\n\r\n%s (%I64u ms @ %s)\r\n"), (LPCTSTR)log, tickSpent, (LPCTSTR)strEndTime);
 			else
 				err.Format(_T("\r\n\r\n%s\r\n"), (LPCTSTR)log);
-			if (!m_GitCmd.IsEmpty() && !m_GitCmdList.empty())
+			if (!m_GitCmd.IsEmpty() || !m_GitCmdList.empty())
 				InsertColorText(this->m_Log, err, RGB(255,0,0));
 			if (CRegDWORD(_T("Software\\TortoiseGit\\NoSounds"), FALSE) == FALSE)
 				PlaySound((LPCTSTR)SND_ALIAS_SYSTEMEXCLAMATION, NULL, SND_ALIAS_ID | SND_ASYNC);
@@ -403,7 +422,7 @@ LRESULT CProgressDlg::OnProgressUpdateUI(WPARAM wParam,LPARAM lParam)
 			temp.LoadString(IDS_SUCCESS);
 			CString log;
 			if (CRegDWORD(_T("Software\\TortoiseGit\\ShowGitexeTimings"), TRUE))
-				log.Format(_T("\r\n%s (%lu ms @ %s)\r\n"), (LPCTSTR)temp, tickSpent, (LPCTSTR)strEndTime);
+				log.Format(_T("\r\n%s (%I64u ms @ %s)\r\n"), (LPCTSTR)temp, tickSpent, (LPCTSTR)strEndTime);
 			else
 				log.Format(_T("\r\n%s\r\n"), (LPCTSTR)temp);
 			InsertColorText(this->m_Log, log, RGB(0,0,255));
@@ -420,8 +439,36 @@ LRESULT CProgressDlg::OnProgressUpdateUI(WPARAM wParam,LPARAM lParam)
 
 				if (!m_PostCmdList.empty())
 				{
+					int i = 0;
 					for (const auto& entry : m_PostCmdList)
+					{
+						++i;
 						m_ctrlPostCmd.AddEntry(entry.icon, entry.label);
+						TCHAR accellerator = CStringUtils::GetAccellerator(entry.label);
+						if (accellerator == L'\0')
+							continue;
+						++m_accellerators[accellerator].cnt;
+						if (m_accellerators[accellerator].cnt > 1)
+							m_accellerators[accellerator].id = -1;
+						else
+							m_accellerators[accellerator].id = i - 1;
+					}
+
+					if (m_accellerators.size())
+					{
+						LPACCEL lpaccelNew = (LPACCEL)LocalAlloc(LPTR, m_accellerators.size() * sizeof(ACCEL));
+						SCOPE_EXIT { LocalFree(lpaccelNew); };
+						i = 0;
+						for (auto& entry : m_accellerators)
+						{
+							lpaccelNew[i].cmd = (WORD)(WM_USER + 1 + entry.second.id);
+							lpaccelNew[i].fVirt = FVIRTKEY | FALT;
+							lpaccelNew[i].key = entry.first;
+							entry.second.wmid = lpaccelNew[i].cmd;
+							++i;
+						}
+						m_hAccel = CreateAcceleratorTable(lpaccelNew, (int)m_accellerators.size());
+					}
 					GetDlgItem(IDC_PROGRESS_BUTTON1)->ShowWindow(SW_SHOW);
 				}
 			}
@@ -598,7 +645,6 @@ void CProgressDlg::RemoveLastLine(CString &str)
 	start=str.ReverseFind(_T('\n'));
 	if(start>0)
 		str=str.Left(start);
-	return;
 }
 // CProgressDlg message handlers
 
@@ -682,7 +728,11 @@ void CProgressDlg::OnCancel()
 
 	::WaitForSingleObject(m_Git->m_CurrentGitPi.hProcess ,10000);
 	if (m_pThread)
-		::WaitForSingleObject(m_pThread->m_hThread, 5000);
+	{
+		if (::WaitForSingleObject(m_pThread->m_hThread, 5000) == WAIT_TIMEOUT)
+			TerminateThread(m_pThread->m_hThread, (DWORD)-1);
+	}
+
 	WriteLog();
 	CResizableStandAloneDialog::OnCancel();
 }
@@ -768,6 +818,8 @@ LRESULT CProgressDlg::OnTaskbarBtnCreated(WPARAM /*wParam*/, LPARAM /*lParam*/)
 
 BOOL CProgressDlg::PreTranslateMessage(MSG* pMsg)
 {
+	if (m_hAccel && TranslateAccelerator(m_hWnd, m_hAccel, pMsg))
+		return TRUE;
 	if (pMsg->message == WM_KEYDOWN)
 	{
 		if (pMsg->wParam == VK_ESCAPE)
@@ -829,4 +881,26 @@ BOOL CProgressDlg::PreTranslateMessage(MSG* pMsg)
 		}
 	}
 	return __super::PreTranslateMessage(pMsg);
+}
+
+LRESULT CProgressDlg::DefWindowProc(UINT message, WPARAM wParam, LPARAM lParam)
+{
+	if (m_hAccel && message == WM_COMMAND && LOWORD(wParam) >= WM_USER && LOWORD(wParam) <= WM_USER + m_accellerators.size())
+	{
+		for (const auto& entry : m_accellerators)
+		{
+			if (entry.second.wmid != LOWORD(wParam))
+				continue;
+			if (entry.second.id == -1)
+				m_ctrlPostCmd.PostMessage(WM_KEYDOWN, VK_F4, NULL);
+			else
+			{
+				m_ctrlPostCmd.SetCurrentEntry(entry.second.id);
+				OnBnClickedButton1();
+			}
+			return 0;
+		}
+	}
+
+	return __super::DefWindowProc(message, wParam, lParam);
 }

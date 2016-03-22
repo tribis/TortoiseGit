@@ -113,7 +113,7 @@ STDMETHODIMP CShellExt::Initialize_Wrap(LPCITEMIDLIST pIDFolder,
 					UINT len = DragQueryFile(drop, i, NULL, 0);
 					if (len == 0)
 						continue;
-					std::unique_ptr<TCHAR[]> szFileName(new TCHAR[len + 1]);
+					auto szFileName = std::make_unique<TCHAR[]>(len + 1);
 					if (0 == DragQueryFile(drop, i, szFileName.get(), len + 1))
 						continue;
 					stdstring str = stdstring(szFileName.get());
@@ -645,7 +645,7 @@ void CShellExt::InsertGitMenu(BOOL istop, HMENU menu, UINT pos, UINT_PTR id, UIN
 	if (icon)
 	{
 		menuiteminfo.fMask |= MIIM_BITMAP;
-		menuiteminfo.hbmpItem = SysInfo::Instance().IsVistaOrLater() ? m_iconBitmapUtils.IconToBitmapPARGB32(g_hResInst, icon) : HBMMENU_CALLBACK;
+		menuiteminfo.hbmpItem = m_iconBitmapUtils.IconToBitmapPARGB32(g_hResInst, icon);
 	}
 	menuiteminfo.wID = (UINT)id;
 	InsertMenuItem(menu, pos, TRUE, &menuiteminfo);
@@ -683,8 +683,8 @@ bool CShellExt::WriteClipboardPathsToTempFile(stdstring& tempfile)
 	//for TortoiseGitProc.exe to read out again.
 	DWORD written = 0;
 	DWORD pathlength = GetTortoiseGitTempPath(0, NULL);
-	std::unique_ptr<TCHAR[]> path(new TCHAR[pathlength + 1]);
-	std::unique_ptr<TCHAR[]> tempFile(new TCHAR[pathlength + 100]);
+	auto path = std::make_unique<TCHAR[]>(pathlength + 1);
+	auto tempFile = std::make_unique<TCHAR[]>(pathlength + 100);
 	GetTortoiseGitTempPath(pathlength+1, path.get());
 	GetTempFileName(path.get(), _T("git"), 0, tempFile.get());
 	tempfile = stdstring(tempFile.get());
@@ -734,8 +734,8 @@ stdstring CShellExt::WriteFileListToTempFile()
 	//write all selected files and paths to a temporary file
 	//for TortoiseGitProc.exe to read out again.
 	DWORD pathlength = GetTortoiseGitTempPath(0, NULL);
-	std::unique_ptr<TCHAR[]> path(new TCHAR[pathlength + 1]);
-	std::unique_ptr<TCHAR[]> tempFile(new TCHAR[pathlength + 100]);
+	auto path = std::make_unique<TCHAR[]>(pathlength + 1);
+	auto tempFile = std::make_unique<TCHAR[]>(pathlength + 100);
 	GetTortoiseGitTempPath(pathlength + 1, path.get());
 	GetTempFileName(path.get(), _T("git"), 0, tempFile.get());
 	stdstring retFilePath = stdstring(tempFile.get());
@@ -1148,7 +1148,7 @@ STDMETHODIMP CShellExt::QueryContextMenu_Wrap(HMENU hMenu,
 	if (uIcon)
 	{
 		menuiteminfo.fMask |= MIIM_BITMAP;
-		menuiteminfo.hbmpItem = SysInfo::Instance().IsVistaOrLater() ? m_iconBitmapUtils.IconToBitmapPARGB32(g_hResInst, uIcon) : HBMMENU_CALLBACK;
+		menuiteminfo.hbmpItem = m_iconBitmapUtils.IconToBitmapPARGB32(g_hResInst, uIcon);
 	}
 	menuiteminfo.hSubMenu = subMenu;
 	menuiteminfo.wID = idCmd++;
@@ -1539,8 +1539,8 @@ STDMETHODIMP CShellExt::InvokeCommand_Wrap(LPCMINVOKECOMMANDINFO lpcmi)
 						LPCSTR lpstr = (LPCSTR)GlobalLock(hglb);
 
 						DWORD len = GetTortoiseGitTempPath(0, NULL);
-						std::unique_ptr<TCHAR[]> path(new TCHAR[len + 1]);
-						std::unique_ptr<TCHAR[]> tempF(new TCHAR[len + 100]);
+						auto path = std::make_unique<TCHAR[]>(len + 1);
+						auto tempF = std::make_unique<TCHAR[]>(len + 100);
 						GetTortoiseGitTempPath(len + 1, path.get());
 						GetTempFileName(path.get(), TEXT("git"), 0, tempF.get());
 						std::wstring sTempFile = std::wstring(tempF.get());
@@ -2160,7 +2160,7 @@ bool CShellExt::InsertIgnoreSubmenus(UINT &idCmd, UINT idCmdFirst, HMENU hMenu, 
 		if (icon)
 		{
 			menuiteminfo.fMask |= MIIM_BITMAP;
-			menuiteminfo.hbmpItem = SysInfo::Instance().IsVistaOrLater() ? m_iconBitmapUtils.IconToBitmapPARGB32(g_hResInst, icon) : m_iconBitmapUtils.IconToBitmap(g_hResInst, icon);
+			menuiteminfo.hbmpItem = m_iconBitmapUtils.IconToBitmapPARGB32(g_hResInst, icon);
 		}
 		menuiteminfo.fType = MFT_STRING;
 		menuiteminfo.hSubMenu = ignoresubmenu;

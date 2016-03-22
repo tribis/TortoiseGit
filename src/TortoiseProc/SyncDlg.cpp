@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2016 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -38,6 +38,7 @@ IMPLEMENT_DYNAMIC(CSyncDlg, CResizableStandAloneDialog)
 
 CSyncDlg::CSyncDlg(CWnd* pParent /*=NULL*/)
 	: CResizableStandAloneDialog(CSyncDlg::IDD, pParent)
+	, m_iPullRebase(0)
 {
 	m_CurrentCmd = 0;
 	m_pTooltip=&this->m_tooltips;
@@ -45,7 +46,6 @@ CSyncDlg::CSyncDlg(CWnd* pParent /*=NULL*/)
 	m_CmdOutCurrentPos=0;
 	m_bAutoLoadPuttyKey = CAppUtils::IsSSHPutty();
 	m_bForce=false;
-	m_Gitverion = 0;
 	m_bBlock = false;
 	m_BufStart = 0;
 	m_pThread = NULL;
@@ -53,7 +53,7 @@ CSyncDlg::CSyncDlg(CWnd* pParent /*=NULL*/)
 	m_bDone = false;
 	m_bWantToExit = false;
 	m_GitCmdStatus = -1;
-	m_startTick = GetTickCount();
+	m_startTick = GetTickCount64();
 	m_seq = 0;
 }
 
@@ -115,6 +115,35 @@ void CSyncDlg::EnableControlButton(bool bEnabled)
 }
 // CSyncDlg message handlers
 
+bool CSyncDlg::AskSetTrackedBranch()
+{
+	CString remote, remoteBranch;
+	g_Git.GetRemoteTrackedBranch(m_strLocalBranch, remote, remoteBranch);
+	if (remoteBranch.IsEmpty())
+	{
+		remoteBranch = m_strRemoteBranch;
+		if (remoteBranch.IsEmpty())
+			remoteBranch = m_strLocalBranch;
+		CString temp;
+		temp.Format(IDS_NOTYET_SETTRACKEDBRANCH, (LPCTSTR)m_strLocalBranch, (LPCTSTR)remoteBranch);
+		BOOL dontShowAgain = FALSE;
+		auto ret = CMessageBox::ShowCheck(GetSafeHwnd(), temp, L"TortoiseGit", MB_ICONQUESTION | MB_YESNOCANCEL, nullptr, CString(MAKEINTRESOURCE(IDS_MSGBOX_DONOTSHOW)), &dontShowAgain);
+		if (dontShowAgain)
+			CRegDWORD(L"Software\\TortoiseGit\\AskSetTrackedBranch") = FALSE;
+		if (ret == IDCANCEL)
+			return false;
+		if (ret == IDYES)
+		{
+			CString key;
+			key.Format(L"branch.%s.remote", (LPCTSTR)m_strLocalBranch);
+			g_Git.SetConfigValue(key, m_strURL);
+			key.Format(L"branch.%s.merge", (LPCTSTR)m_strLocalBranch);
+			g_Git.SetConfigValue(key, L"refs/heads/" + g_Git.StripRefName(remoteBranch));
+		}
+	}
+	return true;
+}
+
 void CSyncDlg::OnBnClickedButtonPull()
 {
 	int CurrentEntry;
@@ -160,27 +189,92 @@ void CSyncDlg::OnBnClickedButtonPull()
 		return;
 	}
 
-	if (m_bAutoLoadPuttyKey && CurrentEntry != 3) // CurrentEntry (Remote Update) handles this on its own)
+	if (!IsURL() && !m_strRemoteBranch.IsEmpty() && CurrentEntry == 0 && CRegDWORD(L"Software\\TortoiseGit\\AskSetTrackedBranch", TRUE) == TRUE)
+	{
+		if (!AskSetTrackedBranch())
+			return;
+	}
+
+	if (m_bAutoLoadPuttyKey && CurrentEntry != 4) // CurrentEntry (Remote Update) handles this on its own)
 	{
 		CAppUtils::LaunchPAgent(NULL,&this->m_strURL);
 	}
 
-	this->SwitchToRun();
 	if (g_Git.GetMapHashToFriendName(m_oldHashMap))
 		MessageBox(g_Git.GetGitLastErr(_T("Could not get all refs.")), _T("TortoiseGit"), MB_ICONERROR);
 
 	CString force;
 	if(this->m_bForce)
-		force = _T(" --force ");
+		force = _T(" --force");
 
 	CString cmd;
 
+	m_iPullRebase = 0;
+	if (CurrentEntry == 0 && CRegDWORD(L"Software\\TortoiseGit\\PullRebaseBehaviorLike1816", FALSE) == FALSE) // check whether we need to override Pull if pull.rebase is set
+	{
+		CAutoRepository repo(g_Git.GetGitRepository());
+		if (!repo)
+			MessageBox(CGit::GetLibGit2LastErr(_T("Could not open repository.")), _T("TortoiseGit"), MB_OK | MB_ICONERROR);
+
+		// Check config branch.<name>.rebase and pull.reabse
+		do
+		{
+			if (!repo)
+				break;
+
+			if (git_repository_head_detached(repo) == 1)
+				break;
+
+			CAutoConfig config(true);
+			if (git_repository_config(config.GetPointer(), repo))
+				break;
+
+			// branch.<name>.rebase overrides pull.rebase
+			if (config.GetBOOL(_T("branch.") + g_Git.GetCurrentBranch() + _T(".rebase"), m_iPullRebase) == GIT_ENOTFOUND)
+			{
+				if (config.GetBOOL(_T("pull.rebase"), m_iPullRebase) == GIT_ENOTFOUND)
+					break;
+				else
+				{
+					CString value;
+					config.GetString(_T("pull.rebase"), value);
+					if (value == _T("preserve"))
+					{
+						m_iPullRebase = 2;
+						break;
+					}
+				}
+			}
+			else
+			{
+				CString value;
+				config.GetString(_T("branch.") + g_Git.GetCurrentBranch() + _T(".rebase"), value);
+				if (value == _T("preserve"))
+				{
+					m_iPullRebase = 2;
+					break;
+				}
+			}
+		} while (0);
+		if (m_iPullRebase > 0)
+		{
+			CurrentEntry = 1;
+			if (m_strRemoteBranch.IsEmpty())
+			{
+				CMessageBox::Show(GetSafeHwnd(), IDS_PROC_PULL_EMPTYBRANCH, IDS_APPNAME, MB_ICONEXCLAMATION);
+				return;
+			}
+		}
+	}
+
+	SwitchToRun();
+
 	ShowTab(IDC_CMD_LOG);
 
-	this->m_ctrlTabCtrl.ShowTab(IDC_REFLIST-1,true);
-	this->m_ctrlTabCtrl.ShowTab(IDC_IN_LOGLIST-1,false);
-	this->m_ctrlTabCtrl.ShowTab(IDC_IN_CHANGELIST-1,false);
-	this->m_ctrlTabCtrl.ShowTab(IDC_IN_CONFLICT-1,false);
+	m_ctrlTabCtrl.ShowTab(IDC_REFLIST - 1, true);
+	m_ctrlTabCtrl.ShowTab(IDC_IN_LOGLIST - 1, false);
+	m_ctrlTabCtrl.ShowTab(IDC_IN_CHANGELIST - 1, false);
+	m_ctrlTabCtrl.ShowTab(IDC_IN_CONFLICT - 1, false);
 
 	///Pull
 	if(CurrentEntry == 0) //Pull
@@ -196,10 +290,7 @@ void CSyncDlg::OnBnClickedButtonPull()
 				remotebranch.Empty();
 		}
 
-		if(m_Gitverion >= 0x01070203) //above 1.7.0.2
-			force += _T("--progress ");
-
-		cmd.Format(_T("git.exe pull -v %s \"%s\" %s"),
+		cmd.Format(_T("git.exe pull -v --progress%s \"%s\" %s"),
 				(LPCTSTR)force,
 				(LPCTSTR)m_strURL,
 				(LPCTSTR)remotebranch);
@@ -221,11 +312,13 @@ void CSyncDlg::OnBnClickedButtonPull()
 	}
 
 	///Fetch
-	if(CurrentEntry == 1 || CurrentEntry ==2 ) //Fetch
+	if (CurrentEntry == 1 || CurrentEntry == 2 || CurrentEntry == 3)
 	{
 		m_oldRemoteHash.Empty();
 		CString remotebranch;
-		if(this->IsURL() || m_strRemoteBranch.IsEmpty())
+		if (CurrentEntry == 3)
+			m_strRemoteBranch.Empty();
+		else if (IsURL() || m_strRemoteBranch.IsEmpty())
 		{
 			remotebranch=this->m_strRemoteBranch;
 
@@ -240,7 +333,7 @@ void CSyncDlg::OnBnClickedButtonPull()
 				remotebranch=m_strRemoteBranch+_T(":")+remotebranch;
 		}
 
-		if(CurrentEntry == 1)
+		if (CurrentEntry == 1 || CurrentEntry == 3)
 			m_CurrentCmd = GIT_COMMAND_FETCH;
 		else
 			m_CurrentCmd = GIT_COMMAND_FETCHANDREBASE;
@@ -248,22 +341,20 @@ void CSyncDlg::OnBnClickedButtonPull()
 		if (g_Git.UsingLibGit2(CGit::GIT_CMD_FETCH))
 		{
 			CString refspec;
-			// current libgit2 only supports well formated refspec
-			refspec.Format(_T("refs/heads/%s:refs/remotes/%s/%s"), (LPCTSTR)m_strRemoteBranch, (LPCTSTR)m_strURL, (LPCTSTR)m_strRemoteBranch);
+			if (!remotebranch.IsEmpty())
+				refspec.Format(_T("refs/heads/%s:refs/remotes/%s/%s"), (LPCTSTR)m_strRemoteBranch, (LPCTSTR)m_strURL, (LPCTSTR)m_strRemoteBranch);
 
-			FetchProgressCommand fetchProgressCommand;
-			fetchProgressCommand.SetUrl(m_strURL);
-			fetchProgressCommand.SetRefSpec(refspec);
-			m_GitProgressList.SetCommand(&fetchProgressCommand);
+			progressCommand = std::make_unique<FetchProgressCommand>();
+			FetchProgressCommand* fetchProgressCommand = reinterpret_cast<FetchProgressCommand*>(progressCommand.get());
+			fetchProgressCommand->SetUrl(m_strURL);
+			fetchProgressCommand->SetRefSpec(refspec);
+			m_GitProgressList.SetCommand(progressCommand.get());
 			m_GitProgressList.Init();
 			ShowTab(IDC_CMD_GIT_PROG);
 		}
 		else
 		{
-			if(m_Gitverion >= 0x01070203) //above 1.7.0.2
-				force += _T("--progress ");
-
-			cmd.Format(_T("git.exe fetch -v %s \"%s\" %s"),
+			cmd.Format(_T("git.exe fetch --progress -v%s \"%s\" %s"),
 					(LPCTSTR)force,
 					(LPCTSTR)m_strURL,
 					(LPCTSTR)remotebranch);
@@ -284,7 +375,7 @@ void CSyncDlg::OnBnClickedButtonPull()
 	}
 
 	///Remote Update
-	if(CurrentEntry == 3)
+	if (CurrentEntry == 4)
 	{
 		if (m_bAutoLoadPuttyKey)
 		{
@@ -316,7 +407,7 @@ void CSyncDlg::OnBnClickedButtonPull()
 	}
 
 	///Cleanup stale remote banches
-	if(CurrentEntry == 4)
+	if (CurrentEntry == 5)
 	{
 		m_CurrentCmd = GIT_COMMAND_REMOTE;
 		cmd.Format(_T("git.exe remote prune \"%s\""), (LPCTSTR)m_strURL);
@@ -338,15 +429,42 @@ void CSyncDlg::OnBnClickedButtonPull()
 	}
 }
 
+void CSyncDlg::ShowInCommits(const CString& friendname)
+{
+	CGitHash newHash;
+
+	if (g_Git.GetHash(newHash, friendname))
+	{
+		MessageBox(g_Git.GetGitLastErr(L"Could not get " + friendname + L" hash."), L"TortoiseGit", MB_ICONERROR);
+		return;
+	}
+
+	if (newHash == m_oldHash)
+	{
+		m_ctrlTabCtrl.ShowTab(IDC_IN_CHANGELIST - 1, false);
+		m_InLogList.ShowText(CString(MAKEINTRESOURCE(IDS_UPTODATE)));
+		m_ctrlTabCtrl.ShowTab(IDC_IN_LOGLIST - 1, true);
+		ShowTab(IDC_REFLIST);
+	}
+	else
+	{
+		m_ctrlTabCtrl.ShowTab(IDC_IN_CHANGELIST - 1, true);
+		m_ctrlTabCtrl.ShowTab(IDC_IN_LOGLIST - 1, true);
+
+		AddDiffFileList(&m_InChangeFileList, &m_arInChangeList, newHash.ToString(), m_oldHash.ToString());
+
+		CString range;
+		range.Format(L"%s..%s", (LPCTSTR)m_oldHash.ToString(), (LPCTSTR)newHash.ToString());
+		m_InLogList.FillGitLog(nullptr, &range, CGit::LOG_INFO_STAT | CGit::LOG_INFO_FILESTATE | CGit::LOG_INFO_SHOW_MERGEDFILE);
+		ShowTab(IDC_IN_LOGLIST);
+	}
+}
+
 void CSyncDlg::PullComplete()
 {
 	EnableControlButton(true);
 	SwitchToInput();
 	this->FetchOutList(true);
-
-	CGitHash newhash;
-	if (g_Git.GetHash(newhash, _T("HEAD")))
-		MessageBox(g_Git.GetGitLastErr(_T("Could not get HEAD hash after pulling.")), _T("TortoiseGit"), MB_ICONERROR);
 
 	if( this ->m_GitCmdStatus )
 	{
@@ -378,27 +496,7 @@ void CSyncDlg::PullComplete()
 
 	}
 	else
-	{
-		if(newhash == this->m_oldHash)
-		{
-			this->m_ctrlTabCtrl.ShowTab(IDC_IN_CHANGELIST-1,false);
-			this->m_InLogList.ShowText(CString(MAKEINTRESOURCE(IDS_UPTODATE)));
-			this->m_ctrlTabCtrl.ShowTab(IDC_IN_LOGLIST-1,true);
-			this->ShowTab(IDC_REFLIST);
-		}
-		else
-		{
-			this->m_ctrlTabCtrl.ShowTab(IDC_IN_CHANGELIST-1,true);
-			this->m_ctrlTabCtrl.ShowTab(IDC_IN_LOGLIST-1,true);
-
-			this->AddDiffFileList(&m_InChangeFileList, &m_arInChangeList, newhash.ToString(), m_oldHash.ToString());
-
-			CString range;
-			range.Format(_T("%s..%s"), (LPCTSTR)m_oldHash.ToString(), (LPCTSTR)newhash.ToString());
-			m_InLogList.FillGitLog(nullptr, &range, CGit::LOG_INFO_STAT| CGit::LOG_INFO_FILESTATE | CGit::LOG_INFO_SHOW_MERGEDFILE);
-			this->ShowTab(IDC_IN_LOGLIST);
-		}
-	}
+		ShowInCommits(L"HEAD");
 }
 
 void CSyncDlg::FetchComplete()
@@ -411,7 +509,7 @@ void CSyncDlg::FetchComplete()
 	else
 		ShowTab(IDC_REFLIST);
 
-	if (m_GitCmdStatus || m_CurrentCmd != GIT_COMMAND_FETCHANDREBASE)
+	if (m_GitCmdStatus || (m_CurrentCmd != GIT_COMMAND_FETCHANDREBASE && m_iPullRebase == 0))
 	{
 		FetchOutList(true);
 		return;
@@ -432,10 +530,24 @@ void CSyncDlg::FetchComplete()
 	if (!remote.IsEmpty() && !remotebranch.IsEmpty())
 		upstream = _T("remotes/") + remote + _T("/") + remotebranch;
 
+	if (m_iPullRebase > 0)
+	{
+		CAppUtils::RebaseAfterFetch(upstream, m_iPullRebase ? 2 : 0, m_iPullRebase == 2);
+		FillNewRefMap();
+		FetchOutList(true);
+
+		ShowInCommits(L"HEAD");
+
+		return;
+	}
+
 	CGitHash remoteBranchHash;
 	g_Git.GetHash(remoteBranchHash, upstream);
 	if (remoteBranchHash == m_oldRemoteHash && !m_oldRemoteHash.IsEmpty() && CMessageBox::ShowCheck(this->GetSafeHwnd(), IDS_REBASE_BRANCH_UNCHANGED, IDS_APPNAME, MB_ICONQUESTION | MB_YESNO | MB_DEFBUTTON2, _T("OpenRebaseRemoteBranchUnchanged"), IDS_MSGBOX_DONOTSHOWAGAIN) == IDNO)
+	{
+		ShowInCommits(upstream);
 		return;
+	}
 
 	if (g_Git.IsFastForward(_T("HEAD"), upstream))
 	{
@@ -463,6 +575,9 @@ void CSyncDlg::FetchComplete()
 			mergeProgress.DoModal();
 			FillNewRefMap();
 			FetchOutList(true);
+
+			ShowInCommits(L"HEAD");
+
 			return;
 		}
 	}
@@ -470,6 +585,8 @@ void CSyncDlg::FetchComplete()
 	CAppUtils::RebaseAfterFetch(upstream);
 	FillNewRefMap();
 	FetchOutList(true);
+
+	ShowInCommits(L"HEAD");
 }
 
 void CSyncDlg::StashComplete()
@@ -522,6 +639,12 @@ void CSyncDlg::OnBnClickedButtonPush()
 		return;
 	}
 
+	if (!IsURL() && m_ctrlPush.GetCurrentEntry() == 0 && CRegDWORD(L"Software\\TortoiseGit\\AskSetTrackedBranch", TRUE) == TRUE)
+	{
+		if (!AskSetTrackedBranch())
+			return;
+	}
+
 	this->m_regPushButton=(DWORD)this->m_ctrlPush.GetCurrentEntry();
 	this->SwitchToRun();
 	this->m_bAbort=false;
@@ -549,7 +672,7 @@ void CSyncDlg::OnBnClickedButtonPush()
 	switch (m_ctrlPush.GetCurrentEntry())
 	{
 	case 1:
-		arg += _T(" --tags ");
+		arg += _T(" --tags");
 		break;
 	case 2:
 		refName = _T("refs/notes/commits");	//default ref for notes
@@ -557,12 +680,9 @@ void CSyncDlg::OnBnClickedButtonPush()
 	}
 
 	if(this->m_bForce)
-		arg += _T(" --force ");
+		arg += _T(" --force");
 
-	if(m_Gitverion >= 0x01070203) //above 1.7.0.2
-		arg += _T("--progress ");
-
-	cmd.Format(_T("git.exe push -v %s \"%s\" %s"),
+	cmd.Format(_T("git.exe push -v --progress%s \"%s\" %s"),
 				(LPCTSTR)arg,
 				(LPCTSTR)m_strURL,
 				(LPCTSTR)refName);
@@ -924,6 +1044,7 @@ BOOL CSyncDlg::OnInitDialog()
 	this->m_ctrlPull.AddEntry(CString(MAKEINTRESOURCE(IDS_PROC_SYNC_PULL)));
 	this->m_ctrlPull.AddEntry(CString(MAKEINTRESOURCE(IDS_PROC_SYNC_FETCH)));
 	this->m_ctrlPull.AddEntry(CString(MAKEINTRESOURCE(IDS_PROC_SYNC_FETCHREBASE)));
+	this->m_ctrlPull.AddEntry(CString(MAKEINTRESOURCE(IDS_PROC_SYNC_FETCHALL)));
 	this->m_ctrlPull.AddEntry(CString(MAKEINTRESOURCE(IDS_PROC_SYNC_REMOTEUPDATE)));
 	this->m_ctrlPull.AddEntry(CString(MAKEINTRESOURCE(IDS_PROC_SYNC_CLEANUPSTALEBRANCHES)));
 
@@ -992,8 +1113,6 @@ BOOL CSyncDlg::OnInitDialog()
 
 	m_ctrlRemoteBranch.m_bWantReturn = TRUE;
 	m_ctrlURL.m_bWantReturn = TRUE;
-
-	this->m_Gitverion = CAppUtils::GetMsysgitVersion();
 
 	if (m_seq > 0 && (DWORD)CRegDWORD(_T("Software\\TortoiseGit\\SyncDialogRandomPos")))
 	{
@@ -1222,7 +1341,7 @@ void CSyncDlg::OnCbnEditchangeComboboxex()
 
 UINT CSyncDlg::ProgressThread()
 {
-	m_startTick = GetTickCount();
+	m_startTick = GetTickCount64();
 	m_bDone = false;
 	STRING_VECTOR list;
 	CProgressDlg::RunCmdList(this, m_GitCmdList, list, true, nullptr, &this->m_bAbort, &this->m_Databuf);
@@ -1233,6 +1352,8 @@ UINT CSyncDlg::ProgressThread()
 
 LRESULT CSyncDlg::OnProgressUpdateUI(WPARAM wParam,LPARAM lParam)
 {
+	if (m_bWantToExit)
+		return 0;
 	if(wParam == MSG_PROGRESSDLG_START)
 	{
 		m_BufStart = 0;
@@ -1247,7 +1368,7 @@ LRESULT CSyncDlg::OnProgressUpdateUI(WPARAM wParam,LPARAM lParam)
 
 	if(wParam == MSG_PROGRESSDLG_END || wParam == MSG_PROGRESSDLG_FAILED)
 	{
-		DWORD tickSpent = GetTickCount() - m_startTick;
+		ULONGLONG tickSpent = GetTickCount64() - m_startTick;
 		CString strEndTime = CLoglistUtils::FormatDateAndTime(CTime::GetCurrentTime(), DATE_SHORTDATE, true, false);
 
 		m_BufStart = 0;
@@ -1271,7 +1392,7 @@ LRESULT CSyncDlg::OnProgressUpdateUI(WPARAM wParam,LPARAM lParam)
 			CString log;
 			log.Format(IDS_PROC_PROGRESS_GITUNCLEANEXIT, exitCode);
 			CString err;
-			err.Format(_T("\r\n\r\n%s (%lu ms @ %s)\r\n"), (LPCTSTR)log, tickSpent, (LPCTSTR)strEndTime);
+			err.Format(_T("\r\n\r\n%s (%I64u ms @ %s)\r\n"), (LPCTSTR)log, tickSpent, (LPCTSTR)strEndTime);
 			CProgressDlg::InsertColorText(this->m_ctrlCmdOut, err, RGB(255,0,0));
 			if (CRegDWORD(_T("Software\\TortoiseGit\\NoSounds"), FALSE) == FALSE)
 				PlaySound((LPCTSTR)SND_ALIAS_SYSTEMEXCLAMATION, NULL, SND_ALIAS_ID | SND_ASYNC);
@@ -1283,7 +1404,7 @@ LRESULT CSyncDlg::OnProgressUpdateUI(WPARAM wParam,LPARAM lParam)
 			CString temp;
 			temp.LoadString(IDS_SUCCESS);
 			CString log;
-			log.Format(_T("\r\n%s (%lu ms @ %s)\r\n"), (LPCTSTR)temp, tickSpent, (LPCTSTR)strEndTime);
+			log.Format(_T("\r\n%s (%I64u ms @ %s)\r\n"), (LPCTSTR)temp, tickSpent, (LPCTSTR)strEndTime);
 			CProgressDlg::InsertColorText(this->m_ctrlCmdOut, log, RGB(0,0,255));
 		}
 		m_GitCmdStatus = exitCode;
@@ -1451,6 +1572,8 @@ void CSyncDlg::RunPostAction()
 }
 void CSyncDlg::ParserCmdOutput(char ch)
 {
+	if (m_bAbort)
+		return;
 	CProgressDlg::ParserCmdOutput(m_ctrlCmdOut,m_ctrlProgress,m_hWnd,m_pTaskbarList,m_LogText,ch);
 }
 void CSyncDlg::OnBnClickedButtonCommit()
@@ -1477,11 +1600,14 @@ void CSyncDlg::OnOK()
 void CSyncDlg::OnCancel()
 {
 	m_bAbort = true;
-	if (m_bDone)
+	m_GitProgressList.Cancel();
+	if (m_bDone && !m_GitProgressList.IsRunning())
 	{
 		CResizableStandAloneDialog::OnCancel();
 		return;
 	}
+	if (m_GitProgressList.IsRunning())
+		WaitForSingleObject(m_GitProgressList.m_pThread->m_hThread, 10000);
 
 	if (g_Git.m_CurrentGitPi.hProcess)
 	{
@@ -1501,6 +1627,11 @@ void CSyncDlg::OnCancel()
 	}
 
 	::WaitForSingleObject(g_Git.m_CurrentGitPi.hProcess ,10000);
+	if (m_pThread)
+	{
+		if (::WaitForSingleObject(m_pThread->m_hThread, 5000) == WAIT_TIMEOUT)
+			TerminateThread(m_pThread->m_hThread, (DWORD)-1);
+	}
 	m_tooltips.Pop();
 	CResizableStandAloneDialog::OnCancel();
 }

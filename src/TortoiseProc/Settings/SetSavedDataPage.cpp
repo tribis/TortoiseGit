@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2012-2013-2015 - TortoiseGit
+// Copyright (C) 2012-2013-2016 - TortoiseGit
 // Copyright (C) 2003-2008,2014 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -115,13 +115,17 @@ BOOL CSetSavedDataPage::OnInitDialog()
 	CString sFile;
 	bool bIsDir = false;
 
-	TCHAR pathbuf[MAX_PATH] = {0};
-	if (SHGetFolderPath(NULL, CSIDL_APPDATA, NULL, SHGFP_TYPE_CURRENT, pathbuf)==S_OK)
+	PWSTR pszPath = nullptr;
+	if (SHGetKnownFolderPath(FOLDERID_RoamingAppData, KF_FLAG_CREATE, nullptr, &pszPath) == S_OK)
 	{
-		_tcscat_s(pathbuf, MAX_PATH, _T("\\Subversion\\auth\\"));
-		CString sSimple = CString(pathbuf) + _T("svn.simple");
-		CString sSSL = CString(pathbuf) + _T("svn.ssl.server");
-		CString sUsername = CString(pathbuf) + _T("svn.username");
+		CString path = pszPath;
+		CoTaskMemFree(pszPath);
+
+		path += L"\\Subversion\\auth\\";
+
+		CString sSimple = path + L"svn.simple";
+		CString sSSL = path + L"svn.ssl.server";
+		CString sUsername = path + L"svn.username";
 		CDirFileEnum simpleenum(sSimple);
 		while (simpleenum.NextFile(sFile, &bIsDir))
 			nSimple++;
@@ -187,6 +191,7 @@ BEGIN_MESSAGE_MAP(CSetSavedDataPage, ISettingsPropPage)
 	ON_BN_CLICKED(IDC_ACTIONLOGCLEAR, &CSetSavedDataPage::OnBnClickedActionlogclear)
 	ON_BN_CLICKED(IDC_TEMPFILESCLEAR, &CSetSavedDataPage::OnBnClickedTempfileclear)
 	ON_EN_CHANGE(IDC_MAXLINES, OnModified)
+	ON_BN_CLICKED(IDC_STOREDDECISIONSCLEAR, &CSetSavedDataPage::OnBnClickedStoreddecisionsclear)
 END_MESSAGE_MAP()
 
 void CSetSavedDataPage::OnBnClickedUrlhistclear()
@@ -231,11 +236,13 @@ void CSetSavedDataPage::OnBnClickedAuthhistclear()
 {
 	CRegStdString auth = CRegStdString(_T("Software\\TortoiseGit\\Auth\\"));
 	auth.removeKey();
-	TCHAR pathbuf[MAX_PATH] = {0};
-	if (SHGetFolderPath(NULL, CSIDL_APPDATA, NULL, SHGFP_TYPE_CURRENT, pathbuf)==S_OK)
+	PWSTR pszPath = nullptr;
+	if (SHGetKnownFolderPath(FOLDERID_RoamingAppData, KF_FLAG_CREATE, nullptr, &pszPath) == S_OK)
 	{
-		_tcscat_s(pathbuf, MAX_PATH, _T("\\Subversion\\auth"));
-		DeleteViaShell(pathbuf, IDS_SETTINGS_DELFILE);
+		CString path = pszPath;
+		CoTaskMemFree(pszPath);
+		path += L"\\Subversion\\auth\\";
+		DeleteViaShell(path, IDS_SETTINGS_DELFILE);
 	}
 	m_btnAuthHistClear.EnableWindow(FALSE);
 	m_tooltips.DelTool(GetDlgItem(IDC_AUTHHISTCLEAR));
@@ -276,7 +283,7 @@ void CSetSavedDataPage::OnBnClickedTempfileclear()
 
 	int count = 0;
 	DWORD len = GetTortoiseGitTempPath(0, NULL);
-	std::unique_ptr<TCHAR[]> path(new TCHAR[len + 100]);
+	auto path = std::make_unique<TCHAR[]>(len + 100);
 	len = GetTortoiseGitTempPath(len + 100, path.get());
 	if (len != 0)
 	{
@@ -325,7 +332,7 @@ void CSetSavedDataPage::DeleteViaShell(LPCTSTR path, UINT progressText)
 	CString p(path);
 	p += L"||";
 	int len = p.GetLength();
-	std::unique_ptr<TCHAR[]> buf(new TCHAR[len + 2]);
+	auto buf = std::make_unique<TCHAR[]>(len + 2);
 	wcscpy_s(buf.get(), len + 2, p);
 	CStringUtils::PipesToNulls(buf.get(), len);
 
@@ -338,4 +345,35 @@ void CSetSavedDataPage::DeleteViaShell(LPCTSTR path, UINT progressText)
 	fileop.fFlags = FOF_NO_CONNECTED_ELEMENTS | FOF_NOCONFIRMATION;
 	fileop.lpszProgressTitle = progText;
 	SHFileOperation(&fileop);
+}
+
+void CSetSavedDataPage::OnBnClickedStoreddecisionsclear()
+{
+	static const CString tgitvalues[] = {
+		L"OldMsysgitVersionWarning",
+		L"OpenRebaseRemoteBranchUnchanged",
+		L"OpenRebaseRemoteBranchFastForwards",
+		L"DaemonNoSecurityWarning",
+		L"NothingToCommitShowUnversioned",
+		L"NoJumpNotFoundWarning",
+		L"HintHierarchicalConfig",
+		L"TagOptNoTagsWarning",
+		L"NoStashIncludeUntrackedWarning",
+		L"CommitMergeHint",
+		L"AskSetTrackedBranch",
+	};
+	for (const auto& value : tgitvalues)
+	{
+		CRegDWORD regkey(_T("Software\\TortoiseGit\\") + value);
+		regkey.removeValue();
+	}
+
+	static const CString tmergevalues[] = {
+		L"DeleteFileWhenEmpty",
+	};
+	for (const auto& value : tgitvalues)
+	{
+		CRegDWORD regkey(_T("Software\\TortoiseGitMerge\\") + value);
+		regkey.removeValue();
+	}
 }

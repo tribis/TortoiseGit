@@ -1,7 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
 // Copyright (C) 2003-2009 - TortoiseSVN
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2016 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -46,6 +46,14 @@
 
 typedef int (__cdecl *GENERICCOMPAREFN)(const void * elem1, const void * elem2);
 
+enum AllBranchType
+{
+	None = 0,
+	AllBranches = 1,
+	AllLocalBranches = 2,
+	AllBasicRefs = 3,
+};
+
 /**
  * \ingroup TortoiseProc
  * Shows log messages of a single file or folder in a listbox.
@@ -72,7 +80,7 @@ public:
 	 * Provides selected commit hash if available, call after OK return from here
 	 * Empty if none
 	**/
-	CString GetSelectedHash(){ return m_sSelectedHash; }
+	std::vector<CGitHash> GetSelectedHash(){ return m_sSelectedHash; }
 
 // Dialog Data
 	enum { IDD = IDD_LOGMESSAGE };
@@ -217,7 +225,7 @@ private:
 	CTGitPath			m_orgPath;
 	CString				m_hightlightRevision;
 
-	CString				m_sSelectedHash;	// set to selected commit hash on OK if appropriate
+	std::vector<CGitHash>	m_sSelectedHash;	// set to selected commit hash on OK if appropriate
 	bool				m_bSelectionMustBeContinuous;
 	bool				m_bSelectionMustBeSingle;
 	bool				m_bCancelled;
@@ -226,7 +234,8 @@ private:
 
 	BOOL				m_iHidePaths;
 	bool				m_bFirstParent;
-	BOOL				m_bAllBranch;
+	BOOL				m_bAllBranch;		// variable for checkbox only
+	AllBranchType		m_AllBranchType;	// variable for actual branch type
 	BOOL				m_bWholeProject;
 	bool				m_bFollowRenames;
 	BOOL				m_bShowUnversioned;

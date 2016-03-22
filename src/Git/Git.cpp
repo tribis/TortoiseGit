@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2016 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -203,6 +203,7 @@ CGit g_Git;
 
 CGit::CGit(void)
 {
+	git_libgit2_init();
 	GetCurrentDirectory(MAX_PATH, CStrBuf(m_CurrentDir, MAX_PATH));
 	m_IsGitDllInited = false;
 	m_GitDiff=0;
@@ -231,6 +232,7 @@ CGit::~CGit(void)
 		git_close_diff(m_GitSimpleListDiff);
 		m_GitSimpleListDiff=0;
 	}
+	git_libgit2_shutdown();
 }
 
 bool CGit::IsBranchNameValid(const CString& branchname)
@@ -297,7 +299,7 @@ int CGit::RunAsync(CString cmd, PROCESS_INFORMATION *piOut, HANDLE *hReadOut, HA
 	}
 
 	STARTUPINFO si = { 0 };
-	PROCESS_INFORMATION pi;
+	PROCESS_INFORMATION pi = { 0 };
 	si.cb=sizeof(STARTUPINFO);
 
 	if (hErrReadOut)
@@ -326,7 +328,6 @@ int CGit::RunAsync(CString cmd, PROCESS_INFORMATION *piOut, HANDLE *hReadOut, HA
 		dwFlags |= DETACHED_PROCESS;
 
 	memset(&this->m_CurrentGitPi,0,sizeof(PROCESS_INFORMATION));
-	memset(&pi, 0, sizeof(PROCESS_INFORMATION));
 
 	if (ms_bMsys2Git && cmd.Find(_T("git")) == 0 && cmd.Find(L"git.exe config ") == -1)
 	{
@@ -340,7 +341,7 @@ int CGit::RunAsync(CString cmd, PROCESS_INFORMATION *piOut, HANDLE *hReadOut, HA
 		cmd.Replace(_T("\""), _T("\\\""));
 		cmd = _T('"') + CGit::ms_LastMsysGitDir + _T("\\bash.exe\" -c \"/bin/") + cmd + _T('"');
 	}
-	else if(cmd.Find(_T("git")) == 0)
+	else if (cmd.Find(_T("git")) == 0 || cmd.Find(_T("bash")) == 0)
 	{
 		int firstSpace = cmd.Find(_T(" "));
 		if (firstSpace > 0)
@@ -847,18 +848,12 @@ int CGit::GetCurrentBranchFromFile(const CString &sProjectRoot, CString &sBranch
 
 	CString sHeadFile = sDotGitPath + _T("HEAD");
 
-	FILE *pFile;
-	_tfopen_s(&pFile, sHeadFile.GetString(), _T("r"));
-
+	CAutoFILE pFile = _tfsopen(sHeadFile.GetString(), _T("r"), SH_DENYWR);
 	if (!pFile)
-	{
 		return -1;
-	}
 
 	char s[256] = {0};
 	fgets(s, sizeof(s), pFile);
-
-	fclose(pFile);
 
 	const char *pfx = "ref: refs/heads/";
 	const int len = 16;//strlen(pfx)
@@ -953,6 +948,15 @@ CString CGit::GetLogCmd(const CString& range, const CTGitPath* path, int mask,
 
 	if(mask& CGit::LOG_INFO_ALL_BRANCH)
 		param += _T(" --all");
+
+	if (mask& CGit::LOG_INFO_BASIC_REFS)
+	{
+		param += _T(" --branches");
+		param += _T(" --tags");
+		param += _T(" --remotes");
+		param += _T(" --glob=stas[h]"); // require at least one glob operator
+		param += _T(" --glob=bisect");
+	}
 
 	if(mask & CGit::LOG_INFO_LOCAL_BRANCHES)
 		param += _T(" --branches");
@@ -1052,7 +1056,7 @@ CString CGit::GetLogCmd(const CString& range, const CTGitPath* path, int mask,
 	}
 
 	DWORD logOrderBy = CRegDWORD(_T("Software\\TortoiseGit\\LogOrderBy"), LOG_ORDER_TOPOORDER);
-	if (logOrderBy == LOG_ORDER_TOPOORDER)
+	if (logOrderBy == LOG_ORDER_TOPOORDER || (mask & CGit::LOG_ORDER_TOPOORDER))
 		param += _T(" --topo-order");
 	else if (logOrderBy == LOG_ORDER_DATEORDER)
 		param += _T(" --date-order");
@@ -1134,26 +1138,22 @@ int CGit::RunLogFile(CString cmd, const CString &filename, CString *stdErr)
 	si.cb=sizeof(STARTUPINFO);
 	GetStartupInfo(&si);
 
-	SECURITY_ATTRIBUTES   psa={sizeof(psa),NULL,TRUE};;
+	SECURITY_ATTRIBUTES psa = {sizeof(psa), nullptr, TRUE};
 	psa.bInheritHandle=TRUE;
 
-	HANDLE hReadErr, hWriteErr;
-	if (!CreatePipe(&hReadErr, &hWriteErr, &psa, 0))
+	CAutoGeneralHandle hReadErr, hWriteErr;
+	if (!CreatePipe(hReadErr.GetPointer(), hWriteErr.GetPointer(), &psa, 0))
 	{
 		CString err = CFormatMessageWrapper();
 		CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": could not open stderr pipe: %s\n"), (LPCTSTR)err.Trim());
 		return TGIT_GIT_ERROR_OPEN_PIP;
 	}
 
-	HANDLE houtfile=CreateFile(filename,GENERIC_WRITE,FILE_SHARE_READ | FILE_SHARE_WRITE,
-			&psa,CREATE_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL);
-
-	if (houtfile == INVALID_HANDLE_VALUE)
+	CAutoFile houtfile = CreateFile(filename, GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, &psa, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+	if (!houtfile)
 	{
 		CString err = CFormatMessageWrapper();
 		CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": could not open stdout pipe: %s\n"), (LPCTSTR)err.Trim());
-		CloseHandle(hReadErr);
-		CloseHandle(hWriteErr);
 		return TGIT_GIT_ERROR_OPEN_PIP;
 	}
 
@@ -1174,24 +1174,23 @@ int CGit::RunLogFile(CString cmd, const CString &filename, CString *stdErr)
 		CString err = CFormatMessageWrapper();
 		CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": failed to create Process: %s\n"), (LPCTSTR)err.Trim());
 		stdErr = &err;
-		CloseHandle(hReadErr);
-		CloseHandle(hWriteErr);
-		CloseHandle(houtfile);
 		return TGIT_GIT_ERROR_CREATE_PROCESS;
 	}
 
+	CAutoGeneralHandle piThread(pi.hThread);
+	CAutoGeneralHandle piProcess(pi.hProcess);
+
 	BYTE_VECTOR stderrVector;
 	CGitCall_ByteVector pcall(L"", nullptr, &stderrVector);
-	HANDLE thread;
 	ASYNCREADSTDERRTHREADARGS threadArguments;
 	threadArguments.fileHandle = hReadErr;
 	threadArguments.pcall = &pcall;
-	thread = CreateThread(nullptr, 0, AsyncReadStdErrThread, &threadArguments, 0, nullptr);
+	CAutoGeneralHandle thread = CreateThread(nullptr, 0, AsyncReadStdErrThread, &threadArguments, 0, nullptr);
 
 	WaitForSingleObject(pi.hProcess,INFINITE);
 
-	CloseHandle(hWriteErr);
-	CloseHandle(hReadErr);
+	hWriteErr.CloseHandle();
+	hReadErr.CloseHandle();
 
 	if (thread)
 		WaitForSingleObject(thread, INFINITE);
@@ -1209,17 +1208,12 @@ int CGit::RunLogFile(CString cmd, const CString &filename, CString *stdErr)
 	else
 		CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": process exited: %d\n"), exitcode);
 
-	CloseHandle(pi.hThread);
-	CloseHandle(pi.hProcess);
-	CloseHandle(houtfile);
 	return exitcode;
 }
 
-git_repository * CGit::GetGitRepository() const
+CAutoRepository CGit::GetGitRepository() const
 {
-	git_repository * repo = nullptr;
-	git_repository_open(&repo, GetGitPathStringA(m_CurrentDir));
-	return repo;
+	return CAutoRepository(GetGitPathStringA(m_CurrentDir));
 }
 
 int CGit::GetHash(git_repository * repo, CGitHash &hash, const CString& friendname, bool skipFastCheck /* = false */)
@@ -2156,11 +2150,13 @@ BOOL CGit::CheckMsysGitDir(BOOL bFallback)
 	CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": System config = %s\n"), (LPCTSTR)g_Git.GetGitSystemConfig());
 
 	// Configure libgit2 search paths
+	SetLibGit2SearchPath(GIT_CONFIG_LEVEL_PROGRAMDATA, CTGitPath(g_Git.GetGitSystemConfig()).GetContainingDirectory().GetWinPathString());
 	SetLibGit2SearchPath(GIT_CONFIG_LEVEL_SYSTEM, CTGitPath(g_Git.GetGitSystemConfig()).GetContainingDirectory().GetWinPathString());
 	SetLibGit2SearchPath(GIT_CONFIG_LEVEL_GLOBAL, g_Git.GetHomeDirectory());
 	SetLibGit2SearchPath(GIT_CONFIG_LEVEL_XDG, g_Git.GetGitGlobalXDGConfigPath());
 	static git_smart_subtransport_definition ssh_wintunnel_subtransport_definition = { [](git_smart_subtransport **out, git_transport* owner, void*) -> int { return git_smart_subtransport_ssh_wintunnel(out, owner, FindExecutableOnPath(g_Git.m_Environment.GetEnv(_T("GIT_SSH")), g_Git.m_Environment.GetEnv(_T("PATH"))), g_Git.m_Environment); }, 0 };
 	git_transport_register("ssh", git_transport_smart, &ssh_wintunnel_subtransport_definition);
+	git_libgit2_opts(GIT_OPT_SET_USER_AGENT, "TortoiseGit libgit2");
 	if (!(ms_bCygwinGit || ms_bMsys2Git))
 		SetLibGit2TemplatePath(CGit::ms_MsysGitRootDir + _T("share\\git-core\\templates"));
 	else
@@ -2173,9 +2169,8 @@ BOOL CGit::CheckMsysGitDir(BOOL bFallback)
 	// register filter only once
 	if (!git_filter_lookup("filter"))
 	{
-		static const CString binDirPrefixes[] = { L"\\..\\usr\\bin", L"\\..\\bin", L"" };
 		CString sh;
-		for (const auto& binDirPrefix : binDirPrefixes)
+		for (const CString& binDirPrefix : { L"\\..\\usr\\bin", L"\\..\\bin", L"" })
 		{
 			CString possibleShExe = CGit::ms_LastMsysGitDir + binDirPrefix + L"\\sh.exe";
 			if (PathFileExists(possibleShExe))
@@ -2188,6 +2183,13 @@ BOOL CGit::CheckMsysGitDir(BOOL bFallback)
 				break;
 			}
 		}
+
+		// Add %GIT_EXEC_PATH% to %PATH% when launching libgit2 filter executable
+		// It is possible that the filter points to a git subcommand, that is located at libexec\git-core
+		CString gitExecPath = CGit::ms_MsysGitRootDir;
+		gitExecPath.Append(_T("libexec\\git-core"));
+		m_Environment.AddToPath(gitExecPath);
+
 		if (git_filter_register("filter", git_filter_filter_new(sh, m_Environment), GIT_FILTER_DRIVER_PRIORITY))
 			return FALSE;
 	}
@@ -2241,7 +2243,7 @@ BOOL CGit::CheckCleanWorkTree(bool stagedOk /* false */)
 {
 	if (UsingLibGit2(GIT_CMD_CHECK_CLEAN_WT))
 	{
-		CAutoRepository repo = GetGitRepository();
+		CAutoRepository repo(GetGitRepository());
 		if (!repo)
 			return FALSE;
 
@@ -2442,10 +2444,13 @@ int CGit::RefreshGitIndex()
 		CAutoLocker lock(g_Git.m_critGitDllSec);
 		try
 		{
-			return [] { return git_run_cmd("update-index","update-index -q --refresh"); }();
+			int result = [] { return git_run_cmd("update-index","update-index -q --refresh"); }();
+			git_exit_cleanup();
+			return result;
 
 		}catch(...)
 		{
+			git_exit_cleanup();
 			return -1;
 		}
 
@@ -2486,8 +2491,7 @@ int CGit::GetOneFile(const CString &Refname, const CTGitPath &path, const CStrin
 		if (git_tree_entry_to_object((git_object**)blob.GetPointer(), repo, entry))
 			return -1;
 
-		FILE *file = nullptr;
-		_tfopen_s(&file, outputfile, _T("wb"));
+		CAutoFILE file = _tfsopen(outputfile, _T("wb"), SH_DENYWR);
 		if (file == nullptr)
 		{
 			giterr_set_str(GITERR_NONE, "Could not create file.");
@@ -2495,18 +2499,12 @@ int CGit::GetOneFile(const CString &Refname, const CTGitPath &path, const CStrin
 		}
 		CAutoBuf buf;
 		if (git_blob_filtered_content(buf, blob, CUnicodeUtils::GetUTF8(path.GetGitPathString()), 0))
-		{
-			fclose(file);
 			return -1;
-		}
 		if (fwrite(buf->ptr, sizeof(char), buf->size, file) != buf->size)
 		{
 			giterr_set_str(GITERR_OS, "Could not write to file.");
-			fclose(file);
-
 			return -1;
 		}
-		fclose(file);
 
 		return 0;
 	}
@@ -2790,6 +2788,8 @@ CString CGit::GetShortName(const CString& ref, REF_TYPE *out_type)
 	{
 		type = CGit::REMOTE_BRANCH;
 	}
+	else if (str.Right(3) == L"^{}" && CGit::GetShortName(str, shortname, L"refs/tags/"))
+		type = CGit::ANNOTATED_TAG;
 	else if (CGit::GetShortName(str, shortname, _T("refs/tags/")))
 	{
 		type = CGit::TAG;
@@ -2801,16 +2801,20 @@ CString CGit::GetShortName(const CString& ref, REF_TYPE *out_type)
 	}
 	else if (CGit::GetShortName(str, shortname, _T("refs/bisect/")))
 	{
-		if (shortname.Find(_T("good")) == 0)
+		CString bisectGood;
+		CString bisectBad;
+		g_Git.GetBisectTerms(&bisectGood, &bisectBad);
+		TCHAR c;
+		if (shortname.Find(bisectGood) == 0 && ((c = shortname.GetAt(bisectGood.GetLength())) == '-' || c == '\0'))
 		{
 			type = CGit::BISECT_GOOD;
-			shortname = _T("good");
+			shortname = bisectGood;
 		}
 
-		if (shortname.Find(_T("bad")) == 0)
+		if (shortname.Find(bisectBad) == 0 && ((c = shortname.GetAt(bisectBad.GetLength())) == '-' || c == '\0'))
 		{
 			type = CGit::BISECT_BAD;
-			shortname = _T("bad");
+			shortname = bisectBad;
 		}
 	}
 	else if (CGit::GetShortName(str, shortname, _T("refs/notes/")))
@@ -2848,13 +2852,13 @@ void CGit::SetGit2CertificateCheckCertificate(void* callback)
 	g_Git2CheckCertificateCallback = (git_transport_certificate_check_cb)callback;
 }
 
-CString CGit::GetUnifiedDiffCmd(const CTGitPath& path, const git_revnum_t& rev1, const git_revnum_t& rev2, bool bMerge, bool bCombine, int diffContext)
+CString CGit::GetUnifiedDiffCmd(const CTGitPath& path, const git_revnum_t& rev1, const git_revnum_t& rev2, bool bMerge, bool bCombine, int diffContext, bool bNoPrefix)
 {
 	CString cmd;
 	if (rev2 == GitRev::GetWorkingCopy())
-		cmd.Format(_T("git.exe diff --stat -p %s --"), (LPCTSTR)rev1);
+		cmd.Format(_T("git.exe diff --stat%s -p %s --"), bNoPrefix ? L" --no-prefix" : L"", (LPCTSTR)rev1);
 	else if (rev1 == GitRev::GetWorkingCopy())
-		cmd.Format(_T("git.exe diff -R --stat -p %s --"), (LPCTSTR)rev2);
+		cmd.Format(_T("git.exe diff -R --stat%s %s-p %s --"), bNoPrefix ? L" --no-prefix" : L"", (LPCTSTR)rev2);
 	else
 	{
 		CString merge;
@@ -2867,7 +2871,7 @@ CString CGit::GetUnifiedDiffCmd(const CTGitPath& path, const git_revnum_t& rev1,
 		CString unified;
 		if (diffContext >= 0)
 			unified.Format(_T(" --unified=%d"), diffContext);
-		cmd.Format(_T("git.exe diff-tree -r -p %s %s --stat %s %s --"), (LPCTSTR)merge, (LPCTSTR)unified, (LPCTSTR)rev1, (LPCTSTR)rev2);
+		cmd.Format(_T("git.exe diff-tree -r -p%s%s --stat%s %s %s --"), (LPCTSTR)merge, (LPCTSTR)unified, bNoPrefix ? L" --no-prefix" : L"", (LPCTSTR)rev1, (LPCTSTR)rev2);
 	}
 
 	if (!path.IsEmpty())
@@ -2925,7 +2929,7 @@ static int resolve_to_tree(git_repository *repo, const char *identifier, git_tre
 }
 
 /* use libgit2 get unified diff */
-static int GetUnifiedDiffLibGit2(const CTGitPath& path, const git_revnum_t& revOld, const git_revnum_t& revNew, std::function<void(const git_buf*, void*)> statCallback, git_diff_line_cb callback, void *data, bool /* bMerge */)
+static int GetUnifiedDiffLibGit2(const CTGitPath& path, const git_revnum_t& revOld, const git_revnum_t& revNew, std::function<void(const git_buf*, void*)> statCallback, git_diff_line_cb callback, void* data, bool /* bMerge */, bool bNoPrefix)
 {
 	CStringA tree1 = CUnicodeUtils::GetMulti(revNew, CP_UTF8);
 	CStringA tree2 = CUnicodeUtils::GetMulti(revOld, CP_UTF8);
@@ -2947,6 +2951,11 @@ static int GetUnifiedDiffLibGit2(const CTGitPath& path, const git_revnum_t& revO
 	{
 		opts.pathspec.strings = &buf;
 		opts.pathspec.count = 1;
+	}
+	if (bNoPrefix)
+	{
+		opts.new_prefix = "";
+		opts.old_prefix = "";
 	}
 	CAutoDiff diff;
 
@@ -3020,22 +3029,19 @@ static int GetUnifiedDiffLibGit2(const CTGitPath& path, const git_revnum_t& revO
 	return 0;
 }
 
-int CGit::GetUnifiedDiff(const CTGitPath& path, const git_revnum_t& rev1, const git_revnum_t& rev2, CString patchfile, bool bMerge, bool bCombine, int diffContext)
+int CGit::GetUnifiedDiff(const CTGitPath& path, const git_revnum_t& rev1, const git_revnum_t& rev2, CString patchfile, bool bMerge, bool bCombine, int diffContext, bool bNoPrefix)
 {
 	if (UsingLibGit2(GIT_CMD_DIFF))
 	{
-		FILE *file = nullptr;
-		_tfopen_s(&file, patchfile, _T("w"));
-		if (file == nullptr)
+		CAutoFILE file = _tfsopen(patchfile, _T("w"), SH_DENYRW);
+		if (!file)
 			return -1;
-		int ret = GetUnifiedDiffLibGit2(path, rev1, rev2, UnifiedDiffStatToFile, UnifiedDiffToFile, file, bMerge);
-		fclose(file);
-		return ret;
+		return GetUnifiedDiffLibGit2(path, rev1, rev2, UnifiedDiffStatToFile, UnifiedDiffToFile, file, bMerge, bNoPrefix);
 	}
 	else
 	{
 		CString cmd;
-		cmd = GetUnifiedDiffCmd(path, rev1, rev2, bMerge, bCombine, diffContext);
+		cmd = GetUnifiedDiffCmd(path, rev1, rev2, bMerge, bCombine, diffContext, bNoPrefix);
 		return RunLogFile(cmd, patchfile, &gitLastErr);
 	}
 }
@@ -3061,7 +3067,7 @@ static int UnifiedDiffToStringA(const git_diff_delta * /*delta*/, const git_diff
 int CGit::GetUnifiedDiff(const CTGitPath& path, const git_revnum_t& rev1, const git_revnum_t& rev2, CStringA * buffer, bool bMerge, bool bCombine, int diffContext)
 {
 	if (UsingLibGit2(GIT_CMD_DIFF))
-		return GetUnifiedDiffLibGit2(path, rev1, rev2, UnifiedDiffStatToStringA, UnifiedDiffToStringA, buffer, bMerge);
+		return GetUnifiedDiffLibGit2(path, rev1, rev2, UnifiedDiffStatToStringA, UnifiedDiffToStringA, buffer, bMerge, false);
 	else
 	{
 		CString cmd;
@@ -3169,32 +3175,31 @@ int CGit::DeleteRef(const CString& reference)
 
 bool CGit::LoadTextFile(const CString &filename, CString &msg)
 {
-	if (PathFileExists(filename))
+	if (!PathFileExists(filename))
+		return false;
+
+	CAutoFILE pFile = _tfsopen(filename, _T("r"), SH_DENYWR);
+	if (!pFile)
 	{
-		FILE *pFile = nullptr;
-		_tfopen_s(&pFile, filename, _T("r"));
-		if (pFile)
-		{
-			CStringA str;
-			do
-			{
-				char s[8196] = { 0 };
-				int read = (int)fread(s, sizeof(char), sizeof(s), pFile);
-				if (read == 0)
-					break;
-				str += CStringA(s, read);
-			} while (true);
-			fclose(pFile);
-			msg = CUnicodeUtils::GetUnicode(str);
-			msg.Replace(_T("\r\n"), _T("\n"));
-			msg.TrimRight(_T("\n"));
-			msg += _T("\n");
-		}
-		else
-			::MessageBox(nullptr, _T("Could not open ") + filename, _T("TortoiseGit"), MB_ICONERROR);
+		::MessageBox(nullptr, _T("Could not open ") + filename, _T("TortoiseGit"), MB_ICONERROR);
 		return true; // load no further files
 	}
-	return false;
+
+	CStringA str;
+	do
+	{
+		char s[8196] = { 0 };
+		int read = (int)fread(s, sizeof(char), sizeof(s), pFile);
+		if (read == 0)
+			break;
+		str += CStringA(s, read);
+	} while (true);
+	msg = CUnicodeUtils::GetUnicode(str);
+	msg.Replace(_T("\r\n"), _T("\n"));
+	msg.TrimRight(_T("\n"));
+	msg += _T("\n");
+
+	return true; // load no further files
 }
 
 int CGit::GetWorkingTreeChanges(CTGitPathList& result, bool amend, CTGitPathList* filterlist)
@@ -3316,4 +3321,107 @@ int CGit::GetWorkingTreeChanges(CTGitPathList& result, bool amend, CTGitPathList
 	}
 
 	return 0;
+}
+
+int CGit::IsRebaseRunning()
+{
+	CString adminDir;
+	if (!GitAdminDir::GetAdminDirPath(g_Git.m_CurrentDir, adminDir))
+		return -1;
+		
+	if (PathIsDirectory(adminDir + L"rebase-apply") || PathIsDirectory(adminDir + L"tgitrebase.active"))
+		return 1;
+	return 0;
+}
+
+void CGit::GetBisectTerms(CString* good, CString* bad)
+{
+	static CString lastGood;
+	static CString lastBad;
+	static ULONGLONG lastRead = 0;
+
+	SCOPE_EXIT
+	{
+		if (bad)
+			*bad = lastBad;
+		if (good)
+			*good = lastGood;
+	};
+
+#ifndef GTEST_INCLUDE_GTEST_GTEST_H_
+	// add some caching here, because this method might be called multiple times in a short time from LogDlg and RevisionGraph
+	// as we only read a small file the performance effects should be negligible
+	if (lastRead + 5000 > GetTickCount64())
+		return;
+#endif
+
+	lastGood = L"good";
+	lastBad = L"bad";
+
+	CString adminDir;
+	if (!GitAdminDir::GetAdminDirPath(m_CurrentDir, adminDir))
+		return;
+
+	CString termsFile = adminDir + L"BISECT_TERMS";
+	CAutoFILE fp;
+	_tfopen_s(fp.GetPointer(), termsFile, L"rb");
+	if (!fp)
+		return;
+	char badA[MAX_PATH] = { 0 };
+	fgets(badA, MAX_PATH, fp);
+	size_t len = strlen(badA);
+	if (len > 0 && badA[len - 1] == '\n')
+		badA[len - 1] = '\0';
+	char goodA[MAX_PATH] = { 0 };
+	fgets(goodA, MAX_PATH, fp);
+	len = strlen(goodA);
+	if (len > 0 && goodA[len - 1] == '\n')
+		goodA[len - 1] = '\0';
+	lastGood = CUnicodeUtils::GetUnicode(goodA);
+	lastBad = CUnicodeUtils::GetUnicode(badA);
+	lastRead = GetTickCount64();
+}
+
+int CGit::GetGitVersion(CString* versiondebug, CString* errStr)
+{
+	CString version, err;
+	if (Run(_T("git.exe --version"), &version, &err, CP_UTF8))
+	{
+		if (errStr)
+			*errStr = err;
+		return -1;
+	}
+
+	int start = 0;
+	int ver = 0;
+	if (versiondebug)
+		*versiondebug = version;
+
+	try
+	{
+		CString str = version.Tokenize(_T("."), start);
+		int space = str.ReverseFind(_T(' '));
+		str = str.Mid(space + 1, start);
+		ver = _ttol(str);
+		ver <<= 24;
+
+		version = version.Mid(start);
+		start = 0;
+
+		str = version.Tokenize(_T("."), start);
+		ver |= (_ttol(str) & 0xFF) << 16;
+
+		str = version.Tokenize(_T("."), start);
+		ver |= (_ttol(str) & 0xFF) << 8;
+
+		str = version.Tokenize(_T("."), start);
+		ver |= (_ttol(str) & 0xFF);
+	}
+	catch (...)
+	{
+		if (!ver)
+			return -1;
+	}
+
+	return ver;
 }
