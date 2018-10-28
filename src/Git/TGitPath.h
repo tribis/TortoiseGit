@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2016 - TortoiseGit
+// Copyright (C) 2008-2018 - TortoiseGit
 // Copyright (C) 2003-2008, 2014 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -28,14 +28,17 @@ class CTGitPath
 {
 public:
 	CTGitPath(void);
+#ifdef GMOCK_INCLUDE_GMOCK_GMOCK_H_
+	virtual ~CTGitPath(void);
+#else
 	~CTGitPath(void);
+#endif
 	CTGitPath(const CString& sUnknownPath);
+	CTGitPath(const CString& sUnknownPath, bool bIsDirectory);
 	int m_Stage;
 	int m_ParentNo;
-public:
-#pragma warning(push)
-#pragma warning(disable: 4480)	// nonstandard extension used: specifying underlying type for enum 'enum'
-	enum : unsigned int
+
+	enum Actions : unsigned int
 	{
 		LOGACTIONS_ADDED	= 0x00000001,
 		LOGACTIONS_MODIFIED	= 0x00000002,
@@ -54,23 +57,22 @@ public:
 		LOGACTIONS_HIDE		= 0x20000000,
 		LOGACTIONS_GRAY		= 0x10000000,
 	};
-#pragma warning(pop)
 
 	CString m_StatAdd;
 	CString m_StatDel;
 	unsigned int		m_Action;
 	bool    m_Checked;
-	int	ParserAction(BYTE action);
-	int ParserAction(git_delta_t action);
-	CString GetActionName();
-	static CString GetActionName(int action);
+	unsigned int ParserAction(BYTE action);
+	unsigned int ParserAction(git_delta_t action);
+	CString GetActionName() const;
+	static CString GetActionName(unsigned int action);
 	/**
 	 * Set the path as an UTF8 string with forward slashes
 	 */
 	void SetFromGit(const char* pPath);
 	void SetFromGit(const char* pPath, bool bIsDirectory);
 	void SetFromGit(const TCHAR* pPath, bool bIsDirectory);
-	void SetFromGit(const CString& sPath,CString *OldPath=NULL);
+	void SetFromGit(const CString& sPath, CString* oldPath = nullptr, int* bIsDirectory = nullptr);
 
 	/**
 	 * Set the path as UNICODE with backslashes
@@ -149,6 +151,8 @@ public:
 	 */
 	CString GetFileExtension() const;
 
+	void UpdateCase();
+
 	bool IsEmpty() const;
 	void Reset();
 	/**
@@ -167,7 +171,7 @@ public:
 	 * section stripped off the front
 	 * Returns a string with fwdslash paths
 	 */
-	CString GetDisplayString(const CTGitPath* pOptionalBasePath = NULL) const;
+	CString GetDisplayString(const CTGitPath* pOptionalBasePath = nullptr) const;
 	/**
 	 * Compares two paths. Slash format is irrelevant.
 	 */
@@ -203,9 +207,8 @@ public:
 
 	/**
 	 * Get the file modification time - returns zero for files which don't exist
-	 * Returns a FILETIME structure cast to an __int64, for easy comparisons
 	 */
-	__int64 GetLastWriteTime() const;
+	__int64 GetLastWriteTime(bool force = false) const;
 
 	/**
 	 * Get the file size. Returns zero for directories or files that don't exist.
@@ -230,8 +233,7 @@ public:
 	 * is done in the same directory. For folders, it checks if the folder itself
 	 * contains an admin directory.
 	 */
-	bool HasAdminDir() const;
-	bool HasAdminDir(CString *ProjectTopDir) const;
+	bool HasAdminDir(CString* projectTopDir = nullptr, bool force = false) const;
 	bool HasSubmodules() const;
 	bool HasGitSVNDir() const;
 	bool IsBisectActive() const;
@@ -243,13 +245,12 @@ public:
 
 	int  GetAdminDirMask() const;
 
+	bool IsRegisteredSubmoduleOfParentProject(CString* parentProjectRoot = nullptr) const;
+
 	/**
 	 * Checks if the path point to or below a git admin directory (.Git).
 	 */
 	bool IsAdminDir() const;
-
-	void SetCustomData(LPARAM lp) {m_customData = lp;}
-	LPARAM GetCustomData() const {return m_customData;}
 
 	/**
 	 * Checks if the path or URL is valid on Windows.
@@ -262,6 +263,8 @@ public:
 	 */
 	bool IsValidOnWindows() const;
 
+	CString GetAbbreviatedRename() const;
+
 private:
 	// All these functions are const, and all the data
 	// is mutable, in order that the hidden caching operations
@@ -271,32 +274,37 @@ private:
 	// const-correctness semantics are preserved
 	void SetFwdslashPath(const CString& sPath) const;
 	void SetBackslashPath(const CString& sPath) const;
-	void SetUTF8FwdslashPath(const CString& sPath) const;
 	void EnsureBackslashPathSet() const;
 	void EnsureFwdslashPathSet() const;
-	/**
-	 * Checks if two path strings are equal. No conversion of slashes is done!
-	 * \remark for slash-independent comparison, use IsEquivalentTo()
-	 */
-	static bool ArePathStringsEqual(const CString& sP1, const CString& sP2);
-	static bool ArePathStringsEqualWithCase(const CString& sP1, const CString& sP2);
 
+public:
+	/**
+	 * Marks a path as a file by unsetting the cached IsDirectory status
+	 * Used while diffing commits where a submodule changed to a file
+	 */
+	void UnsetDirectoryStatus() { m_bIsDirectory = false; }
+
+private:
 	/**
 	 * Adds the required trailing slash to local root paths such as 'C:'
 	 */
 	void SanitizeRootPath(CString& sPath, bool bIsForwardPath) const;
 
+#ifdef GMOCK_INCLUDE_GMOCK_GMOCK_H_
+protected:
+	virtual void UpdateAttributes() const;
+private:
+#else
 	void UpdateAttributes() const;
+#endif
 
-
+	bool HasStashDir(const CString& adminDirPath) const;
 
 private:
 	mutable CString m_sBackslashPath;
 	mutable CString m_sLongBackslashPath;
 	mutable CString m_sFwdslashPath;
 	mutable CString m_sUIPath;
-	mutable	CStringA m_sUTF8FwdslashPath;
-	mutable CStringA m_sUTF8FwdslashPathEscaped;
 	mutable CString m_sProjectRoot;
 
 	//used for rename case
@@ -306,7 +314,6 @@ private:
 	mutable bool m_bDirectoryKnown;
 	mutable bool m_bIsDirectory;
 	mutable bool m_bLastWriteTimeKnown;
-	mutable bool m_bURLKnown;
 	mutable __int64 m_lastWriteTime;
 	mutable __int64 m_fileSize;
 	mutable bool m_bIsReadOnly;
@@ -320,9 +327,6 @@ private:
 	mutable bool m_bIsWCRoot;
 	mutable bool m_bExists;
 	mutable bool m_bExistsKnown;
-	mutable LPARAM m_customData;
-	mutable bool m_bIsSpecialDirectoryKnown;
-	mutable bool m_bIsSpecialDirectory;
 
 	friend bool operator<(const CTGitPath& left, const CTGitPath& right);
 };
@@ -345,7 +349,7 @@ public:
 	CTGitPathList();
 	// A constructor which allows a path list to be easily built with one initial entry in
 	explicit CTGitPathList(const CTGitPath& firstEntry);
-	int m_Action;
+	unsigned int m_Action;
 
 public:
 	void AddPath(const CTGitPath& newPath);
@@ -354,9 +358,9 @@ public:
 	const CTGitPath* LookForGitPath(const CString& path);
 	int	ParserFromLog(BYTE_VECTOR &log, bool parseDeletes = false);
 	int ParserFromLsFile(BYTE_VECTOR &out,bool staged=true);
-	int FillUnRev(unsigned int Action, CTGitPathList *list = nullptr, CString *err = nullptr);
-	int FillBasedOnIndexFlags(unsigned short flag, unsigned short flagextended, CTGitPathList* list = nullptr);
-	int GetAction();
+	int FillUnRev(unsigned int Action, const CTGitPathList* filterlist = nullptr, CString* err = nullptr);
+	int FillBasedOnIndexFlags(unsigned short flag, unsigned short flagextended, const CTGitPathList* filterlist = nullptr);
+	unsigned int GetAction();
 	/**
 	 * Load from the path argument string, when the 'path' parameter is used
 	 * This is a list of paths, with '*' between them
@@ -370,7 +374,17 @@ public:
 	const CTGitPath& operator[](INT_PTR index) const;
 	bool AreAllPathsFiles() const;
 	bool AreAllPathsFilesInOneDirectory() const;
+	/**
+	 * returns the directory which all items have in common.
+	 * if not all paths are in the same directory, then
+	 * an empty path is returned
+	 */
 	CTGitPath GetCommonDirectory() const;
+	/**
+	 * returns the root path of all paths in the list.
+	 * only returns an empty path if not all paths are on
+	 * the same drive/root.
+	 */
 	CTGitPath GetCommonRoot() const;
 	void SortByPathname(bool bReverse = false);
 	/**

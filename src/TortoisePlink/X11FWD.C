@@ -58,11 +58,9 @@ static int xdmseen_cmp(void *a, void *b)
  *      independent network.c or something */
 static void dummy_plug_log(Plug p, int type, SockAddr addr, int port,
 			   const char *error_msg, int error_code) { }
-static int dummy_plug_closing
-     (Plug p, const char *error_msg, int error_code, int calling_back)
-{ return 1; }
-static int dummy_plug_receive(Plug p, int urgent, char *data, int len)
-{ return 1; }
+static void dummy_plug_closing
+     (Plug p, const char *error_msg, int error_code, int calling_back) { }
+static void dummy_plug_receive(Plug p, int urgent, char *data, int len) { }
 static void dummy_plug_sent(Plug p, int bufsize) { }
 static int dummy_plug_accepting(Plug p, accept_fn_t constructor, accept_ctx_t ctx) { return 1; }
 static const struct plug_function_table dummy_plug = {
@@ -190,7 +188,7 @@ int x11_authcmp(void *av, void *bv)
     }
 }
 
-struct X11Display *x11_setup_display(char *display, Conf *conf)
+struct X11Display *x11_setup_display(const char *display, Conf *conf)
 {
     struct X11Display *disp = snew(struct X11Display);
     char *localcopy;
@@ -286,7 +284,8 @@ struct X11Display *x11_setup_display(char *display, Conf *conf)
 
 	disp->port = 6000 + disp->displaynum;
 	disp->addr = name_lookup(disp->hostname, disp->port,
-				 &disp->realhost, conf, ADDRTYPE_UNSPEC);
+				 &disp->realhost, conf, ADDRTYPE_UNSPEC,
+                                 NULL, NULL);
     
 	if ((err = sk_addr_error(disp->addr)) != NULL) {
 	    sk_addr_free(disp->addr);
@@ -357,10 +356,10 @@ void x11_free_display(struct X11Display *disp)
 
 #define XDM_MAXSKEW 20*60      /* 20 minute clock skew should be OK */
 
-static char *x11_verify(unsigned long peer_ip, int peer_port,
-			tree234 *authtree, char *proto,
-			unsigned char *data, int dlen,
-                        struct X11FakeAuth **auth_ret)
+static const char *x11_verify(unsigned long peer_ip, int peer_port,
+                              tree234 *authtree, char *proto,
+                              unsigned char *data, int dlen,
+                              struct X11FakeAuth **auth_ret)
 {
     struct X11FakeAuth match_dummy;    /* for passing to find234 */
     struct X11FakeAuth *auth;
@@ -420,7 +419,8 @@ static char *x11_verify(unsigned long peer_ip, int peer_port,
 	    if (data[i] != 0)	       /* zero padding wrong */
 		return "XDM-AUTHORIZATION-1 data failed check";
 	tim = time(NULL);
-	if (abs(t - tim) > XDM_MAXSKEW)
+	if (((unsigned long)t - (unsigned long)tim
+             + XDM_MAXSKEW) > 2*XDM_MAXSKEW)
 	    return "XDM-AUTHORIZATION-1 time stamp was too far out";
 	seen = snew(struct XDMSeen);
 	seen->time = t;
@@ -614,8 +614,8 @@ static void x11_log(Plug p, int type, SockAddr addr, int port,
 static void x11_send_init_error(struct X11Connection *conn,
                                 const char *err_message);
 
-static int x11_closing(Plug plug, const char *error_msg, int error_code,
-		       int calling_back)
+static void x11_closing(Plug plug, const char *error_msg, int error_code,
+			int calling_back)
 {
     struct X11Connection *xconn = (struct X11Connection *) plug;
 
@@ -644,11 +644,9 @@ static int x11_closing(Plug plug, const char *error_msg, int error_code,
         if (xconn->c)
             sshfwd_write_eof(xconn->c);
     }
-
-    return 1;
 }
 
-static int x11_receive(Plug plug, int urgent, char *data, int len)
+static void x11_receive(Plug plug, int urgent, char *data, int len)
 {
     struct X11Connection *xconn = (struct X11Connection *) plug;
 
@@ -657,8 +655,6 @@ static int x11_receive(Plug plug, int urgent, char *data, int len)
         xconn->no_data_sent_to_x_client = FALSE;
 	sk_set_frozen(xconn->s, 1);
     }
-
-    return 1;
 }
 
 static void x11_sent(Plug plug, int bufsize)
@@ -932,7 +928,7 @@ int x11_send(struct X11Connection *xconn, char *data, int len)
          * Write a new connection header containing our replacement
          * auth data.
 	 */
-
+        socketdatalen = 0;             /* placate compiler warning */
         socketdata = sk_getxdmdata(xconn->s, &socketdatalen);
         if (socketdata && socketdatalen==6) {
             sprintf(new_peer_addr, "%d.%d.%d.%d", socketdata[0],

@@ -1,6 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2003-2006, 2009-2010, 2013 - TortoiseSVN
+// Copyright (C) 2017 - TortoiseGit
+// Copyright (C) 2003-2006, 2009-2010, 2013, 2016 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -29,21 +30,22 @@ class CRenameDlg : public CHorizontalResizableStandAloneDialog
 	DECLARE_DYNAMIC(CRenameDlg)
 
 public:
-	CRenameDlg(CWnd* pParent = NULL);
+	CRenameDlg(CWnd* pParent = nullptr);
 	virtual ~CRenameDlg();
 
-	void SetInputValidator(IInputValidator * validator) { m_pInputValidator = validator; }
+	void SetInputValidator(IInputValidator validator) { m_pInputValidator = validator; }
 	void SetRenameRequired(bool renameRequired) { m_renameRequired = renameRequired; }
 	enum { IDD = IDD_RENAME };
 
 protected:
-	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
+	virtual void DoDataExchange(CDataExchange* pDX) override;    // DDX/DDV support
 
-	virtual BOOL OnInitDialog();
-	virtual void OnOK();
-	virtual void OnCancel();
+	virtual BOOL OnInitDialog() override;
+	virtual void OnOK() override;
+	virtual void OnCancel() override;
 
 	afx_msg void OnEnSetfocusName();
+	afx_msg void OnBnClickedButtonBrowseRef();
 
 	DECLARE_MESSAGE_MAP()
 
@@ -51,10 +53,11 @@ public:
 	CString m_name;
 	CString m_windowtitle;
 	CString m_label;
+	CString m_sBaseDir;
 
 private:
 	bool				m_bBalloonVisible;
 	bool				m_renameRequired;
 	CString				m_originalName;
-	IInputValidator *	m_pInputValidator;
+	IInputValidator		m_pInputValidator;
 };

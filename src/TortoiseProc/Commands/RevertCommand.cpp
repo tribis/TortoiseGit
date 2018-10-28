@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2014 - TortoiseGit
+// Copyright (C) 2008-2014, 2018 - TortoiseGit
 // Copyright (C) 2007-2008 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -30,7 +30,6 @@ bool RevertCommand::Execute()
 	dlg.m_pathList = pathList;
 	if (dlg.DoModal() == IDOK)
 	{
-
 		CGitProgressDlg progDlg;
 		theApp.m_pMainWnd = &progDlg;
 

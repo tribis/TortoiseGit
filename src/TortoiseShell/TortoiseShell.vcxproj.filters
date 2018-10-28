@@ -84,9 +84,6 @@
     <ClCompile Include="..\TGitCache\CacheInterface.cpp">
       <Filter>TGitCache</Filter>
     </ClCompile>
-    <ClCompile Include="..\Git\GitRev.cpp">
-      <Filter>Git</Filter>
-    </ClCompile>
     <ClCompile Include="..\Git\GitStatus.cpp">
       <Filter>Git</Filter>
     </ClCompile>
@@ -116,6 +113,12 @@
     </ClCompile>
     <ClCompile Include="..\Git\MassiveGitTaskBase.cpp">
       <Filter>Git</Filter>
+    </ClCompile>
+    <ClCompile Include="ShellCache.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Utils\LoadIconEx.cpp">
+      <Filter>Utils</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -208,9 +211,6 @@
     <ClInclude Include="..\Git\gitindex.h">
       <Filter>Git</Filter>
     </ClInclude>
-    <ClInclude Include="..\Git\GitRev.h">
-      <Filter>Git</Filter>
-    </ClInclude>
     <ClInclude Include="..\Git\GitStatus.h">
       <Filter>Git</Filter>
     </ClInclude>
@@ -225,6 +225,15 @@
     </ClInclude>
     <ClInclude Include="..\TGitCache\CacheInterface.h">
       <Filter>TGitCache</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Utils\CreateProcessHelper.h">
+      <Filter>Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="MenuInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Utils\LoadIconEx.h">
+      <Filter>Utils</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -247,9 +256,6 @@
       <Filter>Resource Files</Filter>
     </Image>
     <Image Include="..\Resources\menubisectreset.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="..\Resources\menublame.ico">
       <Filter>Resource Files</Filter>
     </Image>
     <Image Include="..\Resources\menucheckout.ico">
@@ -279,9 +285,6 @@
     <Image Include="..\Resources\menudelete.ico">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="..\Resources\menudelunversioned.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
     <Image Include="..\Resources\menudiff.ico">
       <Filter>Resource Files</Filter>
     </Image>
@@ -297,9 +300,6 @@
     <Image Include="..\Resources\menuignore.ico">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="..\Resources\menuimport.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
     <Image Include="..\Resources\menulog.ico">
       <Filter>Resource Files</Filter>
     </Image>
@@ -310,9 +310,6 @@
       <Filter>Resource Files</Filter>
     </Image>
     <Image Include="..\Resources\menupick.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="..\Resources\menuproperties.ico">
       <Filter>Resource Files</Filter>
     </Image>
     <Image Include="..\Resources\menurebase.ico">
@@ -388,9 +385,6 @@
       <Filter>Resource Files</Filter>
     </Image>
     <Image Include="..\Resources\tsvnmenumultiple.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="..\Resources\update1.ico">
       <Filter>Resource Files</Filter>
     </Image>
     <Image Include="..\Resources\menurevisiongraph.ico">

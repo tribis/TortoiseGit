@@ -5,7 +5,7 @@
 #pragma once
 #define XMESSAGEBOX_APPREGPATH "Software\\TortoiseGit\\"
 
-#include "..\targetver.h"
+#include "../targetver.h"
 
 #define _ATL_CSTRING_EXPLICIT_CONSTRUCTORS	// some CString constructors will be explicit
 
@@ -31,10 +31,7 @@
 
 #include <atlbase.h>
 
-#pragma warning(push)
-#pragma warning(disable: 4510 4610)
 #include "git2.h"
-#pragma warning(pop)
 #include "SmartLibgit2Ref.h"
 
 #include <string>

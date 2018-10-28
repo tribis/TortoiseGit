@@ -34,7 +34,7 @@ public:
 	{
 		if(pFmtEtc->cfFormat == CF_TEXT && medium.tymed == TYMED_ISTREAM)
 		{
-			if(medium.pstm != NULL)
+			if (medium.pstm)
 			{
 				const int BUF_SIZE = 10000;
 				auto buff = std::make_unique<char[]>(BUF_SIZE + 1);
@@ -42,7 +42,7 @@ public:
 				HRESULT hr = medium.pstm->Read(buff.get(), BUF_SIZE, &cbRead);
 				if (SUCCEEDED(hr) && (cbRead > 0) && (cbRead < BUF_SIZE))
 				{
-					buff[cbRead]=0;
+					buff[cbRead] = '\0';
 					LRESULT nLen = ::SendMessage(m_hTargetWnd, WM_GETTEXTLENGTH, 0, 0);
 					::SendMessage(m_hTargetWnd, EM_SETSEL, nLen, -1);
 					std::wstring str = CUnicodeUtils::StdGetUnicode(std::string(buff.get()));
@@ -52,7 +52,7 @@ public:
 				{
 					while ((hr==S_OK) && (cbRead >0))
 					{
-						buff[cbRead]=0;
+						buff[cbRead] = '\0';
 						LRESULT nLen = ::SendMessage(m_hTargetWnd, WM_GETTEXTLENGTH, 0, 0);
 						::SendMessage(m_hTargetWnd, EM_SETSEL, nLen, -1);
 						std::wstring str = CUnicodeUtils::StdGetUnicode(std::string(buff.get()));
@@ -65,7 +65,7 @@ public:
 		}
 		if(pFmtEtc->cfFormat == CF_UNICODETEXT && medium.tymed == TYMED_ISTREAM)
 		{
-			if(medium.pstm != NULL)
+			if (medium.pstm)
 			{
 				const int BUF_SIZE = 10000;
 				auto buff = std::make_unique<WCHAR[]>(BUF_SIZE + 1);
@@ -73,7 +73,7 @@ public:
 				HRESULT hr = medium.pstm->Read(buff.get(), BUF_SIZE, &cbRead);
 				if (SUCCEEDED(hr) && (cbRead > 0) && (cbRead < BUF_SIZE))
 				{
-					buff[cbRead]=0;
+					buff[cbRead] = '\0';
 					LRESULT nLen = ::SendMessage(m_hTargetWnd, WM_GETTEXTLENGTH, 0, 0);
 					::SendMessage(m_hTargetWnd, EM_SETSEL, nLen, -1);
 					::SendMessage(m_hTargetWnd, EM_REPLACESEL, TRUE, (LPARAM)buff.get());
@@ -82,7 +82,7 @@ public:
 				{
 					while( (hr==S_OK) && (cbRead >0) )
 					{
-						buff[cbRead]=0;
+						buff[cbRead] = '\0';
 						LRESULT nLen = ::SendMessage(m_hTargetWnd, WM_GETTEXTLENGTH, 0, 0);
 						::SendMessage(m_hTargetWnd, EM_SETSEL, nLen, -1);
 						::SendMessage(m_hTargetWnd, EM_REPLACESEL, TRUE, (LPARAM)buff.get());
@@ -95,7 +95,7 @@ public:
 		if(pFmtEtc->cfFormat == CF_TEXT && medium.tymed == TYMED_HGLOBAL)
 		{
 			char* pStr = (char*)GlobalLock(medium.hGlobal);
-			if(pStr != NULL)
+			if (pStr)
 			{
 				LRESULT nLen = ::SendMessage(m_hTargetWnd, WM_GETTEXTLENGTH, 0, 0);
 				::SendMessage(m_hTargetWnd, EM_SETSEL, nLen, -1);
@@ -107,7 +107,7 @@ public:
 		if(pFmtEtc->cfFormat == CF_UNICODETEXT && medium.tymed == TYMED_HGLOBAL)
 		{
 			WCHAR* pStr = (WCHAR*)GlobalLock(medium.hGlobal);
-			if(pStr != NULL)
+			if (pStr)
 			{
 				LRESULT nLen = ::SendMessage(m_hTargetWnd, WM_GETTEXTLENGTH, 0, 0);
 				::SendMessage(m_hTargetWnd, EM_SETSEL, nLen, -1);
@@ -118,11 +118,11 @@ public:
 		if(pFmtEtc->cfFormat == CF_HDROP && medium.tymed == TYMED_HGLOBAL)
 		{
 			HDROP hDrop = (HDROP)GlobalLock(medium.hGlobal);
-			if(hDrop != NULL)
+			if (hDrop)
 			{
 				TCHAR szFileName[MAX_PATH] = {0};
 
-				UINT cFiles = DragQueryFile(hDrop, 0xFFFFFFFF, NULL, 0);
+				UINT cFiles = DragQueryFile(hDrop, 0xFFFFFFFF, nullptr, 0);
 				for(UINT i = 0; i < cFiles; ++i)
 				{
 					if (DragQueryFile(hDrop, i, szFileName, _countof(szFileName)))
@@ -134,7 +134,6 @@ public:
 		}
 		return true; //let base free the medium
 	}
-
 };
 
 

@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2003-2011,2013-2015 - TortoiseGit
+// Copyright (C) 2003-2011, 2013-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -21,7 +21,7 @@
 #include "CommonAppUtils.h"
 #include "Git.h"
 #include "UnicodeUtils.h"
-
+#include "TempFile.h"
 
 struct num_compare
 {
@@ -35,36 +35,39 @@ ProjectProperties::ProjectProperties(void)
 	: regExNeedUpdate (true)
 	, nBugIdPos(-1)
 	, bWarnNoSignedOffBy(FALSE)
+	, bNumber(TRUE)
+	, bWarnIfNoIssue(FALSE)
+	, nLogWidthMarker(0)
+	, nMinLogSize(0)
+	, bFileListInEnglish(TRUE)
+	, bAppend(TRUE)
+	, lProjectLanguage(0)
 {
-	bNumber = TRUE;
-	bWarnIfNoIssue = FALSE;
-	nLogWidthMarker = 0;
-	nMinLogSize = 0;
-	bFileListInEnglish = TRUE;
-	bAppend = TRUE;
-	lProjectLanguage = 0;
 }
 
 int ProjectProperties::ReadProps()
 {
 	CAutoConfig gitconfig(true);
+	CAutoRepository repo(g_Git.GetGitRepository());
 	CString adminDirPath;
 	if (GitAdminDir::GetAdminDirPath(g_Git.m_CurrentDir, adminDirPath))
-		git_config_add_file_ondisk(gitconfig, CGit::GetGitPathStringA(adminDirPath + L"config"), GIT_CONFIG_LEVEL_APP, FALSE); // this needs to have the highest priority in order to override .tgitconfig settings
+		git_config_add_file_ondisk(gitconfig, CGit::GetGitPathStringA(adminDirPath + L"config"), GIT_CONFIG_LEVEL_APP, repo, FALSE); // this needs to have the highest priority in order to override .tgitconfig settings
 
 	if (!GitAdminDir::IsBareRepo(g_Git.m_CurrentDir))
-		git_config_add_file_ondisk(gitconfig, CGit::GetGitPathStringA(g_Git.CombinePath(L".tgitconfig")), GIT_CONFIG_LEVEL_LOCAL, FALSE); // this needs to have the second highest priority
+		git_config_add_file_ondisk(gitconfig, CGit::GetGitPathStringA(g_Git.CombinePath(L".tgitconfig")), GIT_CONFIG_LEVEL_LOCAL, nullptr, FALSE); // this needs to have the second highest priority
 	else
 	{
-		CString tmpFile = GetTempFile();
-		CTGitPath path(_T(".tgitconfig"));
-		if (g_Git.GetOneFile(_T("HEAD"), path, tmpFile) == 0)
-			git_config_add_file_ondisk(gitconfig, CGit::GetGitPathStringA(tmpFile), GIT_CONFIG_LEVEL_LOCAL, FALSE); // this needs to have the second highest priority
+		CString tmpFile = CTempFiles::Instance().GetTempFilePath(true).GetWinPathString();
+		CTGitPath path(L".tgitconfig");
+		if (g_Git.GetOneFile(L"HEAD", path, tmpFile) == 0)
+			git_config_add_file_ondisk(gitconfig, CGit::GetGitPathStringA(tmpFile), GIT_CONFIG_LEVEL_LOCAL, nullptr, FALSE); // this needs to have the second highest priority
 	}
 
-	git_config_add_file_ondisk(gitconfig, CGit::GetGitPathStringA(g_Git.GetGitGlobalConfig()), GIT_CONFIG_LEVEL_GLOBAL, FALSE);
-	git_config_add_file_ondisk(gitconfig,CGit::GetGitPathStringA(g_Git.GetGitGlobalXDGConfig()), GIT_CONFIG_LEVEL_XDG, FALSE);
-	git_config_add_file_ondisk(gitconfig, CGit::GetGitPathStringA(g_Git.GetGitSystemConfig()), GIT_CONFIG_LEVEL_SYSTEM, FALSE);
+	git_config_add_file_ondisk(gitconfig, CGit::GetGitPathStringA(g_Git.GetGitGlobalConfig()), GIT_CONFIG_LEVEL_GLOBAL, repo, FALSE);
+	git_config_add_file_ondisk(gitconfig,CGit::GetGitPathStringA(g_Git.GetGitGlobalXDGConfig()), GIT_CONFIG_LEVEL_XDG, repo, FALSE);
+	git_config_add_file_ondisk(gitconfig, CGit::GetGitPathStringA(g_Git.GetGitSystemConfig()), GIT_CONFIG_LEVEL_SYSTEM, repo, FALSE);
+	if (!g_Git.ms_bCygwinGit && !g_Git.ms_bMsys2Git)
+		git_config_add_file_ondisk(gitconfig, CGit::GetGitPathStringA(g_Git.GetGitProgramDataConfig()), GIT_CONFIG_LEVEL_PROGRAMDATA, repo, FALSE);
 	giterr_clear();
 
 	CString sPropVal;
@@ -94,28 +97,26 @@ int ProjectProperties::ReadProps()
 		sCheckRe = sCheckRe.Left(sCheckRe.Find('\n')).Trim();
 	}
 	if (!sCheckRe.IsEmpty())
-	{
 		sCheckRe = sCheckRe.Trim();
-	}
 
 	if (gitconfig.GetString(PROJECTPROPNAME_LOGWIDTHLINE, sPropVal) == 0)
 	{
 		CString val;
 		val = sPropVal;
 		if (!val.IsEmpty())
-			nLogWidthMarker = _ttoi(val);
+			nLogWidthMarker = _wtoi(val);
 	}
 
 	if (gitconfig.GetString(PROJECTPROPNAME_PROJECTLANGUAGE, sPropVal) == 0)
 	{
 		CString val;
 		val = sPropVal;
-		if (val == _T("-1"))
+		if (val == L"-1")
 			lProjectLanguage = -1;
 		if (!val.IsEmpty())
 		{
 			LPTSTR strEnd;
-			lProjectLanguage = _tcstol(val, &strEnd, 0);
+			lProjectLanguage = wcstol(val, &strEnd, 0);
 		}
 	}
 
@@ -124,7 +125,7 @@ int ProjectProperties::ReadProps()
 		CString val;
 		val = sPropVal;
 		if (!val.IsEmpty())
-			nMinLogSize = _ttoi(val);
+			nMinLogSize = _wtoi(val);
 	}
 
 	return 0;
@@ -176,9 +177,7 @@ CString ProjectProperties::GetBugIDFromLog(CString& msg)
 				sBugLine = msg;
 		}
 		if (sBugLine.IsEmpty() && (msg.ReverseFind('\n') < 0))
-		{
 			sBugLine = msg.Mid(msg.ReverseFind('\n')+1);
-		}
 		if (sBugLine.Left(sFirstPart.GetLength()).Compare(sFirstPart)!=0)
 			sBugLine.Empty();
 		if (sBugLine.Right(sLastPart.GetLength()).Compare(sLastPart)!=0)
@@ -216,10 +215,10 @@ void ProjectProperties::AutoUpdateRegex()
 	{
 		try
 		{
-			regCheck = std::tr1::wregex(sCheckRe);
-			regBugID = std::tr1::wregex(sBugIDRe);
+			regCheck = std::wregex(sCheckRe);
+			regBugID = std::wregex(sBugIDRe);
 		}
-		catch (std::exception)
+		catch (std::exception&)
 		{
 		}
 
@@ -238,50 +237,49 @@ std::vector<CHARRANGE> ProjectProperties::FindBugIDPositions(const CString& msg)
 	{
 		if (!sBugIDRe.IsEmpty())
 		{
-
 			// match with two regex strings (without grouping!)
 			try
 			{
 				AutoUpdateRegex();
-				const std::tr1::wsregex_iterator end;
+				const std::wsregex_iterator end;
 				std::wstring s = msg;
-				for (std::tr1::wsregex_iterator it(s.cbegin(), s.cend(), regCheck); it != end; ++it)
+				for (std::wsregex_iterator it(s.cbegin(), s.cend(), regCheck); it != end; ++it)
 				{
 					// (*it)[0] is the matched string
 					std::wstring matchedString = (*it)[0];
 					ptrdiff_t matchpos = it->position(0);
-					for (std::tr1::wsregex_iterator it2(matchedString.cbegin(), matchedString.cend(), regBugID); it2 != end; ++it2)
+					for (std::wsregex_iterator it2(matchedString.cbegin(), matchedString.cend(), regBugID); it2 != end; ++it2)
 					{
-						ATLTRACE(_T("matched id : %s\n"), (*it2)[0].str().c_str());
+						ATLTRACE(L"matched id : %s\n", (*it2)[0].str().c_str());
 						ptrdiff_t matchposID = it2->position(0);
 						CHARRANGE range = {(LONG)(matchpos+matchposID), (LONG)(matchpos+matchposID+(*it2)[0].str().size())};
 						result.push_back(range);
 					}
 				}
 			}
-			catch (std::exception) {}
+			catch (std::exception&) {}
 		}
 		else
 		{
 			try
 			{
 				AutoUpdateRegex();
-				const std::tr1::wsregex_iterator end;
+				const std::wsregex_iterator end;
 				std::wstring s = msg;
-				for (std::tr1::wsregex_iterator it(s.cbegin(), s.cend(), regCheck); it != end; ++it)
+				for (std::wsregex_iterator it(s.cbegin(), s.cend(), regCheck); it != end; ++it)
 				{
-					const std::tr1::wsmatch match = *it;
+					const std::wsmatch match = *it;
 					// we define group 1 as the whole issue text and
 					// group 2 as the bug ID
 					if (match.size() >= 2)
 					{
-						ATLTRACE(_T("matched id : %s\n"), std::wstring(match[1]).c_str());
+						ATLTRACE(L"matched id : %s\n", std::wstring(match[1]).c_str());
 						CHARRANGE range = {(LONG)(match[1].first - s.cbegin()), (LONG)(match[1].second - s.cbegin())};
 						result.push_back(range);
 					}
 				}
 			}
-			catch (std::exception) {}
+			catch (std::exception&) {}
 		}
 	}
 	else if (result.empty() && (!sMessage.IsEmpty()))
@@ -335,7 +333,7 @@ std::vector<CHARRANGE> ProjectProperties::FindBugIDPositions(const CString& msg)
 			offset1 = sMsg.GetLength() - sBugLine.GetLength() + sFirstPart.GetLength();
 		else
 			offset1 = sFirstPart.GetLength();
-		sBugIDPart.Trim(_T(","));
+		sBugIDPart.Trim(L',');
 		while (sBugIDPart.Find(',')>=0)
 		{
 			offset2 = offset1 + sBugIDPart.Find(',');
@@ -366,9 +364,7 @@ std::set<CString> ProjectProperties::FindBugIDs (const CString& msg)
 	std::set<CString> bugIDs;
 
 	for (const auto& pos : positions)
-	{
 		bugIDs.insert(msg.Mid(pos.cpMin, pos.cpMax - pos.cpMin));
-	}
 
 	return bugIDs;
 }
@@ -381,14 +377,12 @@ CString ProjectProperties::FindBugID(const CString& msg)
 		std::vector<CHARRANGE> positions = FindBugIDPositions(msg);
 		std::set<CString, num_compare> bugIDs;
 		for (const auto& pos : positions)
-		{
 			bugIDs.insert(msg.Mid(pos.cpMin, pos.cpMax - pos.cpMin));
-		}
 
 		for (const auto& id : bugIDs)
 		{
 			sRet += id;
-			sRet += _T(" ");
+			sRet += L' ';
 		}
 		sRet.Trim();
 	}
@@ -409,7 +403,7 @@ CString ProjectProperties::GetBugIDUrl(const CString& sBugID)
 	if (!sMessage.IsEmpty() || !sCheckRe.IsEmpty())
 	{
 		ret = sUrl;
-		ret.Replace(_T("%BUGID%"), sBugID);
+		ret.Replace(L"%BUGID%", sBugID);
 	}
 	return ret;
 }
@@ -426,9 +420,7 @@ BOOL ProjectProperties::CheckBugID(const CString& sID)
 		{
 			c = sID.GetAt(i);
 			if ((c < '0')&&(c != ',')&&(c != ' '))
-			{
 				return FALSE;
-			}
 			if (c > '9')
 				return FALSE;
 		}
@@ -443,9 +435,9 @@ BOOL ProjectProperties::HasBugID(const CString& sMsg)
 		try
 		{
 			AutoUpdateRegex();
-			return std::tr1::regex_search((LPCTSTR)sMsg, regCheck);
+			return std::regex_search((LPCTSTR)sMsg, regCheck);
 		}
-		catch (std::exception) {}
+		catch (std::exception&) {}
 	}
 	return FALSE;
 }

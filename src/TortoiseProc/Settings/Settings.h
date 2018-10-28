@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2013 - TortoiseGit
+// Copyright (C) 2008-2013, 2016 - TortoiseGit
 // Copyright (C) 2003-2011 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -19,6 +19,7 @@
 //
 #pragma once
 
+#include "StandAloneDlg.h"
 #include "SettingsPropPage.h"
 #include "SetMainPage.h"
 #include "SetProxyPage.h"
@@ -60,7 +61,7 @@ using namespace TreePropSheet;
  * it means that the changes are discarded! Each settings page has
  * to make sure that no changes are saved outside that method.
  */
-class CSettings : public CTreePropSheet
+class CSettings : public CStandAloneDialogTmpl<CTreePropSheet>
 {
 	DECLARE_DYNAMIC(CSettings)
 
@@ -104,10 +105,8 @@ private:
 	CSetExtMenu	*						m_pExtMenu;
 	CSettingsAdvanced *					m_pAdvanced;
 
-	HICON								m_hIcon;
-
 public:
-	CSettings(UINT nIDCaption,CTGitPath *CmdPath=NULL, CWnd* pParentWnd = NULL, UINT iSelectPage = 0);
+	CSettings(UINT nIDCaption, CTGitPath* CmdPath = nullptr, CWnd* pParentWnd = nullptr, UINT iSelectPage = 0);
 	virtual ~CSettings();
 	CString		m_DefaultPage;
 	/**
@@ -117,9 +116,7 @@ public:
 
 protected:
 	DECLARE_MESSAGE_MAP()
-	virtual BOOL OnInitDialog();
-	afx_msg void OnPaint();
-	afx_msg HCURSOR OnQueryDragIcon();
+	virtual BOOL OnInitDialog() override;
 };
 
 

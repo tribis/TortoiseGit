@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2010, 2013-2014 - TortoiseGit
+// Copyright (C) 2010, 2013-2017 - TortoiseGit
 // Copyright (C) 2003-2008,2010 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -26,8 +26,9 @@
 
 IMPLEMENT_DYNAMIC(CSetHooksAdv, CResizableStandAloneDialog)
 
-CSetHooksAdv::CSetHooksAdv(CWnd* pParent /*=NULL*/)
+CSetHooksAdv::CSetHooksAdv(CWnd* pParent /*=nullptr*/)
 	: CResizableStandAloneDialog(CSetHooksAdv::IDD, pParent)
+	, m_bEnabled(FALSE)
 	, m_bWait(FALSE)
 	, m_bHide(FALSE)
 {
@@ -42,6 +43,7 @@ void CSetHooksAdv::DoDataExchange(CDataExchange* pDX)
 	CResizableStandAloneDialog::DoDataExchange(pDX);
 	DDX_Text(pDX, IDC_HOOKPATH, m_sPath);
 	DDX_Text(pDX, IDC_HOOKCOMMANDLINE, m_sCommandLine);
+	DDX_Check(pDX, IDC_ENABLE, m_bEnabled);
 	DDX_Check(pDX, IDC_WAITCHECK, m_bWait);
 	DDX_Check(pDX, IDC_HIDECHECK, m_bHide);
 	DDX_Control(pDX, IDC_HOOKTYPECOMBO, m_cHookTypeCombo);
@@ -57,6 +59,7 @@ BOOL CSetHooksAdv::OnInitDialog()
 {
 	CResizableStandAloneDialog::OnInitDialog();
 
+	AdjustControlSize(IDC_ENABLE);
 	AdjustControlSize(IDC_WAITCHECK);
 	AdjustControlSize(IDC_HIDECHECK);
 
@@ -66,14 +69,14 @@ BOOL CSetHooksAdv::OnInitDialog()
 	m_cHookTypeCombo.SetItemData(index, start_commit_hook);
 	index = m_cHookTypeCombo.AddString(CString(MAKEINTRESOURCE(IDS_HOOKTYPE_PRECOMMIT)));
 	m_cHookTypeCombo.SetItemData(index, pre_commit_hook);
-	/*
 	index = m_cHookTypeCombo.AddString(CString(MAKEINTRESOURCE(IDS_HOOKTYPE_POSTCOMMIT)));
 	m_cHookTypeCombo.SetItemData(index, post_commit_hook);
-	*/
 	index = m_cHookTypeCombo.AddString(CString(MAKEINTRESOURCE(IDS_HOOKTYPE_PREPUSH)));
 	m_cHookTypeCombo.SetItemData(index, pre_push_hook);
 	index = m_cHookTypeCombo.AddString(CString(MAKEINTRESOURCE(IDS_HOOKTYPE_POSTPUSH)));
 	m_cHookTypeCombo.SetItemData(index, post_push_hook);
+	index = m_cHookTypeCombo.AddString(CString(MAKEINTRESOURCE(IDS_HOOKTYPE_PREREBASE)));
+	m_cHookTypeCombo.SetItemData(index, pre_rebase_hook);
 
 	// preselect the right hook type in the combobox
 	for (int i=0; i<m_cHookTypeCombo.GetCount(); ++i)
@@ -92,8 +95,10 @@ BOOL CSetHooksAdv::OnInitDialog()
 	m_sCommandLine = cmd.commandline;
 	m_bWait = cmd.bWait;
 	m_bHide = !cmd.bShow;
+	m_bEnabled = cmd.bEnabled ? BST_CHECKED : BST_UNCHECKED;
 	UpdateData(FALSE);
 
+	AddAnchor(IDC_ENABLE, TOP_LEFT);
 	AddAnchor(IDC_HOOKTYPELABEL, TOP_LEFT, TOP_RIGHT);
 	AddAnchor(IDC_HOOKTYPECOMBO, TOP_RIGHT);
 	AddAnchor(IDC_HOOKWCPATHLABEL, TOP_LEFT, TOP_RIGHT);
@@ -107,13 +112,12 @@ BOOL CSetHooksAdv::OnInitDialog()
 	AddAnchor(IDOK, BOTTOM_RIGHT);
 	AddAnchor(IDCANCEL, BOTTOM_RIGHT);
 	AddAnchor(IDHELP, BOTTOM_RIGHT);
-	EnableSaveRestore(_T("SetHooksAdvDlg"));
+	EnableSaveRestore(L"SetHooksAdvDlg");
 	return TRUE;
 }
 
 void CSetHooksAdv::OnOK()
 {
-
 	UpdateData();
 	int cursel = m_cHookTypeCombo.GetCurSel();
 	key.htype = unknown_hook;
@@ -122,6 +126,7 @@ void CSetHooksAdv::OnOK()
 		key.htype = (hooktype)m_cHookTypeCombo.GetItemData(cursel);
 		key.path = CTGitPath(m_sPath);
 		cmd.commandline = m_sCommandLine;
+		cmd.bEnabled = m_bEnabled == BST_CHECKED;
 		cmd.bWait = !!m_bWait;
 		cmd.bShow = !m_bHide;
 	}
@@ -135,6 +140,11 @@ void CSetHooksAdv::OnOK()
 		ShowEditBalloon(IDC_HOOKPATH, IDS_ERR_NOHOOKPATHSPECIFIED, IDS_ERR_ERROR, TTI_ERROR);
 		return;
 	}
+	if (key.path.GetWinPathString() != L"*" && (!PathIsDirectory(key.path.GetWinPathString()) || PathIsRelative(key.path.GetWinPathString())))
+	{
+		ShowEditBalloon(IDC_HOOKPATH, (LPCTSTR)CFormatMessageWrapper(ERROR_PATH_NOT_FOUND), CString(MAKEINTRESOURCE(IDS_ERR_ERROR)), TTI_ERROR);
+		return;
+	}
 	if (cmd.commandline.IsEmpty())
 	{
 		ShowEditBalloon(IDC_HOOKCOMMANDLINE, IDS_ERR_NOHOOKCOMMANDPECIFIED, IDS_ERR_ERROR, TTI_ERROR);
@@ -146,7 +156,6 @@ void CSetHooksAdv::OnOK()
 
 void CSetHooksAdv::OnBnClickedHookbrowse()
 {
-
 	UpdateData();
 	CBrowseFolder browser;
 	CString sPath;
@@ -157,7 +166,6 @@ void CSetHooksAdv::OnBnClickedHookbrowse()
 		m_sPath = sPath;
 		UpdateData(FALSE);
 	}
-
 }
 
 void CSetHooksAdv::OnBnClickedHookcommandbrowse()
@@ -167,7 +175,7 @@ void CSetHooksAdv::OnBnClickedHookcommandbrowse()
 	if (!PathFileExists(sCmdLine))
 		sCmdLine.Empty();
 	// Display the Open dialog box.
-	if (CAppUtils::FileOpenSave(sCmdLine, NULL, IDS_SETTINGS_HOOKS_SELECTSCRIPTFILE, IDS_COMMONFILEFILTER, true, m_hWnd))
+	if (CAppUtils::FileOpenSave(sCmdLine, nullptr, IDS_SETTINGS_HOOKS_SELECTSCRIPTFILE, IDS_COMMONFILEFILTER, true, m_hWnd))
 	{
 		m_sCommandLine = sCmdLine;
 		UpdateData(FALSE);

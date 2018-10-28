@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2009-2011 - TortoiseGit
+// Copyright (C) 2009-2011, 2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -19,6 +19,7 @@
 #pragma once
 
 #include "StandAloneDlg.h"
+#include "TGitPath.h"
 // CDeleteConflictDlg dialog
 
 class CDeleteConflictDlg : public CStandAloneDialog
@@ -26,19 +27,20 @@ class CDeleteConflictDlg : public CStandAloneDialog
 	DECLARE_DYNAMIC(CDeleteConflictDlg)
 
 public:
-	CDeleteConflictDlg(CWnd* pParent = NULL);   // standard constructor
+	CDeleteConflictDlg(CWnd* pParent = nullptr);   // standard constructor
 	virtual ~CDeleteConflictDlg();
 
 // Dialog Data
 	enum { IDD = IDD_RESOLVE_CONFLICT };
 
 protected:
-	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
+	virtual void DoDataExchange(CDataExchange* pDX) override;    // DDX/DDV support
 	afx_msg void OnBnClickedLog();
 	afx_msg void OnBnClickedLog2();
 	afx_msg void OnBnClickedDelete();
 	afx_msg void OnBnClickedModify();
-	BOOL OnInitDialog();
+	afx_msg void OnBnClickedShowdiff();
+	virtual BOOL OnInitDialog() override;
 	void ShowLog(CString hash);
 	DECLARE_MESSAGE_MAP()
 
@@ -48,6 +50,8 @@ public:
 	CString m_LocalHash;
 	CString m_RemoteHash;
 	BOOL	m_bShowModifiedButton;
-	CString m_File;
+	CTGitPath	m_File;
+	CTGitPath	m_FileBaseVersion;
 	BOOL	m_bIsDelete;
+	bool	m_bDiffMine;
 };

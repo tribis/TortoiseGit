@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2016 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -30,7 +30,7 @@ class CPushDlg : public CHorizontalResizableStandAloneDialog
 	DECLARE_DYNAMIC(CPushDlg)
 
 public:
-	CPushDlg(CWnd* pParent = NULL);   // standard constructor
+	CPushDlg(CWnd* pParent = nullptr);   // standard constructor
 	virtual ~CPushDlg();
 
 	// Dialog Data
@@ -70,9 +70,9 @@ protected:
 	BOOL			m_bSetPushRemote;
 	BOOL			m_bSetPushBranch;
 
-	virtual BOOL OnInitDialog();
+	virtual BOOL OnInitDialog() override;
 
-	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
+	virtual void DoDataExchange(CDataExchange* pDX) override;    // DDX/DDV support
 
 	DECLARE_MESSAGE_MAP()
 
@@ -88,7 +88,7 @@ protected:
 	afx_msg void OnBnClickedTags();
 	afx_msg void OnBnClickedProcPushSetUpstream();
 	afx_msg void OnBnClickedProcPushSetPushremote();
-	virtual BOOL PreTranslateMessage(MSG* pMsg);
+	virtual BOOL PreTranslateMessage(MSG* pMsg) override;
 	void Refresh();
 	void GetRemoteBranch(CString currentBranch);
 	void EnDisablePushRemoteArchiveBranch();

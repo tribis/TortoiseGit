@@ -1,7 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
 // Copyright (C) 2003-2006 - Stefan Kueng
-// Copyright (C) 2012-2015 - TortoiseGit
+// Copyright (C) 2012-2016 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -23,15 +23,15 @@
 #include "gittype.h"
 #include "Git.h"
 #include "BrowseRefsDlg.h"
+#include "StringUtils.h"
 
 IMPLEMENT_DYNAMIC(CRevGraphFilterDlg, CDialog)
 
-CRevGraphFilterDlg::CRevGraphFilterDlg(CWnd* pParent /*=NULL*/)
+CRevGraphFilterDlg::CRevGraphFilterDlg(CWnd* pParent /*=nullptr*/)
 	: CDialog(CRevGraphFilterDlg::IDD, pParent)
 	, m_bCurrentBranch(FALSE)
 	, m_bLocalBranches(FALSE)
 {
-
 }
 
 CRevGraphFilterDlg::~CRevGraphFilterDlg()
@@ -65,10 +65,10 @@ BOOL CRevGraphFilterDlg::OnInitDialog()
 
 	STRING_VECTOR list;
 	if (g_Git.GetRefList(list))
-		MessageBox(g_Git.GetGitLastErr(_T("Could not get all refs.")), _T("TortoiseGit"), MB_ICONERROR);
+		MessageBox(g_Git.GetGitLastErr(L"Could not get all refs."), L"TortoiseGit", MB_ICONERROR);
 
-	m_ctrlFromRev.AddSearchString(_T("HEAD"));
-	m_ctrlToRev.AddSearchString(_T("HEAD"));
+	m_ctrlFromRev.AddSearchString(L"HEAD");
+	m_ctrlToRev.AddSearchString(L"HEAD");
 
 	for (size_t i = 0; i < list.size(); ++i)
 	{
@@ -77,25 +77,25 @@ BOOL CRevGraphFilterDlg::OnInitDialog()
 		m_ctrlFromRev.AddSearchString(list[i]);
 		m_ctrlToRev.AddSearchString(list[i]);
 
-		if(str.Find(_T("refs/")) == 0)
+		if (CStringUtils::StartsWith(str, L"refs/"))
 		{
 			m_ctrlFromRev.AddSearchString(list[i].Mid(5));
 			m_ctrlToRev.AddSearchString(list[i].Mid(5));
 		}
 
-		if(str.Find(_T("refs/heads/")) == 0)
+		if (CStringUtils::StartsWith(str, L"refs/heads/"))
 		{
 			m_ctrlFromRev.AddSearchString(list[i].Mid(11));
 			m_ctrlToRev.AddSearchString(list[i].Mid(11));
 		}
 
-		if(str.Find(_T("refs/remotes/")) == 0)
+		if (CStringUtils::StartsWith(str, L"refs/remotes/"))
 		{
 			m_ctrlFromRev.AddSearchString(list[i].Mid(13));
 			m_ctrlToRev.AddSearchString(list[i].Mid(13));
 		}
 
-		if(str.Find(_T("refs/tags/")) == 0)
+		if (CStringUtils::StartsWith(str, L"refs/tags/"))
 		{
 			m_ctrlFromRev.AddSearchString(list[i].Mid(10));
 			m_ctrlToRev.AddSearchString(list[i].Mid(10));
@@ -164,9 +164,7 @@ void CRevGraphFilterDlg::OnBnClickedCurrentBranch()
 		UpdateData(FALSE);
 	}
 	else
-	{
 		GetDlgItem(IDC_LOCAL_BRANCHES)->EnableWindow(TRUE);
-	}
 }
 
 void CRevGraphFilterDlg::OnBnClickedLocalBranches()
@@ -179,7 +177,5 @@ void CRevGraphFilterDlg::OnBnClickedLocalBranches()
 		UpdateData(FALSE);
 	}
 	else
-	{
 		GetDlgItem(IDC_CURRENT_BRANCH)->EnableWindow(TRUE);
-	}
 }

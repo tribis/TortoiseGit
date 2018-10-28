@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -55,16 +55,12 @@ CTortoiseGitBlameApp::CTortoiseGitBlameApp()
 {
 	SetDllDirectory(L"");
 	SetTaskIDPerUUID();
-	// prevent from inheriting %GIT_DIR% from parent process by resetting it,
-	// use MSVC function instead of Windows API because MSVC runtime caches environment variables
-	_tputenv(_T("GIT_DIR="));
 #if ENABLE_CRASHHANLDER
 	CCrashReportTGit crasher(L"TortoiseGitBlame " _T(APP_X64_STRING), TGIT_VERMAJOR, TGIT_VERMINOR, TGIT_VERMICRO, TGIT_VERBUILD, TGIT_VERDATE);
 	CCrashReport::Instance().AddUserInfoToReport(L"CommandLine", GetCommandLine());
 #endif
 	EnableHtmlHelp();
 	git_libgit2_init();
-	m_nAppLook = 0;
 	m_gdiplusToken = NULL;
 	m_bHiColorIcons = TRUE;
 }
@@ -86,7 +82,7 @@ bool g_bGroupingRemoveIcon = false;
 BOOL CTortoiseGitBlameApp::InitInstance()
 {
 	{
-		DWORD len = GetCurrentDirectory(0, NULL);
+		DWORD len = GetCurrentDirectory(0, nullptr);
 		if (len)
 		{
 			auto originalCurrentDirectory = std::make_unique<TCHAR[]>(len);
@@ -99,13 +95,13 @@ BOOL CTortoiseGitBlameApp::InitInstance()
 	}
 
 	//set the resource dll for the required language
-	CRegDWORD loc = CRegDWORD(_T("Software\\TortoiseGit\\LanguageID"), 1033);
+	CRegDWORD loc = CRegDWORD(L"Software\\TortoiseGit\\LanguageID", 1033);
 	long langId = loc;
 	CString langDll;
-	HINSTANCE hInst = NULL;
+	HINSTANCE hInst = nullptr;
 	do
 	{
-		langDll.Format(_T("%sLanguages\\TortoiseGitBlame%ld.dll"), (LPCTSTR)CPathUtils::GetAppParentDirectory(), langId);
+		langDll.Format(L"%sLanguages\\TortoiseGitBlame%ld.dll", (LPCTSTR)CPathUtils::GetAppParentDirectory(), langId);
 
 		hInst = LoadLibrary(langDll);
 		CString sVer = _T(STRPRODUCTVER);
@@ -113,9 +109,9 @@ BOOL CTortoiseGitBlameApp::InitInstance()
 		if (sFileVer.Compare(sVer)!=0)
 		{
 			FreeLibrary(hInst);
-			hInst = NULL;
+			hInst = nullptr;
 		}
-		if (hInst != NULL)
+		if (hInst)
 			AfxSetResourceHandle(hInst);
 		else
 		{
@@ -128,48 +124,51 @@ BOOL CTortoiseGitBlameApp::InitInstance()
 			else
 				langId = 0;
 		}
-	} while ((hInst == NULL) && (langId != 0));
+	} while (!hInst && (langId != 0));
+	{
+		CString langStr;
+		langStr.Format(L"%ld", langId);
+		CCrashReport::Instance().AddUserInfoToReport(L"LanguageID", langStr);
+	}
 	TCHAR buf[6] = { 0 };
-	_tcscpy_s(buf, _T("en"));
+	wcscpy_s(buf, L"en");
 	langId = loc;
 	CString sHelppath;
 	sHelppath = this->m_pszHelpFilePath;
 	sHelppath = sHelppath.MakeLower();
-	sHelppath.Replace(_T(".chm"), _T("_en.chm"));
+	sHelppath.Replace(L".chm", L"_en.chm");
 	free((void*)m_pszHelpFilePath);
-	m_pszHelpFilePath=_tcsdup(sHelppath);
-	sHelppath = CPathUtils::GetAppParentDirectory() + _T("Languages\\TortoiseGitBlame_en.chm");
+	m_pszHelpFilePath=_wcsdup(sHelppath);
+	sHelppath = CPathUtils::GetAppParentDirectory() + L"Languages\\TortoiseGitBlame_en.chm";
 	do
 	{
 		GetLocaleInfo(MAKELCID(langId, SORT_DEFAULT), LOCALE_SISO639LANGNAME, buf, _countof(buf));
-		CString sLang = _T("_");
+		CString sLang = L"_";
 		sLang += buf;
-		sHelppath.Replace(_T("_en"), sLang);
+		sHelppath.Replace(L"_en", sLang);
 		if (PathFileExists(sHelppath))
 		{
 			free((void*)m_pszHelpFilePath);
-			m_pszHelpFilePath=_tcsdup(sHelppath);
+			m_pszHelpFilePath=_wcsdup(sHelppath);
 			break;
 		}
-		sHelppath.Replace(sLang, _T("_en"));
+		sHelppath.Replace(sLang, L"_en");
 		GetLocaleInfo(MAKELCID(langId, SORT_DEFAULT), LOCALE_SISO3166CTRYNAME, buf, _countof(buf));
-		sLang += _T("_");
+		sLang += L'_';
 		sLang += buf;
-		sHelppath.Replace(_T("_en"), sLang);
+		sHelppath.Replace(L"_en", sLang);
 		if (PathFileExists(sHelppath))
 		{
 			free((void*)m_pszHelpFilePath);
-			m_pszHelpFilePath=_tcsdup(sHelppath);
+			m_pszHelpFilePath=_wcsdup(sHelppath);
 			break;
 		}
-		sHelppath.Replace(sLang, _T("_en"));
+		sHelppath.Replace(sLang, L"_en");
 
 		DWORD lid = SUBLANGID(langId);
 		lid--;
 		if (lid > 0)
-		{
 			langId = MAKELANGID(PRIMARYLANGID(langId), lid);
-		}
 		else
 			langId = 0;
 	} while (langId);
@@ -189,10 +188,12 @@ BOOL CTortoiseGitBlameApp::InitInstance()
 	InitCtrls.dwICC = ICC_WIN95_CLASSES;
 	InitCommonControlsEx(&InitCtrls);
 
+	CMFCVisualManager::SetDefaultManager(RUNTIME_CLASS(CMFCVisualManagerWindows7));
+
 	CWinAppEx::InitInstance();
 
 	Gdiplus::GdiplusStartupInput gdiplusStartupInput;
-	Gdiplus::GdiplusStartup(&m_gdiplusToken,&gdiplusStartupInput,NULL);
+	Gdiplus::GdiplusStartup(&m_gdiplusToken, &gdiplusStartupInput, nullptr);
 
 	// Initialize OLE libraries
 	if (!AfxOleInit())
@@ -207,7 +208,7 @@ BOOL CTortoiseGitBlameApp::InitInstance()
 	// the specific initialization routines you do not need
 	// Change the registry key under which our settings are stored
 
-	SetRegistryKey(_T("TortoiseGit"));
+	SetRegistryKey(L"TortoiseGit");
 	LoadStdProfileSettings(4);  // Load standard INI file options (including MRU)
 
 	InitContextMenuManager();
@@ -232,7 +233,7 @@ BOOL CTortoiseGitBlameApp::InitInstance()
 		return FALSE;
 	AddDocTemplate(pDocTemplate);
 
-	CCmdLineParser parser = CCmdLineParser(this->m_lpCmdLine);
+	CCmdLineParser parser(m_lpCmdLine);
 	g_sGroupingUUID = parser.GetVal(L"groupuuid");
 
 	// Parse command line for standard shell commands, DDE, file open
@@ -288,9 +289,12 @@ BOOL CAboutDlg::OnInitDialog()
 
 	TCHAR verbuf[1024] = {0};
 	TCHAR maskbuf[1024] = {0};
-	::LoadString(GetModuleHandle(NULL), IDS_VERSION, maskbuf, _countof(maskbuf));
-	_stprintf_s(verbuf, maskbuf, TGIT_VERMAJOR, TGIT_VERMINOR, TGIT_VERMICRO, TGIT_VERBUILD);
+	::LoadString(GetModuleHandle(nullptr), IDS_VERSION, maskbuf, _countof(maskbuf));
+	swprintf_s(verbuf, maskbuf, TGIT_VERMAJOR, TGIT_VERMINOR, TGIT_VERMICRO, TGIT_VERBUILD);
 	SetDlgItemText(IDC_VERSION, verbuf);
+
+	SetDlgItemText(IDC_COPYRIGHT, CPathUtils::GetCopyrightForSelf());
+	SetDlgItemText(IDC_STATIC_AUTHORS, L"Sven Strickroth <email@cs-ware.de> (Current Maintainer), Sup Yut Sum <ch3cooli@gmail.com>, Frank Li <lznuaa@gmail.com> and Martin Strauﬂ <MStrauss@MuellerBBM-vas.de>");
 
 	return FALSE;
 }
@@ -304,7 +308,7 @@ void CTortoiseGitBlameApp::OnAppAbout()
 
 void CTortoiseGitBlameApp::OnFileSettings()
 {
-	CCommonAppUtils::RunTortoiseGitProc(_T(" /command:settings /page:blame"));
+	CCommonAppUtils::RunTortoiseGitProc(L" /command:settings /page:blame");
 }
 
 // CTortoiseGitBlameApp customization load/save methods

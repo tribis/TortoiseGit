@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2013, 2015 - TortoiseGit
+// Copyright (C) 2008-2013, 2015-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -24,19 +24,18 @@
 #include "resource.h"
 #include "SubmoduleAddDlg.h"
 #include "BrowseFolder.h"
-#include "MessageBox.h"
 #include "AppUtils.h"
 
 // CSubmoduleAddDlg dialog
 
 IMPLEMENT_DYNAMIC(CSubmoduleAddDlg, CHorizontalResizableStandAloneDialog)
 
-CSubmoduleAddDlg::CSubmoduleAddDlg(CWnd* pParent /*=NULL*/)
+CSubmoduleAddDlg::CSubmoduleAddDlg(CWnd* pParent /*=nullptr*/)
 	: CHorizontalResizableStandAloneDialog(CSubmoduleAddDlg::IDD, pParent)
 	, m_bBranch(FALSE)
 	, m_bForce(FALSE)
+	, m_bAutoloadPuttyKeyFile(CAppUtils::IsSSHPutty())
 {
-	m_bAutoloadPuttyKeyFile = CAppUtils::IsSSHPutty();
 }
 
 CSubmoduleAddDlg::~CSubmoduleAddDlg()
@@ -72,6 +71,10 @@ BOOL CSubmoduleAddDlg::OnInitDialog()
 	CHorizontalResizableStandAloneDialog::OnInitDialog();
 	CAppUtils::MarkWindowAsUnpinnable(m_hWnd);
 
+	AdjustControlSize(IDC_BRANCH_CHECK);
+	AdjustControlSize(IDC_FORCE);
+	AdjustControlSize(IDC_PUTTYKEY_AUTOLOAD);
+
 	AddAnchor(IDOK,BOTTOM_RIGHT);
 	AddAnchor(IDCANCEL,BOTTOM_RIGHT);
 	AddAnchor(IDC_GROUP_SUBMODULE,TOP_LEFT,BOTTOM_RIGHT);
@@ -88,11 +91,7 @@ BOOL CSubmoduleAddDlg::OnInitDialog()
 	AddAnchor(IDHELP, BOTTOM_RIGHT);
 	AddOthersToAnchor();
 
-	AdjustControlSize(IDC_BRANCH_CHECK);
-	AdjustControlSize(IDC_FORCE);
-	AdjustControlSize(IDC_PUTTYKEY_AUTOLOAD);
-
-	EnableSaveRestore(_T("SubmoduleAddDlg"));
+	EnableSaveRestore(L"SubmoduleAddDlg");
 
 	CString sWindowTitle;
 	GetWindowText(sWindowTitle);
@@ -102,13 +101,13 @@ BOOL CSubmoduleAddDlg::OnInitDialog()
 	m_Repository.SetCaseSensitive(TRUE);
 	m_PathCtrl.SetPathHistory(true);
 
-	m_Repository.LoadHistory(_T("Software\\TortoiseGit\\History\\SubModuleRepoURLS"), _T("url"));
-	m_PathCtrl.LoadHistory(_T("Software\\TortoiseGit\\History\\SubModulePath"), _T("url"));
+	m_Repository.LoadHistory(L"Software\\TortoiseGit\\History\\SubModuleRepoURLS", L"url");
+	m_PathCtrl.LoadHistory(L"Software\\TortoiseGit\\History\\SubModulePath", L"url");
 	m_PathCtrl.SetWindowText(m_strPath);
 	m_Repository.SetCurSel(0);
 
 	m_PuttyKeyCombo.SetPathHistory(TRUE);
-	m_PuttyKeyCombo.LoadHistory(_T("Software\\TortoiseGit\\History\\puttykey"), _T("key"));
+	m_PuttyKeyCombo.LoadHistory(L"Software\\TortoiseGit\\History\\puttykey", L"key");
 	m_PuttyKeyCombo.SetCurSel(0);
 
 	GetDlgItem(IDC_PUTTYKEY_AUTOLOAD)->EnableWindow(CAppUtils::IsSSHPutty());
@@ -197,11 +196,13 @@ void CSubmoduleAddDlg::OnOK()
 void CSubmoduleAddDlg::OnBnClickedPuttykeyfileBrowse()
 {
 	UpdateData();
-	CFileDialog dlg(TRUE, NULL, NULL, OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT, CString(MAKEINTRESOURCE(IDS_PUTTYKEYFILEFILTER)));
-	if (dlg.DoModal()==IDOK)
-	{
-		m_PuttyKeyCombo.SetWindowText(dlg.GetPathName());
-	}
+	CString filename;
+	m_PuttyKeyCombo.GetWindowText(filename);
+	if (!PathFileExists(filename))
+		filename.Empty();
+	if (!CAppUtils::FileOpenSave(filename, nullptr, 0, IDS_PUTTYKEYFILEFILTER, true, GetSafeHwnd()))
+		return;
+	m_PuttyKeyCombo.SetWindowText(filename);
 }
 
 void CSubmoduleAddDlg::OnBnClickedPuttykeyAutoload()

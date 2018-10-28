@@ -50,7 +50,7 @@ class CACEdit : public CWnd //CEdit
 public:
 	CACEdit();
 	void SetMode(int iMode=_MODE_STANDARD_);
-	void SetSeparator(LPCTSTR lpszString,TCHAR lpszPrefixChar = 0)
+	void SetSeparator(LPCTSTR lpszString, TCHAR lpszPrefixChar = L'\0')
 	{
 		m_SeparationStr = lpszString;
 		m_Liste.m_PrefixChar = m_PrefixChar = lpszPrefixChar;
@@ -81,7 +81,8 @@ public:
 	// Vom Klassen-Assistenten generierte virtuelle Funktionsüberschreibungen
 	//{{AFX_VIRTUAL(CACEdit)
 public:
-	virtual BOOL PreTranslateMessage(MSG* pMsg);
+	virtual BOOL PreTranslateMessage(MSG* pMsg) override;
+	virtual ULONG GetGestureStatus(CPoint /*ptTouch*/) override { return 0; }
 	//}}AFX_VIRTUAL
 
 	// Implementierung

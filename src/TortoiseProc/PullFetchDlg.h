@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2016 - TortoiseGit
+// Copyright (C) 2008-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -30,18 +30,18 @@ class CPullFetchDlg : public CHorizontalResizableStandAloneDialog
 	DECLARE_DYNAMIC(CPullFetchDlg)
 
 public:
-	CPullFetchDlg(CWnd* pParent = NULL);   // standard constructor
+	CPullFetchDlg(CWnd* pParent = nullptr);   // standard constructor
 	virtual ~CPullFetchDlg();
 
 // Dialog Data
 	enum { IDD = IDD_PULLFETCH };
 
 protected:
-	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
+	virtual void DoDataExchange(CDataExchange* pDX) override;    // DDX/DDV support
 	CHistoryCombo	m_Remote;
 	CHistoryCombo	m_Other;
 	CHistoryCombo	m_RemoteBranch;
-	virtual BOOL OnInitDialog();
+	virtual BOOL OnInitDialog() override;
 	CRegString	m_RemoteReg;
 	CRegDWORD	m_regRebase;
 	CRegDWORD	m_regFFonly;
@@ -74,6 +74,8 @@ protected:
 	CString		m_configPullBranch;
 
 	CHyperLink	m_RemoteManage;
+
+	bool		m_bNamedRemoteFetchAll;
 
 	afx_msg void OnCbnSelchangeRemote();
 	afx_msg void OnBnClickedRd();

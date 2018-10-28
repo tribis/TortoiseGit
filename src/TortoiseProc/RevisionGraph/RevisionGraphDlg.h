@@ -48,7 +48,7 @@ class CRevisionGraphDlg : public CResizableStandAloneDialog
 {
 	DECLARE_DYNAMIC(CRevisionGraphDlg)
 public:
-	CRevisionGraphDlg(CWnd* pParent = NULL);	// standard constructor
+	CRevisionGraphDlg(CWnd* pParent = nullptr);	// standard constructor
 	virtual ~CRevisionGraphDlg();
 	enum { IDD = IDD_REVISIONGRAPH };
 
@@ -76,11 +76,11 @@ protected:
 
 	BOOL			InitializeToolbar();
 
-	virtual void	DoDataExchange(CDataExchange* pDX);		// DDX/DDV support
-	virtual BOOL	OnInitDialog();
-	virtual void	OnCancel();
-	virtual void	OnOK();
-	virtual BOOL	PreTranslateMessage(MSG* pMsg);
+	virtual void	DoDataExchange(CDataExchange* pDX) override;		// DDX/DDV support
+	virtual BOOL	OnInitDialog() override;
+	virtual void	OnCancel() override;
+	virtual void	OnOK() override;
+	virtual BOOL	PreTranslateMessage(MSG* pMsg) override;
 	afx_msg void	OnSize(UINT nType, int cx, int cy);
 	afx_msg void	OnViewFilter();
 	afx_msg void	OnViewZoomin();

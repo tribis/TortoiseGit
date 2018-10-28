@@ -124,6 +124,17 @@
                 </para>
             </listitem>
         </varlistentry>
+        <varlistentry>
+            <term condition="pot">DiffSimilarityIndexThreshold</term>
+            <listitem>
+                <para>
+                    This setting controls which similarity index threshold is passed to git diff (as the value for the parameters <literal>-M</literal> and <literal>-C</literal> in per cent, cf. <literal>--find-copies</literal> in <xref linkend="git-diff(1)"/>).
+                    The default value is <literal>50</literal>. You can disable finding renamed and copied
+                    files by setting this to <literal>0</literal>, for only detecting exact renames use <literal>100</literal>.
+                    You might need to remove the cache files <filename>tortoisegit.data</filename> and <filename>tortoisegit.index</filename> in the <filename>.git</filename> folders after changing this value.
+                </para>
+            </listitem>
+        </varlistentry>
 <!--
         <varlistentry>
             <term condition="pot">DiffBlamesWithTortoiseMerge</term>
@@ -158,14 +169,13 @@
             <listitem>
                 <para>
                     This option determines how the Win7 taskbar icons of the various
-                    TortoiseGit dialogs and windows are grouped together. This
-                    option has no effect on Windows Vista!
+                    TortoiseGit dialogs and windows are grouped together.
                 </para>
                 <para>
                     <orderedlist>
                         <listitem>
                             <para>
-                                The default value is 3. With this setting, the
+                                The default value is <literal>3</literal>. With this setting, the
                                 icons are grouped together by application type per working tree.
                                 All dialogs from TortoiseGit of one working tree are grouped together,
                                 all windows from TortoiseGitMerge of one working tree are grouped together, ...
@@ -185,8 +195,8 @@
                         </listitem>
                         <listitem>
                             <para>
-                                If set to 4, then the grouping works as with
-                                the setting set to 3, except that TortoiseGit, TortoiseGitMerge,
+                                If set to <literal>4</literal>, then the grouping works as with
+                                the setting set to <literal>3</literal>, except that TortoiseGit, TortoiseGitMerge,
                                 TortoiseGitBlame, TortoiseGitIDiff and TortoiseGitUDiff windows
                                 of one working tree
                                 are all grouped together. For example, if you have
@@ -202,8 +212,8 @@
                         </listitem>
                         <listitem>
                             <para>
-                                If set to 1, then the grouping works as with
-                                the setting set to 3 (grouping by application),
+                                If set to <literal>1</literal>, then the grouping works as with
+                                the setting set to <literal>3</literal> (grouping by application),
                                 except that grouping takes place
                                 independently of the working tree. This was the default
                                 before TGit 1.8.1.2.
@@ -211,8 +221,8 @@
                         </listitem>
                         <listitem>
                             <para>
-                                If set to 2, then the grouping works as with
-                                the setting set to 4, except that grouping takes place
+                                If set to <literal>2</literal>, then the grouping works as with
+                                the setting set to <literal>4</literal>, except that grouping takes place
                                 independently of the working tree. Thus all TortoiseGit
                                 icons are grouped to only show one icon.
                             </para>
@@ -226,7 +236,7 @@
             <listitem>
                 <para>
                     This has no effect if the option <literal>GroupTaskbarIconsPerRepo</literal>
-                    is set to 0 (see above).
+                    is set to <literal>0</literal> (see above).
                 </para>
                 <para>
                     If this option is set to <literal>true</literal>, then every
@@ -240,11 +250,20 @@
             </listitem>
         </varlistentry>
         <varlistentry>
+            <term condition="pot">LogShowSuperProjectSubmodulePointer</term>
+            <listitem>
+                <para>
+                    This option defines whether the commit of a submodule to which the super repository points to is highlighted with a branch like label (cf. <ulink url="https://tortoisegit.org/issue/2826"><citetitle>issue #2826</citetitle></ulink>).
+                    The default is <literal>true</literal>.
+                </para>
+            </listitem>
+        </varlistentry>
+        <varlistentry>
             <term condition="pot">MaxRefHistoryItems</term>
             <listitem>
                 <para>
                     This options sets the maximum browse ref history (Right click ref hyperlink to find it).
-                    The default is 5.
+                    The default is <literal>5</literal>.
                 </para>
             </listitem>
         </varlistentry>
@@ -252,10 +271,19 @@
             <term condition="pot">Msys2Hack</term>
             <listitem>
                 <para>
-                    This enables some workarounds which enables TortoiseGit to be used with Msys2 Git.
+                    This enables some workarounds which enables TortoiseGit to be used with Msys2 Git (do not enable this for the Git for Windows package!).
                     Msys2 Git, however, is not officially supported by TortoiseGit.
                     See <xref linkend="tgit-dug-settings-main"/> for more information.
                     The default is <literal>false</literal>.
+                </para>
+            </listitem>
+        </varlistentry>
+        <varlistentry>
+            <term condition="pot">NamedRemoteFetchAll</term>
+            <listitem>
+                <para>
+                    When set to <literal>false</literal>, <literal>fetch</literal> and <literal>pull</literal> don't fetch the default refspec for a named remote.
+                    The default is <literal>true</literal>.
                 </para>
             </listitem>
         </varlistentry>
@@ -274,7 +302,26 @@
                 <para>
                     If you want to show the diff at once for more items
                     than specified with this settings, a warning dialog
-                    is shown first. The default is 10.
+                    is shown first. The default is <literal>10</literal>.
+                </para>
+            </listitem>
+        </varlistentry>
+        <varlistentry>
+            <term condition="pot">OverlaysCaseSensitive</term>
+            <listitem>
+                <para>
+                     Starting with TortoiseGit 2.4.0 the overlay icons are case sensitive on filenames. The change was introduced to fix several issues related to casing (such as <ulink url="https://tortoisegit.org/issue/2654"><citetitle>issue #2654</citetitle></ulink>) and git tools (such as <literal>git log</literal>) being case sensitive on paths.
+                     Upon <ulink url="https://tortoisegit.org/issue/2980"><citetitle>issue #2980</citetitle></ulink> this is configurable starting from TortoiseGit 2.5.0, however, enabling is not recommended.
+                     The default is <literal>true</literal>.
+                </para>
+            </listitem>
+        </varlistentry>
+        <varlistentry>
+            <term condition="pot">ProgressDlgLinesLimit</term>
+            <listitem>
+                <para>
+                    The Git progress dialog shows the output of the executed git.exe commands.
+                    The number of lines are limited for performance reasons. The default is <literal>50000</literal>, minimum is <literal>50</literal>.
                 </para>
             </listitem>
         </varlistentry>
@@ -294,10 +341,19 @@
             <term condition="pot">RefreshFileListAfterResolvingConflict</term>
             <listitem>
                 <para>
-                    This option toggles if the file lists of the commit dialog, resolve conflicts and rebase dialog automatically refresh
+                    This option toggles whether the file lists of the commit dialog, resolve conflicts and rebase dialog automatically refresh
                     when a conflict is marked as resolved. By default this is set to <literal>true</literal>, but in certain cases, e.g.
                     when refreshing takes lots of time or you want to prevent the scrolling to the top, this can be set to <literal>false</literal>.
                     However, then a manual refresh (e.g. by pressing <keycap>F5</keycap>) is necessary.
+                </para>
+            </listitem>
+        </varlistentry>
+        <varlistentry>
+            <term condition="pot">RememberFileListPosition</term>
+            <listitem>
+                <para>
+                    This option toggles whether the file lists of the add, commit, revert, resolve and rebase dialog remember the last selected
+                    line on a refresh. The default is <literal>true</literal>.
                 </para>
             </listitem>
         </varlistentry>
@@ -375,6 +431,29 @@
                     Set this value to <literal>true</literal> to show the images again (default).
                 </para>
             </listitem>
+        </varlistentry>
+        <varlistentry>
+            <term condition="pot">SquashDate</term>
+            <listitem>
+                <para>
+                    Using this setting you can control which date is used on squashing commits.
+                    Set this value to <literal>1</literal> if you want to use the date of the latest commit.
+                    Set this value to <literal>2</literal> if you want to use the current date.
+                    Set this value to <literal>0</literal> to use the date of the first commit (into which all others are squashed, default).
+                </para>
+            </listitem>
+        </varlistentry>
+        <varlistentry>
+          <term condition="pot">StyleCommitMessages</term>
+          <listitem>
+            <para>
+              The commit and log dialog use styling (e.g. bold, italic)
+              in commit messages
+              (see <xref linkend="tgit-dug-commit-log"/> for details).
+              If you don't want to do this, set the value to
+              <literal>false</literal>.
+            </para>
+          </listitem>
         </varlistentry>
         <varlistentry>
             <term condition="pot">TGitCacheCheckContentMaxSize</term>

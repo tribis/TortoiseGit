@@ -27,7 +27,7 @@
 
 IMPLEMENT_DYNAMIC(CRegexFiltersDlg, CDialogEx)
 
-CRegexFiltersDlg::CRegexFiltersDlg(CWnd* pParent /*=NULL*/)
+CRegexFiltersDlg::CRegexFiltersDlg(CWnd* pParent /*=nullptr*/)
 	: CDialogEx(CRegexFiltersDlg::IDD, pParent)
 	, m_pIni(nullptr)
 {
@@ -117,7 +117,7 @@ BOOL CRegexFiltersDlg::OnInitDialog()
 {
 	CDialogEx::OnInitDialog();
 
-	SetWindowTheme(m_RegexList.GetSafeHwnd(), L"Explorer", NULL);
+	SetWindowTheme(m_RegexList.GetSafeHwnd(), L"Explorer", nullptr);
 
 	SetupListControl();
 
@@ -154,7 +154,7 @@ void CRegexFiltersDlg::SetupListControl()
 	int index = 0;
 	for (const auto& section : sections)
 	{
-		m_RegexList.InsertItem(index++, section);
+		m_RegexList.InsertItem(index++, section.pItem);
 	}
 
 	m_RegexList.SetRedraw(true);

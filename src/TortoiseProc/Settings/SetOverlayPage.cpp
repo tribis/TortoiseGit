@@ -1,7 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2009,2011,2013-2015 - TortoiseGit
-// Copyright (C) 2003-2008,2011 - TortoiseSVN
+// Copyright (C) 2008-2009,2011,2013-2017 - TortoiseGit
+// Copyright (C) 2003-2008, 2011, 2017 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -22,9 +22,8 @@
 #include "SetOverlayPage.h"
 #include "SetOverlayIcons.h"
 #include "Globals.h"
-#include "..\TGitCache\CacheInterface.h"
-#include "MessageBox.h"
-
+#include "../TGitCache/CacheInterface.h"
+#include "StringUtils.h"
 
 IMPLEMENT_DYNAMIC(CSetOverlayPage, ISettingsPropPage)
 CSetOverlayPage::CSetOverlayPage()
@@ -36,27 +35,30 @@ CSetOverlayPage::CSetOverlayPage()
 	, m_bRAM(FALSE)
 	, m_bUnknown(FALSE)
 	, m_bOnlyExplorer(FALSE)
+	, m_bOnlyNonElevated(FALSE)
 	, m_bUnversionedAsModified(FALSE)
 	, m_bRecurseSubmodules(FALSE)
 	, m_bFloppy(FALSE)
 	, m_bShowExcludedAsNormal(TRUE)
 {
-	m_regOnlyExplorer = CRegDWORD(_T("Software\\TortoiseGit\\LoadDllOnlyInExplorer"), FALSE);
-	m_regDriveMaskRemovable = CRegDWORD(_T("Software\\TortoiseGit\\DriveMaskRemovable"));
-	m_regDriveMaskFloppy = CRegDWORD(_T("Software\\TortoiseGit\\DriveMaskFloppy"));
-	m_regDriveMaskRemote = CRegDWORD(_T("Software\\TortoiseGit\\DriveMaskRemote"));
-	m_regDriveMaskFixed = CRegDWORD(_T("Software\\TortoiseGit\\DriveMaskFixed"), TRUE);
-	m_regDriveMaskCDROM = CRegDWORD(_T("Software\\TortoiseGit\\DriveMaskCDROM"));
-	m_regDriveMaskRAM = CRegDWORD(_T("Software\\TortoiseGit\\DriveMaskRAM"));
-	m_regDriveMaskUnknown = CRegDWORD(_T("Software\\TortoiseGit\\DriveMaskUnknown"));
-	m_regExcludePaths = CRegString(_T("Software\\TortoiseGit\\OverlayExcludeList"));
-	m_regIncludePaths = CRegString(_T("Software\\TortoiseGit\\OverlayIncludeList"));
-	m_regCacheType = CRegDWORD(_T("Software\\TortoiseGit\\CacheType"), GetSystemMetrics(SM_REMOTESESSION) ? 2 : 1);
-	m_regUnversionedAsModified = CRegDWORD(_T("Software\\TortoiseGit\\UnversionedAsModified"), FALSE);
-	m_regRecurseSubmodules = CRegDWORD(_T("Software\\TortoiseGit\\TGitCacheRecurseSubmodules"), FALSE);
-	m_regShowExcludedAsNormal = CRegDWORD(_T("Software\\TortoiseGit\\ShowExcludedAsNormal"), TRUE);
+	m_regOnlyExplorer = CRegDWORD(L"Software\\TortoiseGit\\LoadDllOnlyInExplorer", FALSE);
+	m_regOnlyNonElevated = CRegDWORD(L"Software\\TortoiseGit\\ShowOverlaysOnlyNonElevated", FALSE);
+	m_regDriveMaskRemovable = CRegDWORD(L"Software\\TortoiseGit\\DriveMaskRemovable");
+	m_regDriveMaskFloppy = CRegDWORD(L"Software\\TortoiseGit\\DriveMaskFloppy");
+	m_regDriveMaskRemote = CRegDWORD(L"Software\\TortoiseGit\\DriveMaskRemote");
+	m_regDriveMaskFixed = CRegDWORD(L"Software\\TortoiseGit\\DriveMaskFixed", TRUE);
+	m_regDriveMaskCDROM = CRegDWORD(L"Software\\TortoiseGit\\DriveMaskCDROM");
+	m_regDriveMaskRAM = CRegDWORD(L"Software\\TortoiseGit\\DriveMaskRAM");
+	m_regDriveMaskUnknown = CRegDWORD(L"Software\\TortoiseGit\\DriveMaskUnknown");
+	m_regExcludePaths = CRegString(L"Software\\TortoiseGit\\OverlayExcludeList");
+	m_regIncludePaths = CRegString(L"Software\\TortoiseGit\\OverlayIncludeList");
+	m_regCacheType = CRegDWORD(L"Software\\TortoiseGit\\CacheType", GetSystemMetrics(SM_REMOTESESSION) ? 2 : 1);
+	m_regUnversionedAsModified = CRegDWORD(L"Software\\TortoiseGit\\UnversionedAsModified", FALSE);
+	m_regRecurseSubmodules = CRegDWORD(L"Software\\TortoiseGit\\TGitCacheRecurseSubmodules", FALSE);
+	m_regShowExcludedAsNormal = CRegDWORD(L"Software\\TortoiseGit\\ShowExcludedAsNormal", TRUE);
 
 	m_bOnlyExplorer = m_regOnlyExplorer;
+	m_bOnlyNonElevated = m_regOnlyNonElevated;
 	m_bRemovable = m_regDriveMaskRemovable;
 	m_bFloppy = m_regDriveMaskFloppy;
 	m_bNetwork = m_regDriveMaskRemote;
@@ -68,9 +70,9 @@ CSetOverlayPage::CSetOverlayPage()
 	m_bRecurseSubmodules = m_regRecurseSubmodules;
 	m_bShowExcludedAsNormal = m_regShowExcludedAsNormal;
 	m_sExcludePaths = m_regExcludePaths;
-	m_sExcludePaths.Replace(_T("\n"), _T("\r\n"));
+	m_sExcludePaths.Replace(L"\n", L"\r\n");
 	m_sIncludePaths = m_regIncludePaths;
-	m_sIncludePaths.Replace(_T("\n"), _T("\r\n"));
+	m_sIncludePaths.Replace(L"\n", L"\r\n");
 	m_dwCacheType = m_regCacheType;
 }
 
@@ -88,6 +90,7 @@ void CSetOverlayPage::DoDataExchange(CDataExchange* pDX)
 	DDX_Check(pDX, IDC_RAM, m_bRAM);
 	DDX_Check(pDX, IDC_UNKNOWN, m_bUnknown);
 	DDX_Check(pDX, IDC_ONLYEXPLORER, m_bOnlyExplorer);
+	DDX_Check(pDX, IDC_ONLYNONELEVATED, m_bOnlyNonElevated);
 	DDX_Text(pDX, IDC_EXCLUDEPATHS, m_sExcludePaths);
 	DDX_Text(pDX, IDC_INCLUDEPATHS, m_sIncludePaths);
 	DDX_Check(pDX, IDC_UNVERSIONEDASMODIFIED, m_bUnversionedAsModified);
@@ -105,6 +108,7 @@ BEGIN_MESSAGE_MAP(CSetOverlayPage, ISettingsPropPage)
 	ON_BN_CLICKED(IDC_UNKNOWN, OnChange)
 	ON_BN_CLICKED(IDC_RAM, OnChange)
 	ON_BN_CLICKED(IDC_ONLYEXPLORER, OnChange)
+	ON_BN_CLICKED(IDC_ONLYNONELEVATED, &CSetOverlayPage::OnChange)
 	ON_EN_CHANGE(IDC_EXCLUDEPATHS, OnChange)
 	ON_EN_CHANGE(IDC_INCLUDEPATHS, OnChange)
 	ON_BN_CLICKED(IDC_CACHEDEFAULT, &CSetOverlayPage::OnChange)
@@ -153,9 +157,9 @@ BOOL CSetOverlayPage::OnInitDialog()
 	}
 	GetDlgItem(IDC_UNVERSIONEDASMODIFIED)->EnableWindow(m_dwCacheType == 1);
 	GetDlgItem(IDC_RECURSIVESUBMODULES)->EnableWindow(m_dwCacheType == 1);
-	GetDlgItem(IDC_FLOPPY)->EnableWindow(m_bRemovable);
 
 	m_tooltips.AddTool(IDC_ONLYEXPLORER, IDS_SETTINGS_ONLYEXPLORER_TT);
+	m_tooltips.AddTool(IDC_ONLYNONELEVATED, IDS_SETTINGS_ONLYNONELEVATED_TT);
 	m_tooltips.AddTool(IDC_EXCLUDEPATHS, IDS_SETTINGS_EXCLUDELIST_TT);
 	m_tooltips.AddTool(IDC_INCLUDEPATHS, IDS_SETTINGS_INCLUDELIST_TT);
 	m_tooltips.AddTool(IDC_CACHEDEFAULT, IDS_SETTINGS_CACHEDEFAULT_TT);
@@ -192,7 +196,6 @@ void CSetOverlayPage::OnChange()
 	}
 	GetDlgItem(IDC_UNVERSIONEDASMODIFIED)->EnableWindow(m_dwCacheType == 1);
 	GetDlgItem(IDC_RECURSIVESUBMODULES)->EnableWindow(m_dwCacheType == 1);
-	GetDlgItem(IDC_FLOPPY)->EnableWindow(m_bRemovable);
 	SetModified();
 }
 
@@ -200,6 +203,7 @@ BOOL CSetOverlayPage::OnApply()
 {
 	UpdateData();
 	Store(m_bOnlyExplorer, m_regOnlyExplorer);
+	Store(m_bOnlyNonElevated, m_regOnlyNonElevated);
 	if (DWORD(m_regDriveMaskRemovable) != DWORD(m_bRemovable))
 		m_restart = Restart_Cache;
 	Store(m_bRemovable, m_regDriveMaskRemovable);
@@ -230,18 +234,18 @@ BOOL CSetOverlayPage::OnApply()
 
 	if (m_sExcludePaths.Compare(CString(m_regExcludePaths)))
 		m_restart = Restart_Cache;
-	m_sExcludePaths.Remove('\r');
-	if (m_sExcludePaths.Right(1).Compare(_T("\n"))!=0)
-		m_sExcludePaths += _T("\n");
+	m_sExcludePaths.Remove(L'\r');
+	if (!CStringUtils::EndsWith(m_sExcludePaths, L'\n'))
+		m_sExcludePaths += L'\n';
 	Store(m_sExcludePaths, m_regExcludePaths);
-	m_sExcludePaths.Replace(_T("\n"), _T("\r\n"));
-	m_sIncludePaths.Remove('\r');
-	if (m_sIncludePaths.Right(1).Compare(_T("\n"))!=0)
-		m_sIncludePaths += _T("\n");
+	m_sExcludePaths.Replace(L"\n", L"\r\n");
+	m_sIncludePaths.Remove(L'\r');
+	if (!CStringUtils::EndsWith(m_sIncludePaths, L'\n'))
+		m_sIncludePaths += L'\n';
 	if (m_sIncludePaths.Compare(CString(m_regIncludePaths)))
 		m_restart = Restart_Cache;
 	Store(m_sIncludePaths, m_regIncludePaths);
-	m_sIncludePaths.Replace(_T("\n"), _T("\r\n"));
+	m_sIncludePaths.Replace(L"\n", L"\r\n");
 
 	if (DWORD(m_regUnversionedAsModified) != DWORD(m_bUnversionedAsModified))
 		m_restart = Restart_Cache;
@@ -259,9 +263,7 @@ BOOL CSetOverlayPage::OnApply()
 		// close the possible running cache process
 		HWND hWnd = ::FindWindow(TGIT_CACHE_WINDOW_NAME, TGIT_CACHE_WINDOW_NAME);
 		if (hWnd)
-		{
 			::PostMessage(hWnd, WM_CLOSE, NULL, NULL);
-		}
 		m_restart = Restart_None;
 	}
 	SetModified(FALSE);

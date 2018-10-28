@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2011-2015 - TortoiseGit
+// Copyright (C) 2011-2016 - TortoiseGit
 // Copyright (C) 2003-2008, 2011, 2014 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -24,7 +24,6 @@
 #include "AppUtils.h"
 #include "StringUtils.h"
 #include "SetLookAndFeelPage.h"
-#include "MessageBox.h"
 #include "MenuInfo.h"
 #include "ShellCache.h"
 
@@ -33,6 +32,8 @@ extern MenuInfo menuInfo[];
 void InsertMenuItemToList(CListCtrl *list,CImageList *imagelist)
 {
 	int i=0;
+	int iconWidth = GetSystemMetrics(SM_CXSMICON);
+	int iconHeight = GetSystemMetrics(SM_CYSMICON);
 	while(menuInfo[i].command != ShellMenuLastEntry)
 	{
 		if ((menuInfo[i].command != ShellSeparator &&
@@ -40,11 +41,11 @@ void InsertMenuItemToList(CListCtrl *list,CImageList *imagelist)
 		   menuInfo[i].command != ShellSubMenuFile &&
 		   menuInfo[i].command != ShellSubMenuFolder &&
 		   menuInfo[i].command != ShellSubMenuLink &&
+		   menuInfo[i].command != ShellMenuMergeAbort &&
 		   menuInfo[i].command != ShellSubMenuMultiple) &&
 		   (i == 0 || menuInfo[i - 1].menuID != menuInfo[i].menuID))
 		{
-			HICON hIcon = reinterpret_cast<HICON>(::LoadImage(AfxGetResourceHandle(),
-					MAKEINTRESOURCE(menuInfo[i].iconID),IMAGE_ICON, 16, 16, LR_LOADTRANSPARENT ));
+			auto hIcon = CAppUtils::LoadIconEx(menuInfo[i].iconID, iconWidth, iconHeight);
 
 			int nImage = imagelist -> Add(hIcon);
 
@@ -80,7 +81,7 @@ void SetMenuItemCheck(CListCtrl *list, unsigned __int64 mask, CButton *selectAll
 		selectAll->SetCheck(BST_INDETERMINATE);
 }
 
-unsigned __int64 GetMenuListMask(CListCtrl *list, CButton *selectAll = NULL)
+unsigned __int64 GetMenuListMask(CListCtrl* list, CButton* selectAll = nullptr)
 {
 	unsigned __int64 mask = 0;
 	bool allChecked = true;
@@ -122,9 +123,7 @@ unsigned __int64 ClickedSelectAll(CListCtrl *list, CButton *selectAll)
 	theApp.DoWaitCursor(1);
 
 	for (int i = 0; i < list->GetItemCount(); i++)
-	{
 		list->SetCheck(i, state == BST_CHECKED);
-	}
 
 	unsigned __int64 mask = GetMenuListMask(list);
 
@@ -146,14 +145,14 @@ CSetLookAndFeelPage::CSetLookAndFeelPage()
 	m_topmenu = unsigned __int64(DWORD(m_regTopmenuhigh))<<32;
 	m_topmenu |= unsigned __int64(DWORD(m_regTopmenu));
 
-	m_regHideMenus = CRegDWORD(_T("Software\\TortoiseGit\\HideMenusForUnversionedItems"), FALSE);
+	m_regHideMenus = CRegDWORD(L"Software\\TortoiseGit\\HideMenusForUnversionedItems", FALSE);
 	m_bHideMenus = m_regHideMenus;
 
-	m_regNoContextPaths = CRegString(_T("Software\\TortoiseGit\\NoContextPaths"), _T(""));
+	m_regNoContextPaths = CRegString(L"Software\\TortoiseGit\\NoContextPaths", L"");
 	m_sNoContextPaths = m_regNoContextPaths;
-	m_sNoContextPaths.Replace(_T("\n"), _T("\r\n"));
+	m_sNoContextPaths.Replace(L"\n", L"\r\n");
 
-	m_regEnableDragContextMenu = CRegDWORD(_T("Software\\TortoiseGit\\EnableDragContextMenu"), TRUE);
+	m_regEnableDragContextMenu = CRegDWORD(L"Software\\TortoiseGit\\EnableDragContextMenu", TRUE);
 	m_bEnableDragContextMenu = m_regEnableDragContextMenu;
 }
 
@@ -194,19 +193,21 @@ BOOL CSetLookAndFeelPage::OnInitDialog()
 	m_tooltips.AddTool(IDC_NOCONTEXTPATHS, IDS_SETTINGS_EXCLUDECONTEXTLIST_TT);
 	m_tooltips.AddTool(IDC_ENABLEDRAGCONTEXTMENU, IDS_SETTINGS_ENABLEDRAGCONTEXTMENU_TT);
 
-	m_cMenuList.SetExtendedStyle(LVS_EX_CHECKBOXES | LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER);
+	m_cMenuList.SetExtendedStyle(LVS_EX_CHECKBOXES | (CRegDWORD(L"Software\\TortoiseGit\\FullRowSelect", TRUE) ? LVS_EX_FULLROWSELECT : 0) | LVS_EX_DOUBLEBUFFER);
 
 	m_cMenuList.DeleteAllItems();
 	int c = m_cMenuList.GetHeaderCtrl()->GetItemCount() - 1;
 	while (c>=0)
 		m_cMenuList.DeleteColumn(c--);
-	m_cMenuList.InsertColumn(0, _T(""));
+	m_cMenuList.InsertColumn(0, L"");
 
-	SetWindowTheme(m_hWnd, L"Explorer", NULL);
+	SetWindowTheme(m_hWnd, L"Explorer", nullptr);
 
 	m_cMenuList.SetRedraw(false);
 
-	m_imgList.Create(16, 16, ILC_COLOR16 | ILC_MASK, 4, 1);
+	int iconWidth = GetSystemMetrics(SM_CXSMICON);
+	int iconHeight = GetSystemMetrics(SM_CYSMICON);
+	m_imgList.Create(iconWidth, iconHeight, ILC_COLOR32 | ILC_MASK, 4, 1);
 
 	m_bBlock = true;
 
@@ -220,9 +221,7 @@ BOOL CSetLookAndFeelPage::OnInitDialog()
 	int maxcol = m_cMenuList.GetHeaderCtrl()->GetItemCount() - 1;
 	int col;
 	for (col = mincol; col <= maxcol; col++)
-	{
 		m_cMenuList.SetColumnWidth(col,LVSCW_AUTOSIZE_USEHEADER);
-	}
 	m_cMenuList.SetRedraw(true);
 
 	UpdateData(FALSE);
@@ -239,14 +238,14 @@ BOOL CSetLookAndFeelPage::OnApply()
 
 	m_regTopmenu.getErrorString();
 	m_sNoContextPaths.Remove('\r');
-	if (m_sNoContextPaths.Right(1).Compare(_T("\n"))!=0)
-		m_sNoContextPaths += _T("\n");
+	if (!CStringUtils::EndsWith(m_sNoContextPaths, L'\n'))
+		m_sNoContextPaths += L'\n';
 
 	Store(m_bHideMenus, m_regHideMenus);
 	Store(m_sNoContextPaths, m_regNoContextPaths);
 	Store(m_bEnableDragContextMenu, m_regEnableDragContextMenu);
 
-	m_sNoContextPaths.Replace(_T("\n"), _T("\r\n"));
+	m_sNoContextPaths.Replace(L"\n", L"\r\n");
 
 	SetModified(FALSE);
 	return ISettingsPropPage::OnApply();
@@ -278,9 +277,7 @@ void CSetLookAndFeelPage::OnLvnItemchangedMenulist(NMHDR * /*pNMHDR*/, LRESULT *
 		return;
 	SetModified(TRUE);
 	if (m_cMenuList.GetItemCount() > 0)
-	{
 		m_topmenu = GetMenuListMask(&m_cMenuList, (CButton*)GetDlgItem(IDC_SELECTALL));
-	}
 	*pResult = 0;
 }
 
@@ -293,8 +290,6 @@ void CSetLookAndFeelPage::OnEnChangeNocontextpaths()
 {
 	SetModified();
 }
-
-
 
 // Set Extmenu class
 #include "SetExtMenu.h"
@@ -312,7 +307,6 @@ CSetExtMenu::CSetExtMenu()
 
 	m_extmenu = unsigned __int64(DWORD(m_regExtmenuhigh))<<32;
 	m_extmenu |= unsigned __int64(DWORD(m_regExtmenu));
-
 }
 
 CSetExtMenu::~CSetExtMenu()
@@ -325,13 +319,11 @@ void CSetExtMenu::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_MENULIST, m_cMenuList);
 }
 
-
 BEGIN_MESSAGE_MAP(CSetExtMenu, ISettingsPropPage)
 	ON_NOTIFY(LVN_ITEMCHANGED, IDC_MENULIST, OnLvnItemchangedMenulist)
 	ON_BN_CLICKED(IDC_SELECTALL, OnBnClickedSelectall)
 	ON_BN_CLICKED(IDC_RESTORE, OnBnClickedRestoreDefaults)
 END_MESSAGE_MAP()
-
 
 BOOL CSetExtMenu::OnInitDialog()
 {
@@ -342,19 +334,21 @@ BOOL CSetExtMenu::OnInitDialog()
 	m_tooltips.AddTool(IDC_MENULIST, IDS_SETTINGS_EXTMENULAYOUT_TT);
 	//m_tooltips.AddTool(IDC_NOCONTEXTPATHS, IDS_SETTINGS_EXCLUDECONTEXTLIST_TT);
 
-	m_cMenuList.SetExtendedStyle(LVS_EX_CHECKBOXES | LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER);
+	m_cMenuList.SetExtendedStyle(LVS_EX_CHECKBOXES | (CRegDWORD(L"Software\\TortoiseGit\\FullRowSelect", TRUE) ? LVS_EX_FULLROWSELECT : 0) | LVS_EX_DOUBLEBUFFER);
 
 	m_cMenuList.DeleteAllItems();
 	int c = m_cMenuList.GetHeaderCtrl()->GetItemCount() - 1;
 	while (c>=0)
 		m_cMenuList.DeleteColumn(c--);
-	m_cMenuList.InsertColumn(0, _T(""));
+	m_cMenuList.InsertColumn(0, L"");
 
-	SetWindowTheme(m_cMenuList.GetSafeHwnd(), L"Explorer", NULL);
+	SetWindowTheme(m_cMenuList.GetSafeHwnd(), L"Explorer", nullptr);
 
 	m_cMenuList.SetRedraw(false);
 
-	m_imgList.Create(16, 16, ILC_COLOR16 | ILC_MASK, 4, 1);
+	int iconWidth = GetSystemMetrics(SM_CXSMICON);
+	int iconHeight = GetSystemMetrics(SM_CYSMICON);
+	m_imgList.Create(iconWidth, iconHeight, ILC_COLOR32 | ILC_MASK, 4, 1);
 
 	m_bBlock = true;
 
@@ -368,9 +362,7 @@ BOOL CSetExtMenu::OnInitDialog()
 	int maxcol = m_cMenuList.GetHeaderCtrl()->GetItemCount() - 1;
 	int col;
 	for (col = mincol; col <= maxcol; col++)
-	{
 		m_cMenuList.SetColumnWidth(col,LVSCW_AUTOSIZE_USEHEADER);
-	}
 	m_cMenuList.SetRedraw(true);
 
 	UpdateData(FALSE);
@@ -416,9 +408,7 @@ void CSetExtMenu::OnLvnItemchangedMenulist(NMHDR * /*pNMHDR*/, LRESULT *pResult)
 
 	SetModified(TRUE);
 	if (m_cMenuList.GetItemCount() > 0)
-	{
 		m_extmenu = GetMenuListMask(&m_cMenuList, (CButton*)GetDlgItem(IDC_SELECTALL));
-	}
 	*pResult = 0;
 }
 

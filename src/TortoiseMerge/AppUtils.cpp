@@ -1,6 +1,6 @@
 // TortoiseGitMerge - a Diff/Patch program
 
-// Copyright (C) 2010-2011,2014-2015 - TortoiseGit
+// Copyright (C) 2010-2011,2014-2016 - TortoiseGit
 // Copyright (C) 2006-2010, 2012-2014 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -36,35 +36,27 @@
 #include "CreateProcessHelper.h"
 #include "FormatMessageWrapper.h"
 
-CAppUtils::CAppUtils(void)
+BOOL CAppUtils::GetVersionedFile(CString sPath, CString sVersion, CString sSavePath, CSysProgressDlg* progDlg, HWND hWnd /*=nullptr*/)
 {
-}
-
-CAppUtils::~CAppUtils(void)
-{
-}
-
-BOOL CAppUtils::GetVersionedFile(CString sPath, CString sVersion, CString sSavePath, CSysProgressDlg * progDlg, HWND hWnd /*=NULL*/)
-{
-	CString sSCMPath = CRegString(_T("Software\\TortoiseGitMerge\\SCMPath"), _T(""));
+	CString sSCMPath = CRegString(L"Software\\TortoiseGitMerge\\SCMPath", L"");
 	if (sSCMPath.IsEmpty())
 	{
 		// no path set, so use TortoiseGit as default
-		sSCMPath = CPathUtils::GetAppDirectory() + _T("TortoiseGitProc.exe");
-		sSCMPath += _T(" /command:cat /path:\"%1\" /revision:%2 /savepath:\"%3\" /hwnd:%4");
+		sSCMPath = CPathUtils::GetAppDirectory() + L"TortoiseGitProc.exe";
+		sSCMPath += L" /command:cat /path:\"%1\" /revision:%2 /savepath:\"%3\" /hwnd:%4";
 	}
 	CString sTemp;
-	sTemp.Format(_T("%p"), (void*)hWnd);
-	sSCMPath.Replace(_T("%1"), sPath);
-	sSCMPath.Replace(_T("%2"), sVersion);
-	sSCMPath.Replace(_T("%3"), sSavePath);
-	sSCMPath.Replace(_T("%4"), sTemp);
+	sTemp.Format(L"%p", (void*)hWnd);
+	sSCMPath.Replace(L"%1", sPath);
+	sSCMPath.Replace(L"%2", sVersion);
+	sSCMPath.Replace(L"%3", sSavePath);
+	sSCMPath.Replace(L"%4", sTemp);
 	// start the external SCM program to fetch the specific version of the file
 	PROCESS_INFORMATION process;
-	if (!CCreateProcessHelper::CreateProcess(NULL, (LPTSTR)(LPCTSTR)sSCMPath, &process))
+	if (!CCreateProcessHelper::CreateProcess(nullptr, sSCMPath.GetBuffer(), &process))
 	{
 		CFormatMessageWrapper errorDetails;
-		MessageBox(NULL, errorDetails, _T("TortoiseGitMerge"), MB_OK | MB_ICONERROR);
+		MessageBox(nullptr, errorDetails, L"TortoiseGitMerge", MB_OK | MB_ICONERROR);
 		return FALSE;
 	}
 	DWORD ret = 0;
@@ -88,14 +80,14 @@ bool CAppUtils::CreateUnifiedDiff(const CString& orig, const CString& modified, 
 {
 	CString diffContext;
 	if (contextsize >= 0)
-		diffContext.Format(_T("--unified=%d"), contextsize);
+		diffContext.Format(L"--unified=%d", contextsize);
 	CString cmd, err;
-	cmd.Format(_T("git.exe diff --no-index %s -- \"%s\" \"%s\""), (LPCTSTR)diffContext, (LPCTSTR)orig, (LPCTSTR)modified);
+	cmd.Format(L"git.exe diff --no-index %s -- \"%s\" \"%s\"", (LPCTSTR)diffContext, (LPCTSTR)orig, (LPCTSTR)modified);
 
 	int result = g_Git.RunLogFile(cmd, output, &err);
 	if (result != 0 && result != 1 && bShowError)
 	{
-		MessageBox(NULL, _T("Failed to create patch.\n") + err, _T("TortoiseGit"), MB_OK | MB_ICONERROR);
+		MessageBox(nullptr, L"Failed to create patch.\n" + err, L"TortoiseGit", MB_OK | MB_ICONERROR);
 		return false;
 	}
 	return true;
@@ -103,7 +95,7 @@ bool CAppUtils::CreateUnifiedDiff(const CString& orig, const CString& modified, 
 
 bool CAppUtils::HasClipboardFormat(UINT format)
 {
-	if (OpenClipboard(NULL))
+	if (OpenClipboard(nullptr))
 	{
 		UINT enumFormat = 0;
 		do

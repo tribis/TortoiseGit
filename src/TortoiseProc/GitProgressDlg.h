@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2016 - TortoiseGit
+// Copyright (C) 2008-2017 - TortoiseGit
 // Copyright (C) 2003-2008 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -37,7 +37,7 @@ public:
 
 public:
 
-	CGitProgressDlg(CWnd* pParent = NULL);
+	CGitProgressDlg(CWnd* pParent = nullptr);
 	virtual ~CGitProgressDlg();
 
 
@@ -58,13 +58,12 @@ public:
 
 protected:
 
-	virtual BOOL						OnInitDialog();
-	virtual void						OnCancel();
-	virtual BOOL						PreTranslateMessage(MSG* pMsg);
-	virtual void						DoDataExchange(CDataExchange* pDX);
+	virtual BOOL						OnInitDialog() override;
+	virtual void						OnCancel() override;
+	virtual BOOL						PreTranslateMessage(MSG* pMsg) override;
+	virtual void						DoDataExchange(CDataExchange* pDX) override;
 
 	afx_msg void	OnBnClickedLogbutton();
-	afx_msg void	OnBnClickedOk();
 	afx_msg BOOL	OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message);
 	afx_msg void	OnClose();
 	afx_msg void	OnEnSetfocusInfotext();
@@ -77,7 +76,7 @@ protected:
 	DECLARE_MESSAGE_MAP()
 
 private:
-	virtual void OnOK();
+	virtual void OnOK() override;
 
 	CAnimateCtrl			m_Animate;
 	CProgressCtrl			m_ProgCtrl;
@@ -97,5 +96,5 @@ private:
 	} ACCELLERATOR;
 	std::map<TCHAR, ACCELLERATOR>	m_accellerators;
 	HACCEL							m_hAccel;
-	virtual LRESULT DefWindowProc(UINT message, WPARAM wParam, LPARAM lParam);
+	virtual LRESULT DefWindowProc(UINT message, WPARAM wParam, LPARAM lParam) override;
 };

@@ -1,7 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2014-2015 - TortoiseGit
-// Copyright (C) 2014 - TortoiseSVN
+// Copyright (C) 2014-2016 - TortoiseGit
+// Copyright (C) 2014, 2018 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -44,7 +44,7 @@ CSettingsUDiff::CSettingsUDiff()
 	m_regBackAddedColor = CRegDWORD(L"Software\\TortoiseGit\\UDiffBackAddedColor", UDIFF_COLORBACKADDED);
 	m_regBackRemovedColor = CRegDWORD(L"Software\\TortoiseGit\\UDiffBackRemovedColor", UDIFF_COLORBACKREMOVED);
 
-	m_regFontName = CRegString(L"Software\\TortoiseGit\\UDiffFontName", L"Courier New");
+	m_regFontName = CRegString(L"Software\\TortoiseGit\\UDiffFontName", L"Consolas");
 	m_regFontSize = CRegDWORD(L"Software\\TortoiseGit\\UDiffFontSize", 10);
 	m_regTabSize = CRegDWORD(L"Software\\TortoiseGit\\UDiffTabSize", 4);
 }
@@ -99,6 +99,7 @@ BEGIN_MESSAGE_MAP(CSettingsUDiff, ISettingsPropPage)
 	ON_BN_CLICKED(IDC_BACKCOMMENTCOLOR, &CSettingsUDiff::OnBnClickedColor)
 	ON_BN_CLICKED(IDC_BACKADDEDCOLOR, &CSettingsUDiff::OnBnClickedColor)
 	ON_BN_CLICKED(IDC_BACKREMOVEDCOLOR, &CSettingsUDiff::OnBnClickedColor)
+	ON_WM_MEASUREITEM()
 END_MESSAGE_MAP()
 
 // CSettingsUDiff message handlers
@@ -179,6 +180,7 @@ BOOL CSettingsUDiff::OnInitDialog()
 	}
 	m_cFontNames.Setup(DEVICE_FONTTYPE | RASTER_FONTTYPE | TRUETYPE_FONTTYPE, 1, FIXED_PITCH);
 	m_cFontNames.SelectFont(m_sFontName);
+	m_cFontNames.SendMessage(CB_SETITEMHEIGHT, (WPARAM)-1, m_cFontSizes.GetItemHeight(-1));
 
 	UpdateData(FALSE);
 	return TRUE;
@@ -241,4 +243,20 @@ BOOL CSettingsUDiff::OnApply()
 void CSettingsUDiff::OnBnClickedColor()
 {
 	SetModified();
+}
+
+void CSettingsUDiff::OnMeasureItem(int nIDCtl, LPMEASUREITEMSTRUCT lpMeasureItemStruct)
+{
+	CFont* pFont = GetFont();
+	if (pFont)
+	{
+		CDC* pDC = GetDC();
+		CFont* pFontPrev = pDC->SelectObject(pFont);
+		int iborder = ::GetSystemMetrics(SM_CYBORDER);
+		CSize sz = pDC->GetTextExtent(L"0");
+		lpMeasureItemStruct->itemHeight = sz.cy + 2 * iborder;
+		pDC->SelectObject(pFontPrev);
+		ReleaseDC(pDC);
+	}
+	ISettingsPropPage::OnMeasureItem(nIDCtl, lpMeasureItemStruct);
 }

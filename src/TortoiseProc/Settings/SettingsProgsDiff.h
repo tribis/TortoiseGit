@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2011 - TortoiseGit
+// Copyright (C) 2011, 2017 - TortoiseGit
 // Copyright (C) 2003-2008,2011 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -34,31 +34,29 @@ public:
 	CSettingsProgsDiff();
 	virtual ~CSettingsProgsDiff();
 
-	UINT GetIconID() {return IDI_DIFF;}
+	UINT GetIconID() override { return IDI_DIFF; }
 
 	enum { IDD = IDD_SETTINGSPROGSDIFF };
 
 protected:
-	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
+	virtual void DoDataExchange(CDataExchange* pDX) override;    // DDX/DDV support
 
 	DECLARE_MESSAGE_MAP()
 protected:
-	virtual BOOL OnInitDialog();
-	virtual BOOL OnApply();
+	virtual BOOL OnInitDialog() override;
+	virtual BOOL OnApply() override;
 	afx_msg void OnBnClickedExtdiffOff();
 	afx_msg void OnBnClickedExtdiffOn();
 	afx_msg void OnBnClickedExtdiffbrowse();
 	afx_msg void OnBnClickedExtdiffadvanced();
 	afx_msg void OnEnChangeExtdiff();
-	afx_msg void OnEnChangeExtdiffprops();
 	afx_msg void OnBnClickedDiffviewerOff();
 	afx_msg void OnBnClickedDiffviewerOn();
 	afx_msg void OnBnClickedDiffviewerbrowse();
 	afx_msg void OnEnChangeDiffviewer();
 
-	bool IsExternal(const CString& path) const { return !path.IsEmpty() && path.Left(1) != _T("#"); }
+	bool IsExternal(const CString& path) const { return !path.IsEmpty() && path.Left(1) != L"#"; }
 	void CheckProgComment();
-	void CheckProgCommentProps();
 
 private:
 	CString			m_sDiffPath;

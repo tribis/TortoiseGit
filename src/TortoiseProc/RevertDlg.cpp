@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2009-2013 - TortoiseGit
+// Copyright (C) 2009-2013, 2016-2018 - TortoiseGit
 // Copyright (C) 2003-2008 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -22,13 +22,14 @@
 #include "MessageBox.h"
 #include "RevertDlg.h"
 #include "Git.h"
+#include "PathUtils.h"
 #include "registry.h"
 #include "AppUtils.h"
 
 #define REFRESHTIMER   100
 
 IMPLEMENT_DYNAMIC(CRevertDlg, CResizableStandAloneDialog)
-CRevertDlg::CRevertDlg(CWnd* pParent /*=NULL*/)
+CRevertDlg::CRevertDlg(CWnd* pParent /*=nullptr*/)
 	: CResizableStandAloneDialog(CRevertDlg::IDD, pParent)
 	, m_bSelectAll(TRUE)
 	, m_bThreadRunning(FALSE)
@@ -64,7 +65,7 @@ BOOL CRevertDlg::OnInitDialog()
 	CResizableStandAloneDialog::OnInitDialog();
 	CAppUtils::MarkWindowAsUnpinnable(m_hWnd);
 
-	m_RevertList.Init(GITSLC_COLEXT | GITSLC_COLSTATUS | GITSLC_COLADD| GITSLC_COLDEL, _T("RevertDlg"));
+	m_RevertList.Init(GITSLC_COLEXT | GITSLC_COLSTATUS | GITSLC_COLADD| GITSLC_COLDEL, L"RevertDlg");
 	m_RevertList.SetConfirmButton((CButton*)GetDlgItem(IDOK));
 	m_RevertList.SetSelectButton(&m_SelectAll);
 	m_RevertList.SetCancelBool(&m_bCancelled);
@@ -73,10 +74,7 @@ BOOL CRevertDlg::OnInitDialog()
 
 	CString sWindowTitle;
 	GetWindowText(sWindowTitle);
-	if (m_pathList.GetCount() == 1)
-		CAppUtils::SetWindowTitle(m_hWnd, g_Git.CombinePath(m_pathList[0].GetUIPathString()), sWindowTitle);
-	else
-		CAppUtils::SetWindowTitle(m_hWnd, m_pathList.GetCommonRoot().GetUIPathString(), sWindowTitle);
+	CAppUtils::SetWindowTitle(m_hWnd, g_Git.CombinePath(m_pathList.GetCommonRoot()), sWindowTitle);
 
 	AdjustControlSize(IDC_SELECTALL);
 
@@ -86,16 +84,14 @@ BOOL CRevertDlg::OnInitDialog()
 	AddAnchor(IDOK, BOTTOM_RIGHT);
 	AddAnchor(IDCANCEL, BOTTOM_RIGHT);
 	AddAnchor(IDHELP, BOTTOM_RIGHT);
-	if (hWndExplorer)
-		CenterWindow(CWnd::FromHandle(hWndExplorer));
-	EnableSaveRestore(_T("RevertDlg"));
+	if (GetExplorerHWND())
+		CenterWindow(CWnd::FromHandle(GetExplorerHWND()));
+	EnableSaveRestore(L"RevertDlg");
 
 	// first start a thread to obtain the file list with the status without
 	// blocking the dialog
-	if (AfxBeginThread(RevertThreadEntry, this)==0)
-	{
+	if (AfxBeginThread(RevertThreadEntry, this) == nullptr)
 		CMessageBox::Show(this->m_hWnd, IDS_ERR_THREADSTARTFAILED, IDS_APPNAME, MB_OK | MB_ICONERROR);
-	}
 	InterlockedExchange(&m_bThreadRunning, TRUE);
 
 	return TRUE;
@@ -103,7 +99,7 @@ BOOL CRevertDlg::OnInitDialog()
 
 UINT CRevertDlg::RevertThreadEntry(LPVOID pVoid)
 {
-	return ((CRevertDlg*)pVoid)->RevertThread();
+	return reinterpret_cast<CRevertDlg*>(pVoid)->RevertThread();
 }
 
 UINT CRevertDlg::RevertThread()
@@ -114,7 +110,10 @@ UINT CRevertDlg::RevertThread()
 	DialogEnableWindow(IDOK, false);
 	m_bCancelled = false;
 
+	m_RevertList.StoreScrollPos();
 	m_RevertList.Clear();
+
+	g_Git.RefreshGitIndex();
 
 	if (!m_RevertList.GetStatus(&m_pathList))
 	{
@@ -126,7 +125,7 @@ UINT CRevertDlg::RevertThread()
 
 	if (m_RevertList.HasUnversionedItems())
 	{
-		if (DWORD(CRegStdDWORD(_T("Software\\TortoiseGit\\UnversionedAsModified"), FALSE)))
+		if (DWORD(CRegStdDWORD(L"Software\\TortoiseGit\\UnversionedAsModified", FALSE)))
 		{
 			GetDlgItem(IDC_UNVERSIONEDITEMS)->ShowWindow(SW_SHOW);
 		}
@@ -146,17 +145,16 @@ void CRevertDlg::OnOK()
 {
 	if (m_bThreadRunning)
 		return;
+	auto locker(m_RevertList.AcquireReadLock());
 	// save only the files the user has selected into the temporary file
 	m_bRecursive = TRUE;
 	for (int i=0; i<m_RevertList.GetItemCount(); ++i)
 	{
 		if (!m_RevertList.GetCheck(i))
-		{
 			m_bRecursive = FALSE;
-		}
 		else
 		{
-			m_selectedPathList.AddPath(*(CTGitPath*)m_RevertList.GetItemData(i));
+			m_selectedPathList.AddPath(*m_RevertList.GetListEntry(i));
 #if 0
 			CGitStatusListCtrl::FileEntry * entry = m_RevertList.GetListEntry(i);
 			// add all selected entries to the list, except the ones with 'added'
@@ -175,9 +173,7 @@ void CRevertDlg::OnOK()
 		}
 	}
 	if (!m_bRecursive)
-	{
 		m_RevertList.WriteCheckedNamesToPathList(m_pathList);
-	}
 	m_selectedPathList.SortByPathname();
 
 	CResizableStandAloneDialog::OnOK();
@@ -218,9 +214,7 @@ BOOL CRevertDlg::PreTranslateMessage(MSG* pMsg)
 				if (GetAsyncKeyState(VK_CONTROL)&0x8000)
 				{
 					if ( GetDlgItem(IDOK)->IsWindowEnabled() )
-					{
 						PostMessage(WM_COMMAND, IDOK);
-					}
 					return TRUE;
 				}
 			}
@@ -229,10 +223,8 @@ BOOL CRevertDlg::PreTranslateMessage(MSG* pMsg)
 			{
 				if (!m_bThreadRunning)
 				{
-					if (AfxBeginThread(RevertThreadEntry, this)==0)
-					{
+					if (AfxBeginThread(RevertThreadEntry, this) == nullptr)
 						CMessageBox::Show(this->m_hWnd, IDS_ERR_THREADSTARTFAILED, IDS_APPNAME, MB_OK | MB_ICONERROR);
-					}
 					else
 						InterlockedExchange(&m_bThreadRunning, TRUE);
 				}
@@ -246,10 +238,8 @@ BOOL CRevertDlg::PreTranslateMessage(MSG* pMsg)
 
 LRESULT CRevertDlg::OnSVNStatusListCtrlNeedsRefresh(WPARAM, LPARAM)
 {
-	if (AfxBeginThread(RevertThreadEntry, this)==0)
-	{
+	if (AfxBeginThread(RevertThreadEntry, this) == nullptr)
 		CMessageBox::Show(this->m_hWnd, IDS_ERR_THREADSTARTFAILED, IDS_APPNAME, MB_OK | MB_ICONERROR);
-	}
 	return 0;
 }
 
@@ -269,6 +259,11 @@ LRESULT CRevertDlg::OnFileDropped(WPARAM, LPARAM lParam)
 	// restart the timer.
 	CTGitPath path;
 	path.SetFromWin((LPCTSTR)lParam);
+
+	// check whether the dropped file belongs to the very same repository
+	CString projectDir;
+	if (!path.HasAdminDir(&projectDir) || !CPathUtils::ArePathStringsEqual(g_Git.m_CurrentDir, projectDir))
+		return 0;
 
 	if (!m_RevertList.HasPath(path))
 	{
@@ -299,10 +294,11 @@ LRESULT CRevertDlg::OnFileDropped(WPARAM, LPARAM lParam)
 			}
 		}
 	}
+	m_RevertList.ResetChecked(path);
 
 	// Always start the timer, since the status of an existing item might have changed
-	SetTimer(REFRESHTIMER, 200, NULL);
-	CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": Item %s dropped, timer started\n"), path.GetWinPath());
+	SetTimer(REFRESHTIMER, 200, nullptr);
+	CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) L": Item %s dropped, timer started\n", path.GetWinPath());
 	return 0;
 }
 
@@ -313,7 +309,7 @@ void CRevertDlg::OnTimer(UINT_PTR nIDEvent)
 	case REFRESHTIMER:
 		if (m_bThreadRunning)
 		{
-			SetTimer(REFRESHTIMER, 200, NULL);
+			SetTimer(REFRESHTIMER, 200, nullptr);
 			CTraceToOutputDebugString::Instance()(__FUNCTION__ ": Wait some more before refreshing\n");
 		}
 		else

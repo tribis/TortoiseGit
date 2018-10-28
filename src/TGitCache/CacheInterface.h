@@ -1,7 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
 // External Cache Copyright (C) 2005-2006,2008-2010 - TortoiseSVN
-// Copyright (C) 2008-2013 - TortoiseGit
+// Copyright (C) 2008-2013, 2016-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -24,10 +24,10 @@
 
 // The name of the named-pipe for the cache
 
-#define TGIT_CACHE_PIPE_NAME _T("\\\\.\\pipe\\TGitCache")
-#define TGIT_CACHE_COMMANDPIPE_NAME _T("\\\\.\\pipe\\TGitCacheCommand")
-#define TGIT_CACHE_WINDOW_NAME _T("TGitCacheWindow")
-#define TGIT_CACHE_MUTEX_NAME _T("TGitCacheMutex")
+#define TGIT_CACHE_PIPE_NAME L"\\\\.\\pipe\\TGitCache"
+#define TGIT_CACHE_COMMANDPIPE_NAME L"\\\\.\\pipe\\TGitCacheCommand"
+#define TGIT_CACHE_WINDOW_NAME L"TGitCacheWindow"
+#define TGIT_CACHE_MUTEX_NAME L"TGitCacheMutex"
 
 
 CString GetCachePipeName();
@@ -35,16 +35,7 @@ CString GetCacheCommandPipeName();
 CString GetCacheMutexName();
 
 CString GetCacheID();
-bool	SendCacheCommand(BYTE command, const WCHAR * path = NULL);
-
-typedef enum git_node_kind_t
-{
-	git_node_none,
-	git_node_file,
-	git_node_dir,
-	git_node_unknown,
-
-}git_node_kind;
+bool	SendCacheCommand(BYTE command, const WCHAR* path = nullptr);
 
 /**
  * \ingroup TGitCache
@@ -80,10 +71,12 @@ struct TGITCacheRequest
  */
 struct TGITCacheResponse
 {
-	git_wc_status2_t m_status;
+	UINT8 m_status;
 	bool m_bAssumeValid;
 	bool m_bSkipWorktree;
 };
+static_assert((UINT8)git_wc_status_unknown == git_wc_status_unknown, "type git_wc_status_kind fits into UINT8");
+static_assert(sizeof(TGITCacheResponse) == 3 && offsetof(TGITCacheResponse, m_status) == 0 && offsetof(TGITCacheResponse, m_bAssumeValid) == 1 && offsetof(TGITCacheResponse, m_bSkipWorktree) == 2, "Cross platform compatibility");
 
 /**
  * \ingroup TGitCache

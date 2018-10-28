@@ -29,15 +29,15 @@ class CStashSaveDlg : public CHorizontalResizableStandAloneDialog
 	DECLARE_DYNAMIC(CStashSaveDlg)
 
 public:
-	CStashSaveDlg(CWnd* pParent = NULL);   // standard constructor
+	CStashSaveDlg(CWnd* pParent = nullptr);   // standard constructor
 	virtual ~CStashSaveDlg();
 
 // Dialog Data
 	enum { IDD = IDD_STASH };
 
 protected:
-	virtual BOOL OnInitDialog();
-	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
+	virtual BOOL OnInitDialog() override;
+	virtual void DoDataExchange(CDataExchange* pDX) override;    // DDX/DDV support
 
 	DECLARE_MESSAGE_MAP()
 

@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2015 - TortoiseGit
+// Copyright (C) 2015-2017 - TortoiseGit
 // Copyright (C) 2005-2006, 2009-2010 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -36,10 +36,10 @@ CSimpleFileFind::CSimpleFileFind(const CString &sPath, LPCTSTR pPattern) :
             m_sPathPrefix += "\\";
         }
     }
-    if ((len >= 248)&&(m_sPathPrefix.Left(4).Compare(_T("\\\\?\\"))))
-        m_hFindFile = ::FindFirstFileEx((LPCTSTR)(_T("\\\\?\\") + m_sPathPrefix + pPattern), SysInfo::Instance().IsWin7OrLater() ? FindExInfoBasic : FindExInfoStandard, &m_FindFileData, FindExSearchNameMatch, nullptr, SysInfo::Instance().IsWin7OrLater() ? FIND_FIRST_EX_LARGE_FETCH : 0);
+    if ((len >= 248) && (m_sPathPrefix.Left(4).Compare(L"\\\\?\\")))
+        m_hFindFile = ::FindFirstFileEx((LPCTSTR)(L"\\\\?\\" + m_sPathPrefix + pPattern), FindExInfoBasic, &m_FindFileData, FindExSearchNameMatch, nullptr, FIND_FIRST_EX_LARGE_FETCH);
     else
-        m_hFindFile = ::FindFirstFileEx((LPCTSTR)(m_sPathPrefix + pPattern), SysInfo::Instance().IsWin7OrLater() ? FindExInfoBasic : FindExInfoStandard, &m_FindFileData, FindExSearchNameMatch, nullptr, SysInfo::Instance().IsWin7OrLater() ? FIND_FIRST_EX_LARGE_FETCH : 0);
+        m_hFindFile = ::FindFirstFileEx((LPCTSTR)(m_sPathPrefix + pPattern), FindExInfoBasic, &m_FindFileData, FindExSearchNameMatch, nullptr, FIND_FIRST_EX_LARGE_FETCH);
     if (m_hFindFile == INVALID_HANDLE_VALUE) {
         m_dError = ::GetLastError();
     }
@@ -138,7 +138,7 @@ inline void CDirFileEnum::PushStack(const CString& sDirName)
 }
 
 CDirFileEnum::CDirFileEnum(const CString& sDirName) :
-   m_seStack(NULL),
+   m_seStack(nullptr),
    m_bIsNew(TRUE)
 {
    PushStack(sDirName);
@@ -146,7 +146,8 @@ CDirFileEnum::CDirFileEnum(const CString& sDirName) :
 
 CDirFileEnum::~CDirFileEnum()
 {
-   while (m_seStack != NULL) {
+   while (m_seStack)
+   {
       PopStack();
    }
 }
@@ -169,10 +170,8 @@ BOOL CDirFileEnum::NextFile(CString &sResult, bool* pbIsDirectory, bool bRecurse
    if (m_seStack)
    {
       sResult = m_seStack->GetFilePath();
-      if(pbIsDirectory != NULL)
-      {
+      if (pbIsDirectory)
           *pbIsDirectory = m_seStack->IsDirectory();
-      }
       return TRUE;
    } else {
       return FALSE;

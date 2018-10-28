@@ -22,11 +22,9 @@
 
 
 CShellExtClassFactory::CShellExtClassFactory(FileState state)
+	: m_StateToMake(state)
+	, m_cRef(0L)
 {
-	m_StateToMake = state;
-
-	m_cRef = 0L;
-
 	InterlockedIncrement(&g_cRefThisDll);
 }
 
@@ -38,10 +36,10 @@ CShellExtClassFactory::~CShellExtClassFactory()
 STDMETHODIMP CShellExtClassFactory::QueryInterface(REFIID riid,
 												   LPVOID FAR *ppv)
 {
-	if(ppv == 0)
+	if (!ppv)
 		return E_POINTER;
 
-	*ppv = NULL;
+	*ppv = nullptr;
 
 	// Any interface on this object is the object pointer
 
@@ -57,6 +55,7 @@ STDMETHODIMP CShellExtClassFactory::QueryInterface(REFIID riid,
 
 STDMETHODIMP_(ULONG) CShellExtClassFactory::AddRef()
 {
+	git_libgit2_init();
 	return InterlockedIncrement(&m_cRef);
 }
 
@@ -67,6 +66,8 @@ STDMETHODIMP_(ULONG) CShellExtClassFactory::Release()
 
 	delete this;
 
+	git_libgit2_shutdown();
+
 	return 0L;
 }
 
@@ -74,10 +75,10 @@ STDMETHODIMP CShellExtClassFactory::CreateInstance(LPUNKNOWN pUnkOuter,
 												   REFIID riid,
 												   LPVOID *ppvObj)
 {
-	if(ppvObj == 0)
+	if (!ppvObj)
 		return E_POINTER;
 
-	*ppvObj = NULL;
+	*ppvObj = nullptr;
 
 	// Shell extensions typically don't support aggregation (inheritance)
 
@@ -90,7 +91,7 @@ STDMETHODIMP CShellExtClassFactory::CreateInstance(LPUNKNOWN pUnkOuter,
 
 	CShellExt* pShellExt = new (std::nothrow) CShellExt(m_StateToMake);  //Create the CShellExt object
 
-	if (NULL == pShellExt)
+	if (!pShellExt)
 		return E_OUTOFMEMORY;
 
 	const HRESULT hr = pShellExt->QueryInterface(riid, ppvObj);

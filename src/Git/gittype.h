@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2016 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -19,6 +19,7 @@
 
 #pragma once
 #include "GitHash.h"
+#include <unordered_map>
 
 enum
 {
@@ -31,61 +32,68 @@ enum
 class CGitByteArray:public std::vector<BYTE>
 {
 public:
-	int find(BYTE data, int start = 0) const
+	size_t find(BYTE data, size_t start = 0) const
 	{
-		for (unsigned int i = start; i < size(); ++i)
-			if( at(i) == data )
+		for (size_t i = start, end = size(); i < end; ++i)
+			if ((*this)[i] == data)
 				return i;
-		return -1;
+		return npos;
 	}
-	int RevertFind(BYTE data, int start = -1) const
+	size_t RevertFind(BYTE data, size_t start = npos) const
 	{
-		if(start == -1)
-			start = (int)size() - 1;
+		if (start == npos)
+		{
+			if (empty())
+				return npos;
+			start = size() - 1;
+		}
 
-		if(start<0)
-			return -1;
-
-		for(int i=start; i>=0;i--)
-			if( at(i) == data )
+		for (size_t i = start + 1; i-- > 0;)
+			if ((*this)[i] == data)
 				return i;
-		return -1;
+		return npos;
 	}
-	int findNextString(int start = 0) const
+	size_t findNextString(size_t start = 0) const
 	{
-		int pos=start;
+		size_t pos = start;
+		size_t end = size();
 		do
 		{
 			pos=find(0,pos);
-			if(pos >= 0)
+			if(pos != npos)
 				++pos;
 			else
 				break;
 
-			if (pos >= (int)size())
-				return -1;
+			if (pos >= end)
+				return npos;
 
 		}while(at(pos)==0);
 
 		return pos;
 	}
-	int append( std::vector<BYTE> &v,int start=0,int end=-1)
+	size_t append(std::vector<BYTE> &v, size_t start = 0, size_t end = npos)
 	{
-		if(end<0)
-			end = (int)v.size();
-		for (int i = start; i < end; ++i)
+		if (end == npos)
+			end = v.size();
+		for (size_t i = start; i < end; ++i)
 			this->push_back(v[i]);
 		return 0;
 	}
-	int append(const BYTE* data, size_t dataSize)
+	void append(const BYTE* data, size_t dataSize)
 	{
 		if (dataSize == 0)
-			return 0;
+			return;
 		size_t oldsize=size();
 		resize(oldsize+dataSize);
 		memcpy(&*(begin()+oldsize),data,dataSize);
-		return 0;
 	}
+	static const size_t npos = (size_t)-1; // bad/missing length/position
+	static_assert(MAXSIZE_T == npos, "NPOS must equal MAXSIZE_T");
+#pragma warning(push)
+#pragma warning(disable: 4310)
+	static_assert(-1 == (int)npos, "NPOS must equal -1");
+#pragma warning(pop)
 };
 
 class CGitGuardedByteArray : public CGitByteArray
@@ -99,7 +107,15 @@ public:
 	CComCriticalSection			m_critSec;
 };
 
+struct TGitRef
+{
+	CString name;
+	CGitHash hash;
+	operator const CString&() const { return name; }
+};
+
 typedef std::vector<CString> STRING_VECTOR;
-typedef std::map<CGitHash, STRING_VECTOR> MAP_HASH_NAME;
+typedef std::unordered_map<CGitHash, STRING_VECTOR> MAP_HASH_NAME;
 typedef std::map<CString, CString> MAP_STRING_STRING;
+typedef std::vector<TGitRef> REF_VECTOR;
 typedef CGitByteArray BYTE_VECTOR;

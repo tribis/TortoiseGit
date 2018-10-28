@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2013, 2015-2016 - TortoiseGit
+// Copyright (C) 2008-2013, 2015-2016, 2018 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -20,43 +20,42 @@
 #include "BisectCommand.h"
 #include "AppUtils.h"
 #include "ProgressDlg.h"
-#include "MessageBox.h"
 #include "resource.h"
 
 bool BisectCommand::Execute()
 {
 	CTGitPath path = g_Git.m_CurrentDir;
 
-	if (this->parser.HasKey(_T("start")) && !path.IsBisectActive())
+	if (parser.HasKey(L"start") && !path.IsBisectActive())
 	{
 		CString lastGood, firstBad;
-		if (parser.HasKey(_T("good")))
-			lastGood = parser.GetVal(_T("good"));
-		if (parser.HasKey(_T("bad")))
-			firstBad = parser.GetVal(_T("bad"));
+		if (parser.HasKey(L"good"))
+			lastGood = parser.GetVal(L"good");
+		if (parser.HasKey(L"bad"))
+			firstBad = parser.GetVal(L"bad");
 
-		return CAppUtils::BisectStart(lastGood, firstBad, true);
+		return CAppUtils::BisectStart(GetExplorerHWND(), lastGood, firstBad);
 	}
-	else if ((this->parser.HasKey(_T("good")) || this->parser.HasKey(_T("bad")) || this->parser.HasKey(_T("reset"))) && path.IsBisectActive())
+	else if ((this->parser.HasKey(L"good") || this->parser.HasKey(L"bad") || this->parser.HasKey(L"skip") || this->parser.HasKey(L"reset")) && path.IsBisectActive())
 	{
 		CString op;
 		CString ref;
 
-		if (this->parser.HasKey(_T("good")))
+		if (parser.HasKey(L"good"))
 			g_Git.GetBisectTerms(&op, nullptr);
-		else if (this->parser.HasKey(_T("bad")))
+		else if (parser.HasKey(L"bad"))
 			g_Git.GetBisectTerms(nullptr, &op);
-		else if (this->parser.HasKey(_T("reset")))
-			op = _T("reset");
+		else if (this->parser.HasKey(L"skip"))
+			op = L"skip";
+		else if (parser.HasKey(L"reset"))
+			op = L"reset";
 
-		if (this->parser.HasKey(_T("ref")) &&! this->parser.HasKey(_T("reset")))
-			ref = this->parser.GetVal(_T("ref"));
+		if (parser.HasKey(L"ref") && !parser.HasKey(L"reset"))
+			ref = parser.GetVal(L"ref");
 
-		return CAppUtils::BisectOperation(op, ref);
+		return CAppUtils::BisectOperation(GetExplorerHWND(), op, ref);
 	}
 	else
-	{
-		CMessageBox::Show(NULL,_T("Operation unknown or not allowed."), _T("TortoiseGit"), MB_OK|MB_ICONINFORMATION);
-	}
+		MessageBox(GetExplorerHWND(), L"Operation unknown or not allowed.", L"TortoiseGit", MB_OK | MB_ICONINFORMATION);
 	return false;
 }

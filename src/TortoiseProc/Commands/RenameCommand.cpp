@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2012, 2015 - TortoiseGit
+// Copyright (C) 2008-2012, 2015-2018 - TortoiseGit
 // Copyright (C) 2007-2008 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -34,33 +34,44 @@ bool RenameCommand::Execute()
 	// show the rename dialog until the user either cancels or enters a new
 	// name (one that's different to the original name
 	CString sNewName;
-	do
+	CRenameDlg dlg;
+	dlg.SetInputValidator([&](const int /*nID*/, const CString& input) -> CString
 	{
-		CRenameDlg dlg;
-		dlg.m_name = filename;
-		if (dlg.DoModal() != IDOK)
-			return FALSE;
-		sNewName = dlg.m_name;
-	} while(PathIsRelative(sNewName) && !PathIsURL(sNewName) && (sNewName.IsEmpty() || (sNewName.Compare(filename)==0)));
+		CString newName;
+		if (!basePath.IsEmpty())
+			newName = basePath + "/" + input;
+		else
+			newName = input;
 
-	if(!basePath.IsEmpty())
-		sNewName=basePath+"/"+sNewName;
+		if (newName.CompareNoCase(cmdLinePath.GetGitPathString()) != 0 && PathFileExists(g_Git.CombinePath(newName)))
+			return CString(CFormatMessageWrapper(ERROR_FILE_EXISTS));
+
+		return{};
+	});
+	dlg.m_sBaseDir = g_Git.CombinePath(basePath);
+	dlg.m_name = filename;
+	if (dlg.DoModal() != IDOK)
+		return FALSE;
+	if (!basePath.IsEmpty())
+		sNewName = basePath + "/" + dlg.m_name;
+	else
+		sNewName = dlg.m_name;
 
 	CString force;
 	// if the filenames only differ in case, we have to pass "-f"
 	if (sNewName.CompareNoCase(cmdLinePath.GetGitPathString()) == 0)
-		force = _T("-f ");
+		force = L"-f ";
 
 	CString cmd;
 	CString output;
-	cmd.Format(_T("git.exe mv %s-- \"%s\" \"%s\""),
+	cmd.Format(L"git.exe mv %s-- \"%s\" \"%s\"",
 					(LPCTSTR)force,
 					(LPCTSTR)cmdLinePath.GetGitPathString(),
 					(LPCTSTR)sNewName);
 
 	if (g_Git.Run(cmd, &output, CP_UTF8))
 	{
-		CMessageBox::Show(hwndExplorer, output, _T("TortoiseGit"), MB_OK);
+		CMessageBox::Show(GetExplorerHWND(), output, L"TortoiseGit", MB_OK);
 		bRet = false;
 	}
 

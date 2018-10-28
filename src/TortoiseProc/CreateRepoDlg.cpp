@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2010-2014 - TortoiseGit
+// Copyright (C) 2010-2014, 2016 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -23,17 +23,17 @@
 #include "TortoiseProc.h"
 #include "CreateRepoDlg.h"
 #include "BrowseFolder.h"
-#include "MessageBox.h"
 #include "AppUtils.h"
+#include "StringUtils.h"
 
 // CCreateRepoDlg dialog
 
 IMPLEMENT_DYNCREATE(CCreateRepoDlg, CStandAloneDialog)
 
-CCreateRepoDlg::CCreateRepoDlg(CWnd* pParent /*=NULL*/)
+CCreateRepoDlg::CCreateRepoDlg(CWnd* pParent /*=nullptr*/)
 	: CStandAloneDialog(CCreateRepoDlg::IDD, pParent)
+	, m_bBare(BST_UNCHECKED)
 {
-	m_bBare = FALSE;
 }
 
 CCreateRepoDlg::~CCreateRepoDlg()
@@ -59,7 +59,7 @@ BOOL CCreateRepoDlg::OnInitDialog()
 	CAppUtils::SetWindowTitle(m_hWnd, m_folder, sWindowTitle);
 
 	// Check if the folder ends with .git this indicates the use probably want this to be a bare repository
-	if (m_folder.Right(4) == _T(".git"))
+	if (CStringUtils::EndsWith(m_folder, L".git"))
 	{
 		m_bBare = TRUE;
 		UpdateData(FALSE);

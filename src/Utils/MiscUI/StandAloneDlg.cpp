@@ -1,5 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
+// Copyright (C) 2013, 2016 - TortoiseGit
 // Copyright (C) 2003-2008,2011 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -20,14 +21,8 @@
 #include "Resource.h"
 #include "StandAloneDlg.h"
 
-const UINT TaskBarButtonCreated = RegisterWindowMessage(L"TaskbarButtonCreated");
-
-BEGIN_TEMPLATE_MESSAGE_MAP(CStandAloneDialogTmpl, BaseType, BaseType)
-	ON_REGISTERED_MESSAGE(TaskBarButtonCreated, OnTaskbarButtonCreated)
-END_MESSAGE_MAP()
-
 IMPLEMENT_DYNAMIC(CStandAloneDialog, CStandAloneDialogTmpl<CDialog>)
-CStandAloneDialog::CStandAloneDialog(UINT nIDTemplate, CWnd* pParentWnd /*= NULL*/)
+CStandAloneDialog::CStandAloneDialog(UINT nIDTemplate, CWnd* pParentWnd /*= nullptr*/)
 : CStandAloneDialogTmpl<CDialog>(nIDTemplate, pParentWnd)
 {
 }
@@ -35,7 +30,7 @@ BEGIN_MESSAGE_MAP(CStandAloneDialog, CStandAloneDialogTmpl<CDialog>)
 END_MESSAGE_MAP()
 
 IMPLEMENT_DYNAMIC(CStateStandAloneDialog, CStandAloneDialogTmpl<CStateDialog>)
-CStateStandAloneDialog::CStateStandAloneDialog(UINT nIDTemplate, CWnd* pParentWnd /*= NULL*/)
+CStateStandAloneDialog::CStateStandAloneDialog(UINT nIDTemplate, CWnd* pParentWnd /*= nullptr*/)
 : CStandAloneDialogTmpl<CStateDialog>(nIDTemplate, pParentWnd)
 {
 }
@@ -44,11 +39,26 @@ BEGIN_MESSAGE_MAP(CStateStandAloneDialog, CStandAloneDialogTmpl<CStateDialog>)
 END_MESSAGE_MAP()
 
 IMPLEMENT_DYNAMIC(CResizableStandAloneDialog, CDialog)
-CResizableStandAloneDialog::CResizableStandAloneDialog(UINT nIDTemplate, CWnd* pParentWnd /*= NULL*/)
+CResizableStandAloneDialog::CResizableStandAloneDialog(UINT nIDTemplate, CWnd* pParentWnd /*= nullptr*/)
 	: CStandAloneDialogTmpl<CResizableDialog>(nIDTemplate, pParentWnd)
 	, m_bVertical(false)
 	, m_bHorizontal(false)
+	, m_nResizeBlock(0)
+	, m_height(0)
+	, m_width(0)
 {
+}
+
+BOOL CResizableStandAloneDialog::OnInitDialog()
+{
+	__super::OnInitDialog();
+
+	RECT rect;
+	GetWindowRect(&rect);
+	m_height = rect.bottom - rect.top;
+	m_width = rect.right - rect.left;
+
+	return FALSE;
 }
 
 BEGIN_MESSAGE_MAP(CResizableStandAloneDialog, CStandAloneDialogTmpl<CResizableDialog>)

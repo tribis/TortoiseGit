@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2003-2007, 2011-2012, 2014-2015 - TortoiseSVN
+// Copyright (C) 2003-2007, 2011-2012, 2014-2017 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -84,7 +84,7 @@ public:
 	~CResModule(void);
 
 	BOOL    ExtractResources(LPCTSTR lpszSrcLangDllPath, LPCTSTR lpszPOFilePath, BOOL bNoUpdate, LPCTSTR lpszHeaderFile);
-	BOOL    ExtractResources(std::vector<std::wstring> filelist, LPCTSTR lpszPOFilePath, BOOL bNoUpdate, LPCTSTR lpszHeaderFile);
+	BOOL    ExtractResources(const std::vector<std::wstring>& filelist, LPCTSTR lpszPOFilePath, BOOL bNoUpdate, LPCTSTR lpszHeaderFile);
 	BOOL    CreateTranslatedResources(LPCTSTR lpszSrcLangDllPath, LPCTSTR lpszDestLangDllPath, LPCTSTR lpszPOFilePath);
 	void    SetQuiet(BOOL bQuiet = TRUE) {m_bQuiet = bQuiet; m_StringEntries.SetQuiet(bQuiet);}
 	void    SetLanguage(WORD wLangID) {m_wTargetLang = wLangID;}
@@ -106,6 +106,9 @@ private:
 	BOOL    ReplaceAccelerator(LPCTSTR lpszType, WORD wLanguage);
 	BOOL    ReplaceRibbon(LPCTSTR lpszType, WORD wLanguage);
 
+	std::wstring ReplaceWithRegex(WCHAR* pBuf);
+	std::wstring ReplaceWithRegex(std::wstring& s);
+
 	const WORD* ParseMenuResource(const WORD * res);
 	const WORD* CountMemReplaceMenuResource(const WORD * res, size_t * wordcount, WORD * newMenu);
 	const WORD* ParseMenuExResource(const WORD * res);
@@ -119,6 +122,8 @@ private:
 
 	size_t  ScanHeaderFile(const std::wstring& filepath);
 	void    InsertResourceIDs(LPCWSTR lpType, INT_PTR mainId, RESOURCEENTRY& entry, INT_PTR id, LPCWSTR infotext);
+	bool    AdjustCheckSum(const std::wstring& resFile);
+	void    RemoveSignatures(LPCTSTR lpszDestLangDllPath);
 
 	HMODULE         m_hResDll;
 	HANDLE          m_hUpdateRes;

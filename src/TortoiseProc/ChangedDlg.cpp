@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2016 - TortoiseGit
+// Copyright (C) 2008-2018 - TortoiseGit
 // Copyright (C) 2003-2008 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -27,10 +27,8 @@
 #include "IconMenu.h"
 #include "RefLogDlg.h"
 
-#include "GitStatusListCtrl.h"
-
 IMPLEMENT_DYNAMIC(CChangedDlg, CResizableStandAloneDialog)
-CChangedDlg::CChangedDlg(CWnd* pParent /*=NULL*/)
+CChangedDlg::CChangedDlg(CWnd* pParent /*=nullptr*/)
 	: CResizableStandAloneDialog(CChangedDlg::IDD, pParent)
 	, m_bShowUnversioned(FALSE)
 	, m_iShowUnmodified(0)
@@ -39,8 +37,8 @@ CChangedDlg::CChangedDlg(CWnd* pParent /*=NULL*/)
 	, m_bShowIgnored(FALSE)
 	, m_bShowLocalChangesIgnored(FALSE)
 	, m_bWholeProject(FALSE)
+	, m_bRemote(FALSE)
 {
-	m_bRemote = FALSE;
 }
 
 CChangedDlg::~CChangedDlg()
@@ -78,18 +76,24 @@ BOOL CChangedDlg::OnInitDialog()
 {
 	CResizableStandAloneDialog::OnInitDialog();
 
-	m_regAddBeforeCommit = CRegDWORD(_T("Software\\TortoiseGit\\AddBeforeCommit"), TRUE);
+	m_regAddBeforeCommit = CRegDWORD(L"Software\\TortoiseGit\\AddBeforeCommit", TRUE);
 	m_bShowUnversioned = m_regAddBeforeCommit;
 
 	CString regPath(g_Git.m_CurrentDir);
-	regPath.Replace(_T(":"), _T("_"));
-	m_regShowWholeProject = CRegDWORD(_T("Software\\TortoiseGit\\TortoiseProc\\ShowWholeProject\\") + regPath, FALSE);
+	regPath.Replace(L':', L'_');
+	m_regShowWholeProject = CRegDWORD(L"Software\\TortoiseGit\\TortoiseProc\\ShowWholeProject\\" + regPath, FALSE);
 	m_bWholeProject = m_regShowWholeProject;
 	SetDlgTitle();
 
+	if (m_pathList.GetCount() == 1 && m_pathList[0].GetWinPathString().IsEmpty())
+	{
+		m_bWholeProject = BST_CHECKED;
+		DialogEnableWindow(IDC_WHOLE_PROJECT, FALSE);
+	}
+
 	UpdateData(FALSE);
 
-	m_FileListCtrl.Init(GITSLC_COLEXT | GITSLC_COLSTATUS | GITSLC_COLADD| GITSLC_COLDEL | GITSLC_COLMODIFICATIONDATE, _T("ChangedDlg"), (GITSLC_POPALL ^ (GITSLC_POPSAVEAS | GITSLC_POPRESTORE | GITSLC_PREPAREDIFF)), false);
+	m_FileListCtrl.Init(GITSLC_COLEXT | GITSLC_COLSTATUS | GITSLC_COLADD| GITSLC_COLDEL | GITSLC_COLMODIFICATIONDATE, L"ChangedDlg", (GITSLC_POPALL ^ (GITSLC_POPSAVEAS | GITSLC_POPRESTORE | GITSLC_POPPREPAREDIFF)), false);
 	m_FileListCtrl.SetCancelBool(&m_bCanceled);
 	m_FileListCtrl.SetBackgroundImage(IDI_CFM_BKG);
 	m_FileListCtrl.SetEmptyString(IDS_REPOSTATUS_EMPTYFILELIST);
@@ -114,17 +118,19 @@ BOOL CChangedDlg::OnInitDialog()
 	AddAnchor(IDC_REFRESH, BOTTOM_RIGHT);
 	AddAnchor(IDOK, BOTTOM_RIGHT);
 //	SetPromptParentWindow(m_hWnd);
-	if (hWndExplorer)
-		CenterWindow(CWnd::FromHandle(hWndExplorer));
-	EnableSaveRestore(_T("ChangedDlg"));
+	if (GetExplorerHWND())
+		CenterWindow(CWnd::FromHandle(GetExplorerHWND()));
+	EnableSaveRestore(L"ChangedDlg");
 
-	m_bRemote = !!(DWORD)CRegDWORD(_T("Software\\TortoiseGit\\CheckRepo"), FALSE);
+	m_ctrlStash.m_bAlwaysShowArrow = true;
+
+	m_bRemote = !!(DWORD)CRegDWORD(L"Software\\TortoiseGit\\CheckRepo", FALSE);
 
 	// first start a thread to obtain the status without
 	// blocking the dialog
-	if (AfxBeginThread(ChangedStatusThreadEntry, this)==NULL)
+	if (!AfxBeginThread(ChangedStatusThreadEntry, this))
 	{
-		CMessageBox::Show(NULL, IDS_ERR_THREADSTARTFAILED, IDS_APPNAME, MB_OK | MB_ICONERROR);
+		CMessageBox::Show(GetSafeHwnd(), IDS_ERR_THREADSTARTFAILED, IDS_APPNAME, MB_OK | MB_ICONERROR);
 	}
 
 	return TRUE;
@@ -132,14 +138,12 @@ BOOL CChangedDlg::OnInitDialog()
 
 UINT CChangedDlg::ChangedStatusThreadEntry(LPVOID pVoid)
 {
-	return ((CChangedDlg*)pVoid)->ChangedStatusThread();
+	return reinterpret_cast<CChangedDlg*>(pVoid)->ChangedStatusThread();
 }
 
 UINT CChangedDlg::ChangedStatusThread()
 {
 	InterlockedExchange(&m_bBlock, TRUE);
-
-	g_Git.RefreshGitIndex();
 
 	m_bCanceled = false;
 	SetDlgItemText(IDOK, CString(MAKEINTRESOURCE(IDS_MSGBOX_CANCEL)));
@@ -148,14 +152,17 @@ UINT CChangedDlg::ChangedStatusThread()
 	DialogEnableWindow(IDC_SHOWUNMODIFIED, FALSE);
 	DialogEnableWindow(IDC_SHOWIGNORED, FALSE);
 	DialogEnableWindow(IDC_SHOWLOCALCHANGESIGNORED, FALSE);
-	CString temp;
+
+	g_Git.RefreshGitIndex();
+
+	m_FileListCtrl.StoreScrollPos();
 	m_FileListCtrl.Clear();
 	if (!m_FileListCtrl.GetStatus(m_bWholeProject ? nullptr : &m_pathList, m_bRemote, m_bShowIgnored != FALSE, m_bShowUnversioned != FALSE, m_bShowLocalChangesIgnored != FALSE))
 	{
 		if (!m_FileListCtrl.GetLastErrorMessage().IsEmpty())
 			m_FileListCtrl.SetEmptyString(m_FileListCtrl.GetLastErrorMessage());
 	}
-	unsigned int dwShow = GITSLC_SHOWVERSIONEDBUTNORMALANDEXTERNALS | GITSLC_SHOWLOCKS | GITSLC_SHOWSWITCHED | GITSLC_SHOWINCHANGELIST;
+	unsigned int dwShow = GITSLC_SHOWVERSIONEDBUTNORMALANDEXTERNALS | GITSLC_SHOWSWITCHED | GITSLC_SHOWINCHANGELIST;
 	dwShow |= m_bShowUnversioned ? GITSLC_SHOWUNVERSIONED : 0;
 	dwShow |= m_iShowUnmodified ? GITSLC_SHOWNORMAL : 0;
 	dwShow |= m_bShowIgnored ? GITSLC_SHOWIGNORED : 0;
@@ -176,7 +183,7 @@ UINT CChangedDlg::ChangedStatusThread()
 	DialogEnableWindow(IDC_SHOWLOCALCHANGESIGNORED, TRUE);
 	InterlockedExchange(&m_bBlock, FALSE);
 	// revert the remote flag back to the default
-	m_bRemote = !!(DWORD)CRegDWORD(_T("Software\\TortoiseGit\\CheckRepo"), FALSE);
+	m_bRemote = !!(DWORD)CRegDWORD(L"Software\\TortoiseGit\\CheckRepo", FALSE);
 	RefreshCursor();
 	return 0;
 }
@@ -249,16 +256,15 @@ void CChangedDlg::OnBnClickedShowunversioned()
 	m_regAddBeforeCommit = m_bShowUnversioned;
 	if(m_FileListCtrl.m_FileLoaded & CGitStatusListCtrl::FILELIST_UNVER)
 	{
+		m_FileListCtrl.StoreScrollPos();
 		m_FileListCtrl.Show(UpdateShowFlags());
 	}
 	else
 	{
 		if(m_bShowUnversioned)
 		{
-			if (AfxBeginThread(ChangedStatusThreadEntry, this)==NULL)
-			{
-				CMessageBox::Show(NULL, IDS_ERR_THREADSTARTFAILED, IDS_APPNAME, MB_OK | MB_ICONERROR);
-			}
+			if (!AfxBeginThread(ChangedStatusThreadEntry, this))
+				CMessageBox::Show(GetSafeHwnd(), IDS_ERR_THREADSTARTFAILED, IDS_APPNAME, MB_OK | MB_ICONERROR);
 		}
 	}
 	UpdateStatistics();
@@ -267,6 +273,7 @@ void CChangedDlg::OnBnClickedShowunversioned()
 void CChangedDlg::OnBnClickedShowUnmodified()
 {
 	UpdateData();
+	m_FileListCtrl.StoreScrollPos();
 	m_FileListCtrl.Show(UpdateShowFlags());
 	m_regAddBeforeCommit = m_bShowUnversioned;
 	UpdateStatistics();
@@ -275,12 +282,13 @@ void CChangedDlg::OnBnClickedShowUnmodified()
 void CChangedDlg::OnBnClickedShowignored()
 {
 	UpdateData();
+	m_FileListCtrl.StoreScrollPos();
 	if (m_FileListCtrl.m_FileLoaded & CGitStatusListCtrl::FILELIST_IGNORE)
 		m_FileListCtrl.Show(UpdateShowFlags());
 	else if (m_bShowIgnored)
 	{
-		if (AfxBeginThread(ChangedStatusThreadEntry, this) == nullptr)
-			CMessageBox::Show(NULL, IDS_ERR_THREADSTARTFAILED, IDS_APPNAME, MB_OK | MB_ICONERROR);
+		if (!AfxBeginThread(ChangedStatusThreadEntry, this))
+			CMessageBox::Show(GetSafeHwnd(), IDS_ERR_THREADSTARTFAILED, IDS_APPNAME, MB_OK | MB_ICONERROR);
 	}
 	UpdateStatistics();
 }
@@ -288,22 +296,21 @@ void CChangedDlg::OnBnClickedShowignored()
 void CChangedDlg::OnBnClickedShowlocalchangesignored()
 {
 	UpdateData();
+	m_FileListCtrl.StoreScrollPos();
 	if (m_FileListCtrl.m_FileLoaded & CGitStatusListCtrl::FILELIST_LOCALCHANGESIGNORED)
 		m_FileListCtrl.Show(UpdateShowFlags());
 	else if (m_bShowLocalChangesIgnored)
 	{
-		if (AfxBeginThread(ChangedStatusThreadEntry, this) == nullptr)
-			CMessageBox::Show(nullptr, IDS_ERR_THREADSTARTFAILED, IDS_APPNAME, MB_OK | MB_ICONERROR);
+		if (!AfxBeginThread(ChangedStatusThreadEntry, this))
+			CMessageBox::Show(GetSafeHwnd(), IDS_ERR_THREADSTARTFAILED, IDS_APPNAME, MB_OK | MB_ICONERROR);
 	}
 	UpdateStatistics();
 }
 
 LRESULT CChangedDlg::OnSVNStatusListCtrlNeedsRefresh(WPARAM, LPARAM)
 {
-	if (AfxBeginThread(ChangedStatusThreadEntry, this)==NULL)
-	{
-		CMessageBox::Show(NULL, IDS_ERR_THREADSTARTFAILED, IDS_APPNAME, MB_OK | MB_ICONERROR);
-	}
+	if (!AfxBeginThread(ChangedStatusThreadEntry, this))
+		CMessageBox::Show(GetSafeHwnd(), IDS_ERR_THREADSTARTFAILED, IDS_APPNAME, MB_OK | MB_ICONERROR);
 	return 0;
 }
 
@@ -323,9 +330,9 @@ BOOL CChangedDlg::PreTranslateMessage(MSG* pMsg)
 			{
 				if (m_bBlock)
 					return CResizableStandAloneDialog::PreTranslateMessage(pMsg);
-				if (AfxBeginThread(ChangedStatusThreadEntry, this)==NULL)
+				if (!AfxBeginThread(ChangedStatusThreadEntry, this))
 				{
-					CMessageBox::Show(NULL, IDS_ERR_THREADSTARTFAILED, IDS_APPNAME, MB_OK | MB_ICONERROR);
+					CMessageBox::Show(GetSafeHwnd(), IDS_ERR_THREADSTARTFAILED, IDS_APPNAME, MB_OK | MB_ICONERROR);
 				}
 			}
 			break;
@@ -339,48 +346,39 @@ void CChangedDlg::OnBnClickedRefresh()
 {
 	if (!m_bBlock)
 	{
-		if (AfxBeginThread(ChangedStatusThreadEntry, this)==NULL)
-		{
-			CMessageBox::Show(NULL, IDS_ERR_THREADSTARTFAILED, IDS_APPNAME, MB_OK | MB_ICONERROR);
-		}
+		if (!AfxBeginThread(ChangedStatusThreadEntry, this))
+			CMessageBox::Show(GetSafeHwnd(), IDS_ERR_THREADSTARTFAILED, IDS_APPNAME, MB_OK | MB_ICONERROR);
 	}
 }
 
 void CChangedDlg::UpdateStatistics()
 {
-	CString temp;
-#if 0
-	LONG lMin, lMax;
-
-	m_FileListCtrl.GetMinMaxRevisions(lMin, lMax, true, false);
-	if (LONG(m_FileListCtrl.m_HeadRev) >= 0)
-	{
-		temp.Format(IDS_REPOSTATUS_HEADREV, lMin, lMax, LONG(m_FileListCtrl.m_HeadRev));
-		SetDlgItemText(IDC_SUMMARYTEXT, temp);
-	}
-	else
-	{
-		temp.Format(IDS_REPOSTATUS_WCINFO, lMin, lMax);
-		SetDlgItemText(IDC_SUMMARYTEXT, temp);
-	}
-#endif
-	temp = m_FileListCtrl.GetStatisticsString();
-	temp.Replace(_T(" = "), _T("="));
-	temp.Replace(_T("\n"), _T(", "));
+	CString temp = m_FileListCtrl.GetStatisticsString();
+	temp.Replace(L" = ", L"=");
+	temp.Replace(L"\n", L", ");
 	SetDlgItemText(IDC_INFOLABEL, temp);
-
 }
 
 void CChangedDlg::OnBnClickedCommit()
 {
-	CString cmd = _T("/command:commit /path:\"");
-	bool bSingleFile = ((m_pathList.GetCount()==1)&&(!m_pathList[0].IsEmpty())&&(!m_pathList[0].IsDirectory()));
+	CTGitPathList pathList;
+	bool bSingleFile = (m_pathList.GetCount() >= 1 && !m_pathList[0].IsEmpty() && !m_pathList[0].IsDirectory());
 	if (bSingleFile)
-		cmd += m_pathList[0].GetWinPathString();
+		pathList.AddPath(m_pathList[0]);
 	else
-		cmd += g_Git.CombinePath(m_pathList.GetCommonRoot().GetDirectory());
-	cmd += _T("\"");
-	CAppUtils::RunTortoiseGitProc(cmd);
+		pathList.AddPath(m_pathList.GetCommonRoot().GetDirectory());
+
+	bool bSelectFilesForCommit = !!DWORD(CRegStdDWORD(L"Software\\TortoiseGit\\SelectFilesForCommit", TRUE));
+
+	CString logmsg;
+	CAppUtils::Commit(GetSafeHwnd(),
+		L"",
+		m_bWholeProject,
+		logmsg,
+		pathList,
+		bSelectFilesForCommit);
+
+	OnBnClickedRefresh();
 }
 
 void CChangedDlg::OnBnClickedStash()
@@ -389,35 +387,38 @@ void CChangedDlg::OnBnClickedStash()
 
 	if (popup.CreatePopupMenu())
 	{
-		popup.AppendMenuIcon(ID_STASH_SAVE, IDS_MENUSTASHSAVE, IDI_COMMIT);
+		popup.AppendMenuIcon(ID_STASH_SAVE, IDS_MENUSTASHSAVE, IDI_SHELVE);
 
 		CTGitPath root = g_Git.m_CurrentDir;
 		if (root.HasStashDir())
 		{
-			popup.AppendMenuIcon(ID_STASH_POP, IDS_MENUSTASHPOP, IDI_RELOCATE);
-			popup.AppendMenuIcon(ID_STASH_APPLY, IDS_MENUSTASHAPPLY, IDI_RELOCATE);
+			popup.AppendMenuIcon(ID_STASH_POP, IDS_MENUSTASHPOP, IDI_UNSHELVE);
+			popup.AppendMenuIcon(ID_STASH_APPLY, IDS_MENUSTASHAPPLY, IDI_UNSHELVE);
 			popup.AppendMenuIcon(ID_STASH_LIST, IDS_MENUSTASHLIST, IDI_LOG);
 		}
 
-		POINT cursorPos;
-		GetCursorPos(&cursorPos);
-		int cmd = popup.TrackPopupMenu(TPM_RETURNCMD | TPM_LEFTALIGN | TPM_NONOTIFY, cursorPos.x, cursorPos.y, this, 0);
+		RECT rect;
+		GetDlgItem(IDC_BUTTON_STASH)->GetWindowRect(&rect);
+		TPMPARAMS params;
+		params.cbSize = sizeof(TPMPARAMS);
+		params.rcExclude = rect;
+		int cmd = popup.TrackPopupMenuEx(TPM_RETURNCMD | TPM_LEFTALIGN | TPM_NONOTIFY | TPM_VERTICAL, rect.left, rect.top, this, &params);
 
 		switch (cmd & 0xFFFF)
 		{
 		case ID_STASH_SAVE:
-			CAppUtils::StashSave();
+			CAppUtils::StashSave(GetSafeHwnd());
 			break;
 		case ID_STASH_POP:
-			CAppUtils::StashPop(2);
+			CAppUtils::StashPop(GetSafeHwnd(), 2);
 			break;
 		case ID_STASH_APPLY:
-			CAppUtils::StashApply(_T(""), false);
+			CAppUtils::StashApply(GetSafeHwnd(), L"", false);
 			break;
 		case ID_STASH_LIST:
 			{
 				CRefLogDlg dlg;
-				dlg.m_CurrentBranch = _T("refs/stash");
+				dlg.m_CurrentBranch = L"refs/stash";
 				dlg.DoModal();
 			}
 			break;
@@ -436,7 +437,11 @@ void CChangedDlg::OnBnClickedButtonUnifieddiff()
 	bool bSingleFile = ((m_pathList.GetCount()==1)&&(!m_pathList[0].IsEmpty())&&(!m_pathList[0].IsDirectory()));
 	if (bSingleFile)
 		commonDirectory = m_pathList[0];
-	CAppUtils::StartShowUnifiedDiff(m_hWnd, commonDirectory, GitRev::GetHead(), commonDirectory, GitRev::GetWorkingCopy());
+	CString sCmd;
+	sCmd.Format(L"/command:showcompare /unified /path:\"%s\" /revision1:HEAD /revision2:%s", (LPCTSTR)g_Git.CombinePath(commonDirectory), (LPCTSTR)GitRev::GetWorkingCopy());
+	if (!!(GetAsyncKeyState(VK_SHIFT) & 0x8000))
+		sCmd += L" /alternative";
+	CAppUtils::RunTortoiseGitProc(sCmd);
 }
 
 void CChangedDlg::OnBnClickedWholeProject()

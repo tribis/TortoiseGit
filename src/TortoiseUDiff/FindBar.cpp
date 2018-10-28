@@ -1,7 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2012-2013, 2015 - TortoiseGit
-// Copyright (C) 2003-2007, 2012-2013 - TortoiseSVN
+// Copyright (C) 2012-2013, 2015-2016 - TortoiseGit
+// Copyright (C) 2003-2007, 2012-2013, 2018 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -23,10 +23,11 @@
 #include "registry.h"
 #include <string>
 #include <Commdlg.h>
+#include "LoadIconEx.h"
 
 CFindBar::CFindBar()
-	: m_hParent(NULL)
-	, m_hIcon(NULL)
+	: m_hParent(nullptr)
+	, m_hIcon(nullptr)
 {
 }
 
@@ -41,7 +42,7 @@ LRESULT CFindBar::DlgFunc(HWND /*hwndDlg*/, UINT uMsg, WPARAM wParam, LPARAM /*l
 	{
 	case WM_INITDIALOG:
 		{
-			m_hIcon = (HICON)::LoadImage(hResource, MAKEINTRESOURCE(IDI_CANCELNORMAL), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
+			m_hIcon = LoadIconEx(hResource, MAKEINTRESOURCE(IDI_CANCELNORMAL));
 			SendMessage(GetDlgItem(*this, IDC_FINDEXIT), BM_SETIMAGE, IMAGE_ICON, (LPARAM)m_hIcon);
 		}
 		return TRUE;
@@ -90,7 +91,7 @@ void CFindBar::DoFind(bool bFindPrev)
 	if (!::GetWindowText(GetDlgItem(*this, IDC_FINDTEXT), findtext.get(), len + 1))
 		return;
 	std::wstring ft = std::wstring(findtext.get());
-	const bool bCaseSensitive = !!SendMessage(GetDlgItem(*this, IDC_MATCHCASECHECK), BM_GETCHECK, 0, NULL);
+	const bool bCaseSensitive = !!SendMessage(GetDlgItem(*this, IDC_MATCHCASECHECK), BM_GETCHECK, 0, 0);
 	const UINT message = bFindPrev ? COMMITMONITOR_FINDMSGPREV : COMMITMONITOR_FINDMSGNEXT;
 	::SendMessage(m_hParent, message, (WPARAM)bCaseSensitive, (LPARAM)ft.c_str());
 }

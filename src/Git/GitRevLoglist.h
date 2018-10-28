@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2016 - TortoiseGit
+// Copyright (C) 2008-2018 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -19,13 +19,16 @@
 
 #pragma once
 #include "GitRev.h"
+#include "TGitPath.h"
+#include "gitdll.h"
 
 class CGit;
 extern CGit g_Git;
 class GitRevLoglist;
 class CLogCache;
+class IAsyncDiffCB;
 
-typedef int CALL_UPDATE_DIFF_ASYNC(GitRevLoglist* pRev, void* data);
+typedef int CALL_UPDATE_DIFF_ASYNC(GitRevLoglist* pRev, IAsyncDiffCB* data);
 
 class GitRevLoglist : public GitRev
 {
@@ -37,7 +40,7 @@ public:
 
 protected:
 	int				m_RebaseAction;
-	int				m_Action;
+	unsigned int	m_Action;
 	CTGitPathList	m_Files;
 	CTGitPathList	m_UnRevFiles;
 
@@ -75,7 +78,7 @@ public:
 	}
 
 public:
-	int& GetAction(void* data)
+	unsigned int& GetAction(IAsyncDiffCB* data)
 	{
 		CheckAndParser();
 		if (!m_IsDiffFiles && m_CallDiffAsync)
@@ -90,7 +93,7 @@ public:
 		return m_RebaseAction;
 	}
 
-	CTGitPathList& GetFiles(void* data)
+	CTGitPathList& GetFiles(IAsyncDiffCB* data)
 	{
 		CheckAndParser();
 		if (data && !m_IsDiffFiles && m_CallDiffAsync)
@@ -173,23 +176,23 @@ public:
 		CString ret(m_Subject);
 		if (!crlf)
 		{
-			ret += _T("\n\n");
+			ret += L"\n";
 			ret += m_Body;
 		}
 		else
 		{
 			ret.TrimRight();
-			ret += _T("\r\n\r\n");
+			ret += L"\r\n";
 			CString body(m_Body);
-			body.Replace(_T("\n"), _T("\r\n"));
+			body.Replace(L"\n", L"\r\n");
 			ret += body.TrimRight();
 		}
 		return ret;
 	}
 
-	BOOL IsBoundary() { return m_Mark == _T('-'); }
+	BOOL IsBoundary() { return m_Mark == L'-'; }
 
-	virtual void Clear();
+	virtual void Clear() override;
 
 	int SafeFetchFullInfo(CGit* git);
 

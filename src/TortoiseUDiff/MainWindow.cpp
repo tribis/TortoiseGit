@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2012-2015 - TortoiseGit
+// Copyright (C) 2012-2018 - TortoiseGit
 // Copyright (C) 2003-2014 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -26,18 +26,20 @@
 #include "CreateProcessHelper.h"
 #include "UDiffColors.h"
 #include "registry.h"
+#include "DPIAware.h"
+#include "LoadIconEx.h"
 
 const UINT TaskBarButtonCreated = RegisterWindowMessage(L"TaskbarButtonCreated");
 
-CMainWindow::CMainWindow(HINSTANCE hInst, const WNDCLASSEX* wcx /* = NULL*/)
+CMainWindow::CMainWindow(HINSTANCE hInst, const WNDCLASSEX* wcx /* = nullptr*/)
 	: CWindow(hInst, wcx)
 	, m_bShowFindBar(false)
 	, m_directFunction(0)
 	, m_directPointer(0)
-	, m_hWndEdit(NULL)
+	, m_hWndEdit(nullptr)
 	, m_bMatchCase(false)
 {
-	SetWindowTitle(_T("TortoiseGitUDiff"));
+	SetWindowTitle(L"TortoiseGitUDiff");
 }
 
 CMainWindow::~CMainWindow(void)
@@ -55,16 +57,16 @@ bool CMainWindow::RegisterAndCreateWindow()
 	wcx.cbClsExtra = 0;
 	wcx.cbWndExtra = 0;
 	wcx.hInstance = hResource;
-	wcx.hCursor = NULL;
+	wcx.hCursor = nullptr;
 	ResString clsname(hResource, IDS_APP_TITLE);
 	wcx.lpszClassName = clsname;
-	wcx.hIcon = LoadIcon(hResource, MAKEINTRESOURCE(IDI_TORTOISEUDIFF));
+	wcx.hIcon = LoadIconEx(hResource, MAKEINTRESOURCE(IDI_TORTOISEUDIFF), GetSystemMetrics(SM_CXICON), GetSystemMetrics(SM_CYICON));
 	wcx.hbrBackground = (HBRUSH)(COLOR_3DFACE+1);
 	wcx.lpszMenuName = MAKEINTRESOURCE(IDC_TORTOISEUDIFF);
-	wcx.hIconSm = LoadIcon(wcx.hInstance, MAKEINTRESOURCE(IDI_TORTOISEUDIFF));
+	wcx.hIconSm = LoadIconEx(wcx.hInstance, MAKEINTRESOURCE(IDI_TORTOISEUDIFF));
 	if (RegisterWindow(&wcx))
 	{
-		if (Create(WS_CAPTION | WS_MAXIMIZEBOX | WS_MINIMIZEBOX | WS_SIZEBOX | WS_SYSMENU | WS_CLIPCHILDREN, NULL))
+		if (Create(WS_CAPTION | WS_MAXIMIZEBOX | WS_MINIMIZEBOX | WS_SIZEBOX | WS_SYSMENU | WS_CLIPCHILDREN, nullptr))
 		{
 			m_FindBar.SetParent(*this);
 			m_FindBar.Create(::hResource, IDD_FINDBAR, *this);
@@ -113,11 +115,11 @@ LRESULT CALLBACK CMainWindow::WinMsgHandler(HWND hwnd, UINT uMsg, WPARAM wParam,
 			{
 				::SetWindowPos(m_hWndEdit, HWND_TOP,
 					rect.left, rect.top,
-					rect.right-rect.left, rect.bottom-rect.top-30,
+					rect.right - rect.left, rect.bottom - rect.top - int(30 * CDPIAware::Instance().ScaleFactorY()),
 					SWP_SHOWWINDOW);
 				::SetWindowPos(m_FindBar, HWND_TOP,
-					rect.left, rect.bottom-30,
-					rect.right-rect.left, 30,
+					rect.left, rect.bottom - int(30 * CDPIAware::Instance().ScaleFactorY()),
+					rect.right - rect.left, int(30 * CDPIAware::Instance().ScaleFactorY()),
 					SWP_SHOWWINDOW);
 			}
 			else
@@ -146,6 +148,9 @@ LRESULT CALLBACK CMainWindow::WinMsgHandler(HWND hwnd, UINT uMsg, WPARAM wParam,
 		break;
 	case WM_SETFOCUS:
 		SetFocus(m_hWndEdit);
+		break;
+	case WM_SYSCOLORCHANGE:
+		SetupColors(true);
 		break;
 	case COMMITMONITOR_FINDMSGNEXT:
 		{
@@ -214,11 +219,11 @@ LRESULT CMainWindow::DoCommand(int id)
 			GetClientRect(*this, &rect);
 			::SetWindowPos(m_hWndEdit, HWND_TOP,
 				rect.left, rect.top,
-				rect.right-rect.left, rect.bottom-rect.top-30,
+				rect.right - rect.left, rect.bottom - rect.top - int(30 * CDPIAware::Instance().ScaleFactorY()),
 				SWP_SHOWWINDOW);
 			::SetWindowPos(m_FindBar, HWND_TOP,
-				rect.left, rect.bottom-30,
-				rect.right-rect.left, 30,
+				rect.left, rect.bottom - int(30 * CDPIAware::Instance().ScaleFactorY()),
+				rect.right - rect.left, int(30 * CDPIAware::Instance().ScaleFactorY()),
 				SWP_SHOWWINDOW);
 			::SetFocus(m_FindBar);
 			SendEditor(SCI_SETSELECTIONSTART, 0);
@@ -253,7 +258,7 @@ LRESULT CMainWindow::DoCommand(int id)
 		break;
 	case ID_FILE_SETTINGS:
 		{
-			tstring gitCmd = _T(" /command:settings /page:udiff");
+			tstring gitCmd = L" /command:settings /page:udiff";
 			RunCommand(gitCmd);
 		}
 		break;
@@ -261,9 +266,9 @@ LRESULT CMainWindow::DoCommand(int id)
 		{
 			std::wstring command = L" /diff:\"";
 			command += m_filename;
-			command += L"\"";
-			std::wstring tortoiseMergePath = GetAppDirectory() + _T("TortoiseGitMerge.exe");
-			CCreateProcessHelper::CreateProcessDetached(tortoiseMergePath.c_str(), const_cast<TCHAR*>(command.c_str()));
+			command += L'"';
+			std::wstring tortoiseMergePath = GetAppDirectory() + L"TortoiseGitMerge.exe";
+			CCreateProcessHelper::CreateProcessDetached(tortoiseMergePath.c_str(), command.c_str());
 		}
 		break;
 	case ID_FILE_PAGESETUP:
@@ -276,7 +281,7 @@ LRESULT CMainWindow::DoCommand(int id)
 			PAGESETUPDLG pdlg = {0};
 			pdlg.lStructSize = sizeof(PAGESETUPDLG);
 			pdlg.hwndOwner = *this;
-			pdlg.hInstance = NULL;
+			pdlg.hInstance = nullptr;
 			pdlg.Flags = PSD_DEFAULTMINMARGINS|PSD_MARGINS|PSD_DISABLEPAPER|PSD_DISABLEORIENTATION;
 			if (localeInfo[0] == '0')
 				pdlg.Flags |= PSD_INHUNDREDTHSOFMILLIMETERS;
@@ -305,7 +310,7 @@ LRESULT CMainWindow::DoCommand(int id)
 			PRINTDLGEX pdlg = {0};
 			pdlg.lStructSize = sizeof(PRINTDLGEX);
 			pdlg.hwndOwner = *this;
-			pdlg.hInstance = NULL;
+			pdlg.hInstance = nullptr;
 			pdlg.Flags = PD_USEDEVMODECOPIESANDCOLLATE | PD_ALLPAGES | PD_RETURNDC | PD_NOCURRENTPAGE | PD_NOPAGENUMS;
 			pdlg.nMinPage = 1;
 			pdlg.nMaxPage = 0xffffU; // We do not know how many pages in the document
@@ -314,8 +319,8 @@ LRESULT CMainWindow::DoCommand(int id)
 			pdlg.nStartPage = START_PAGE_GENERAL;
 
 			// See if a range has been selected
-			size_t startPos = SendEditor(SCI_GETSELECTIONSTART);
-			size_t endPos = SendEditor(SCI_GETSELECTIONEND);
+			auto startPos = (Sci_Position)SendEditor(SCI_GETSELECTIONSTART);
+			auto endPos = (Sci_Position)SendEditor(SCI_GETSELECTIONEND);
 
 			if (startPos == endPos)
 				pdlg.Flags |= PD_NOSELECTION;
@@ -327,16 +332,16 @@ LRESULT CMainWindow::DoCommand(int id)
 				return 0;
 
 			// reset all indicators
-			size_t endpos = SendEditor(SCI_GETLENGTH);
+			auto endpos = (int)SendEditor(SCI_GETLENGTH);
 			for (int i = INDIC_CONTAINER; i <= INDIC_MAX; ++i)
 			{
 				SendEditor(SCI_SETINDICATORCURRENT, i);
 				SendEditor(SCI_INDICATORCLEARRANGE, 0, endpos);
 			}
 			// store and reset UI settings
-			int viewws = (int)SendEditor(SCI_GETVIEWWS);
+			auto viewws = (int)SendEditor(SCI_GETVIEWWS);
 			SendEditor(SCI_SETVIEWWS, 0);
-			int edgemode = (int)SendEditor(SCI_GETEDGEMODE);
+			auto edgemode = (int)SendEditor(SCI_GETEDGEMODE);
 			SendEditor(SCI_SETEDGEMODE, EDGE_NONE);
 			SendEditor(SCI_SETWRAPVISUALFLAGS, SC_WRAPVISUALFLAG_END);
 
@@ -446,7 +451,7 @@ LRESULT CMainWindow::DoCommand(int id)
 				return 0;
 			}
 
-			size_t lengthDoc = SendEditor(SCI_GETLENGTH);
+			size_t lengthDoc = (int)SendEditor(SCI_GETLENGTH);
 			size_t lengthDocMax = lengthDoc;
 			size_t lengthPrinted = 0;
 
@@ -499,11 +504,11 @@ LRESULT CMainWindow::DoCommand(int id)
 			::EndDoc(hdc);
 			::DeleteDC(hdc);
 
-			if (pdlg.hDevMode != NULL)
+			if (pdlg.hDevMode)
 				GlobalFree(pdlg.hDevMode);
-			if (pdlg.hDevNames != NULL)
+			if (pdlg.hDevNames)
 				GlobalFree(pdlg.hDevNames);
-			if (pdlg.lpPageRanges != NULL)
+			if (pdlg.lpPageRanges)
 				GlobalFree(pdlg.lpPageRanges);
 
 			// reset the UI
@@ -527,7 +532,7 @@ std::wstring CMainWindow::GetAppDirectory()
 	{
 		bufferlen += MAX_PATH;		// MAX_PATH is not the limit here!
 		auto pBuf = std::make_unique<TCHAR[]>(bufferlen);
-		len = GetModuleFileName(NULL, pBuf.get(), bufferlen);
+		len = GetModuleFileName(nullptr, pBuf.get(), bufferlen);
 		path = std::wstring(pBuf.get(), len);
 	} while(len == bufferlen);
 	path = path.substr(0, path.rfind('\\') + 1);
@@ -537,8 +542,8 @@ std::wstring CMainWindow::GetAppDirectory()
 
 void CMainWindow::RunCommand(const std::wstring& command)
 {
-	tstring tortoiseProcPath = GetAppDirectory() + _T("TortoiseGitProc.exe");
-	CCreateProcessHelper::CreateProcessDetached(tortoiseProcPath.c_str(), const_cast<TCHAR*>(command.c_str()));
+	tstring tortoiseProcPath = GetAppDirectory() + L"TortoiseGitProc.exe";
+	CCreateProcessHelper::CreateProcessDetached(tortoiseProcPath.c_str(), command.c_str());
 }
 
 LRESULT CMainWindow::SendEditor(UINT Msg, WPARAM wParam, LPARAM lParam)
@@ -553,16 +558,16 @@ LRESULT CMainWindow::SendEditor(UINT Msg, WPARAM wParam, LPARAM lParam)
 bool CMainWindow::Initialize()
 {
 	m_hWndEdit = ::CreateWindow(
-		_T("Scintilla"),
-		_T("Source"),
+		L"Scintilla",
+		L"Source",
 		WS_CHILD | WS_VSCROLL | WS_HSCROLL | WS_CLIPCHILDREN,
 		CW_USEDEFAULT, CW_USEDEFAULT,
 		CW_USEDEFAULT, CW_USEDEFAULT,
 		*this,
-		0,
+		nullptr,
 		hResource,
-		0);
-	if (m_hWndEdit == NULL)
+		nullptr);
+	if (!m_hWndEdit)
 		return false;
 
 	RECT rect;
@@ -578,7 +583,7 @@ bool CMainWindow::Initialize()
 	// Set up the global default style. These attributes are used wherever no explicit choices are made.
 	SetAStyle(STYLE_DEFAULT, ::GetSysColor(COLOR_WINDOWTEXT), ::GetSysColor(COLOR_WINDOW),
 		CRegStdDWORD(L"Software\\TortoiseGit\\UDiffFontSize", 10),
-		CUnicodeUtils::StdGetUTF8(CRegStdString(L"Software\\TortoiseGit\\UDiffFontName", L"Courier New")).c_str());
+		CUnicodeUtils::StdGetUTF8(CRegStdString(L"Software\\TortoiseGit\\UDiffFontName", L"Consolas")).c_str());
 	SendEditor(SCI_SETTABWIDTH, CRegStdDWORD(L"Software\\TortoiseGit\\UDiffTabSize", 4));
 	SendEditor(SCI_SETREADONLY, TRUE);
 	LRESULT pix = SendEditor(SCI_TEXTWIDTH, STYLE_LINENUMBER, (LPARAM)"_99999");
@@ -586,11 +591,7 @@ bool CMainWindow::Initialize()
 	SendEditor(SCI_SETMARGINWIDTHN, 1);
 	SendEditor(SCI_SETMARGINWIDTHN, 2);
 	//Set the default windows colors for edit controls
-	SendEditor(SCI_STYLESETFORE, STYLE_DEFAULT, ::GetSysColor(COLOR_WINDOWTEXT));
-	SendEditor(SCI_STYLESETBACK, STYLE_DEFAULT, ::GetSysColor(COLOR_WINDOW));
-	SendEditor(SCI_SETSELFORE, TRUE, ::GetSysColor(COLOR_HIGHLIGHTTEXT));
-	SendEditor(SCI_SETSELBACK, TRUE, ::GetSysColor(COLOR_HIGHLIGHT));
-	SendEditor(SCI_SETCARETFORE, ::GetSysColor(COLOR_WINDOWTEXT));
+	SetupColors(false);
 	if (CRegStdDWORD(L"Software\\TortoiseGit\\ScintillaDirect2D", FALSE) != FALSE)
 	{
 		SendEditor(SCI_SETTECHNOLOGY, SC_TECHNOLOGY_DIRECTWRITERETAIN);
@@ -598,7 +599,6 @@ bool CMainWindow::Initialize()
 	}
 	SendEditor(SCI_SETVIEWWS, 1);
 	SendEditor(SCI_SETWHITESPACESIZE, 2);
-	SendEditor(SCI_SETWHITESPACEFORE, true, ::GetSysColor(COLOR_3DSHADOW));
 	SendEditor(SCI_STYLESETVISIBLE, STYLE_CONTROLCHAR, TRUE);
 
 	return true;
@@ -610,13 +610,13 @@ bool CMainWindow::LoadFile(HANDLE hFile)
 	char data[4096] = { 0 };
 	DWORD dwRead = 0;
 
-	BOOL bRet = ReadFile(hFile, data, sizeof(data), &dwRead, NULL);
+	BOOL bRet = ReadFile(hFile, data, sizeof(data), &dwRead, nullptr);
 	bool bUTF8 = IsUTF8(data, dwRead);
 	while ((dwRead > 0) && (bRet))
 	{
 		SendEditor(SCI_ADDTEXT, dwRead,
 			reinterpret_cast<LPARAM>(static_cast<char *>(data)));
-		bRet = ReadFile(hFile, data, sizeof(data), &dwRead, NULL);
+		bRet = ReadFile(hFile, data, sizeof(data), &dwRead, nullptr);
 	}
 	SetupWindow(bUTF8);
 	return true;
@@ -625,8 +625,8 @@ bool CMainWindow::LoadFile(HANDLE hFile)
 bool CMainWindow::LoadFile(LPCTSTR filename)
 {
 	InitEditor();
-	FILE *fp = NULL;
-	_tfopen_s(&fp, filename, _T("rb"));
+	FILE* fp = nullptr;
+	_wfopen_s(&fp, filename, L"rb");
 	if (!fp)
 		return false;
 
@@ -666,13 +666,30 @@ void CMainWindow::SetupWindow(bool bUTF8)
 	SendEditor(SCI_SETSAVEPOINT);
 	SendEditor(SCI_GOTOPOS, 0);
 
+	SetupColors(true);
+
+	::ShowWindow(m_hWndEdit, SW_SHOW);
+}
+
+void CMainWindow::SetupColors(bool recolorize)
+{
+	SendEditor(SCI_STYLESETFORE, STYLE_DEFAULT, ::GetSysColor(COLOR_WINDOWTEXT));
+	SendEditor(SCI_STYLESETBACK, STYLE_DEFAULT, ::GetSysColor(COLOR_WINDOW));
+	SendEditor(SCI_SETSELFORE, TRUE, ::GetSysColor(COLOR_HIGHLIGHTTEXT));
+	SendEditor(SCI_SETSELBACK, TRUE, ::GetSysColor(COLOR_HIGHLIGHT));
+	SendEditor(SCI_SETCARETFORE, ::GetSysColor(COLOR_WINDOWTEXT));
+
+	SendEditor(SCI_SETWHITESPACEFORE, true, ::GetSysColor(COLOR_3DSHADOW));
+
 	SendEditor(SCI_CLEARDOCUMENTSTYLE, 0, 0);
-	SendEditor(SCI_SETSTYLEBITS, 5, 0);
 
 	HIGHCONTRAST highContrast = { 0 };
 	highContrast.cbSize = sizeof(HIGHCONTRAST);
 	if (SystemParametersInfo(SPI_GETHIGHCONTRAST, 0, &highContrast, 0) == TRUE && (highContrast.dwFlags & HCF_HIGHCONTRASTON))
+	{
+		SendEditor(SCI_SETLEXER, SCLEX_NULL);
 		return;
+	}
 
 	//SetAStyle(SCE_DIFF_DEFAULT, RGB(0, 0, 0));
 	SetAStyle(SCE_DIFF_COMMAND,
@@ -698,18 +715,19 @@ void CMainWindow::SetupWindow(bool bUTF8)
 
 	SendEditor(SCI_SETLEXER, SCLEX_DIFF);
 	SendEditor(SCI_SETKEYWORDS, 0, (LPARAM)"revision");
-	SendEditor(SCI_COLOURISE, 0, -1);
-	::ShowWindow(m_hWndEdit, SW_SHOW);
+
+	if (recolorize)
+		SendEditor(SCI_COLOURISE, 0, -1);
 }
 
 bool CMainWindow::SaveFile(LPCTSTR filename)
 {
-	FILE *fp = NULL;
-	_tfopen_s(&fp, filename, _T("w+b"));
+	FILE* fp = nullptr;
+	_wfopen_s(&fp, filename, L"w+b");
 	if (!fp)
 		return false;
 
-	LRESULT len = SendEditor(SCI_GETTEXT, 0, 0);
+	auto len = (int)SendEditor(SCI_GETTEXT, 0, 0);
 	auto data = std::make_unique<char[]>(len + 1);
 	SendEditor(SCI_GETTEXT, len, reinterpret_cast<LPARAM>(static_cast<char *>(data.get())));
 	fwrite(data.get(), sizeof(char), len-1, fp);
@@ -722,9 +740,9 @@ bool CMainWindow::SaveFile(LPCTSTR filename)
 
 void CMainWindow::SetTitle(LPCTSTR title)
 {
-	size_t len = _tcslen(title);
+	size_t len = wcslen(title);
 	auto pBuf = std::make_unique<TCHAR[]>(len + 40);
-	_stprintf_s(pBuf.get(), len + 40, _T("%s - TortoiseGitUDiff"), title);
+	swprintf_s(pBuf.get(), len + 40, L"%s - TortoiseGitUDiff", title);
 	SetWindowTitle(std::wstring(pBuf.get()));
 }
 
@@ -827,9 +845,10 @@ void CMainWindow::loadOrSaveFile(bool doLoad, const std::wstring& filename /* = 
 	CStringUtils::PipesToNulls(filter);
 	ofn.lpstrFilter = filter;
 	ofn.nFilterIndex = 1;
-	ofn.lpstrFileTitle = NULL;
+	ofn.lpstrFileTitle = nullptr;
+	ofn.lpstrDefExt = L"diff";
 	ofn.nMaxFileTitle = 0;
-	ofn.lpstrInitialDir = NULL;
+	ofn.lpstrInitialDir = nullptr;
 	TCHAR fileTitle[1024] = { 0 };
 	LoadString(::hResource, doLoad ? IDS_OPENPATCH : IDS_SAVEPATCH, fileTitle, sizeof(fileTitle)/sizeof(TCHAR));
 	ofn.lpstrTitle = fileTitle;

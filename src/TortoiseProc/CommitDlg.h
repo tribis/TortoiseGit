@@ -1,7 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
 // Copyright (C) 2003-2008 - TortoiseSVN
-// Copyright (C) 2008-2016 - TortoiseGit
+// Copyright (C) 2008-2018 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -28,8 +28,7 @@
 #include "LinkControl.h"
 #include "PathWatcher.h"
 #include "BugTraqAssociations.h"
-#include "..\IBugTraqProvider\IBugTraqProvider_h.h"
-#include "Git.h"
+#include "../IBugTraqProvider/IBugTraqProvider_h.h"
 #include "HyperLink.h"
 #include "PatchViewDlg.h"
 #include "MenuButton.h"
@@ -60,14 +59,14 @@ class CCommitDlg : public CResizableStandAloneDialog, public CSciEditContextMenu
 	DECLARE_DYNAMIC(CCommitDlg)
 
 public:
-	CCommitDlg(CWnd* pParent = NULL); // standard constructor
+	CCommitDlg(CWnd* pParent = nullptr); // standard constructor
 	virtual ~CCommitDlg();
 
 protected:
 	// CSciEditContextMenuInterface
-	virtual void		InsertMenuItems(CMenu& mPopup, int& nCmd);
-	virtual bool		HandleMenuItemClick(int cmd, CSciEdit * pSciEdit);
-	virtual void		HandleSnippet(int type, const CString &text, CSciEdit *pSciEdit);
+	virtual void		InsertMenuItems(CMenu& mPopup, int& nCmd) override;
+	virtual bool		HandleMenuItemClick(int cmd, CSciEdit* pSciEdit) override;
+	virtual void		HandleSnippet(int type, const CString& text, CSciEdit* pSciEdit) override;
 
 public:
 	void ShowViewPatchText(bool b=true)
@@ -96,7 +95,7 @@ private:
 	UINT StatusThread();
 	void FillPatchView(bool onlySetTimer = false);
 	CWnd * GetPatchViewParentWnd() { return this; }
-	virtual void TogglePatchView();
+	void TogglePatchView();
 	void SetDlgTitle();
 	CString GetSignedOffByLine();
 	CString m_sTitle;
@@ -105,13 +104,13 @@ private:
 	enum { IDD = IDD_COMMITDLG };
 
 protected:
-	virtual void DoDataExchange(CDataExchange* pDX); // DDX/DDV support
+	virtual void DoDataExchange(CDataExchange* pDX) override; // DDX/DDV support
 
-	virtual BOOL OnInitDialog();
-	virtual void OnOK();
-	virtual void OnCancel();
-	virtual BOOL PreTranslateMessage(MSG* pMsg);
-	virtual LRESULT DefWindowProc(UINT message, WPARAM wParam, LPARAM lParam);
+	virtual BOOL OnInitDialog() override;
+	virtual void OnOK() override;
+	virtual void OnCancel() override;
+	virtual BOOL PreTranslateMessage(MSG* pMsg) override;
+	virtual LRESULT DefWindowProc(UINT message, WPARAM wParam, LPARAM lParam) override;
 	afx_msg void OnBnClickedShowunversioned();
 	afx_msg void OnBnClickedHistory();
 	afx_msg void OnBnClickedBugtraqbutton();
@@ -123,6 +122,7 @@ protected:
 	afx_msg LRESULT OnGitStatusListCtrlNeedsRefresh(WPARAM, LPARAM);
 	afx_msg LRESULT OnGitStatusListCtrlCheckChanged(WPARAM, LPARAM);
 	afx_msg LRESULT OnGitStatusListCtrlItemChanged(WPARAM, LPARAM);
+	afx_msg void OnSysColorChange();
 
 	afx_msg LRESULT OnCheck(WPARAM count, LPARAM);
 	afx_msg LRESULT OnAutoListReady(WPARAM, LPARAM);
@@ -134,15 +134,15 @@ protected:
 	void Refresh();
 	void StartStatusThread();
 	void StopStatusThread();
-	void GetAutocompletionList();
-	void ScanFile(const CString& sFilePath, const CString& sRegex, const CString& sExt);
+	void GetAutocompletionList(std::map<CString, int>& autolist);
+	void ScanFile(std::map<CString, int>& autolist, const CString& sFilePath, const CString& sRegex, const CString& sExt);
 	void DoSize(int delta);
 	void SetSplitterRange();
 	void SaveSplitterPos();
 	void UpdateCheckLinks();
 	void ParseRegexFile(const CString& sFile, std::map<CString, CString>& mapRegex);
 	void ParseSnippetFile(const CString& sFile, std::map<CString, CString>& mapSnippet);
-	void RunStartCommitHook();
+	bool RunStartCommitHook();
 
 	DECLARE_MESSAGE_MAP()
 
@@ -160,8 +160,6 @@ public:
 	BOOL				m_bWholeProject;
 	BOOL				m_bWholeProject2;
 	CTGitPathList		m_pathList;
-	CTGitPathList		m_checkedPathList;
-	CTGitPathList		m_updatedPathList;
 	GIT_POSTCOMMIT_CMD	m_PostCmd;
 	BOOL				m_bAmendDiffToLastCommit;
 	BOOL				m_bCommitMessageOnly;
@@ -177,12 +175,12 @@ protected:
 	CString				m_sCreateNewBranch;
 	BOOL				m_bSetAuthor;
 	CString				m_sAuthor;
+	volatile bool		m_bDoNotStoreLastSelectedLine; // true on first start of commit dialog and set on recommit
 
 	int					CheckHeadDetach();
 
 private:
 	CWinThread*			m_pThread;
-	std::map<CString, int>	m_autolist;
 	std::map<CString, CString>	m_snippet;
 	CGitStatusListCtrl	m_ListCtrl;
 	BOOL				m_bShowUnversioned;

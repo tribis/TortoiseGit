@@ -45,7 +45,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>comctl32.lib;imm32.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>imm32.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug'">
@@ -56,6 +56,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\be_all_s.c" />
+    <ClCompile Include="..\..\..\be_misc.c" />
     <ClCompile Include="..\..\..\callback.c" />
     <ClCompile Include="..\..\..\cmdline.c" />
     <ClCompile Include="..\..\..\conf.c" />
@@ -65,6 +66,7 @@
     <ClCompile Include="..\..\..\logging.c" />
     <ClCompile Include="..\..\..\logindialog.cpp" />
     <ClCompile Include="..\..\..\misc.c" />
+    <ClCompile Include="..\..\..\miscucs.c" />
     <ClCompile Include="..\..\..\noterm.c" />
     <ClCompile Include="..\..\..\pgssapi.c" />
     <ClCompile Include="..\..\..\pinger.c" />
@@ -78,14 +80,18 @@
     </ClCompile>
     <ClCompile Include="..\..\..\sshaes.c" />
     <ClCompile Include="..\..\..\ssharcf.c" />
+    <ClCompile Include="..\..\..\sshbcrypt.c" />
     <ClCompile Include="..\..\..\sshblowf.c" />
     <ClCompile Include="..\..\..\sshbn.c" />
+    <ClCompile Include="..\..\..\sshccp.c" />
     <ClCompile Include="..\..\..\sshcrc.c" />
     <ClCompile Include="..\..\..\sshcrcda.c" />
     <ClCompile Include="..\..\..\sshdes.c" />
     <ClCompile Include="..\..\..\sshdh.c" />
     <ClCompile Include="..\..\..\sshdss.c" />
     <ClCompile Include="..\..\..\sshdssg.c" />
+    <ClCompile Include="..\..\..\sshecc.c" />
+    <ClCompile Include="..\..\..\sshecdsag.c" />
     <ClCompile Include="..\..\..\sshgssc.c" />
     <ClCompile Include="..\..\..\sshmd5.c" />
     <ClCompile Include="..\..\..\sshprime.c" />
@@ -103,6 +109,7 @@
     <ClCompile Include="..\..\..\tree234.c" />
     <ClCompile Include="..\..\..\version.c" />
     <ClCompile Include="..\..\..\wildcard.c" />
+    <ClCompile Include="..\..\wincapi.c" />
     <ClCompile Include="..\..\wincons.c" />
     <ClCompile Include="..\..\windefs.c" />
     <ClCompile Include="..\..\wingss.c" />
@@ -123,6 +130,7 @@
     <ClCompile Include="..\..\winstore.c" />
     <ClCompile Include="..\..\wintime.c" />
     <ClCompile Include="..\..\..\x11fwd.c" />
+    <ClCompile Include="..\..\winucs.c" />
     <ClCompile Include="..\..\winx11.c" />
   </ItemGroup>
   <ItemGroup>
@@ -137,12 +145,14 @@
     <ClInclude Include="..\..\..\putty.h" />
     <ClInclude Include="..\..\..\puttymem.h" />
     <ClInclude Include="..\..\..\puttyps.h" />
+    <ClInclude Include="..\..\..\sshblowf.h" />
     <ClInclude Include="..\..\..\sshgss.h" />
     <ClInclude Include="..\..\..\sshgssc.h" />
     <ClInclude Include="..\..\..\ssh.h" />
     <ClInclude Include="..\..\..\storage.h" />
     <ClInclude Include="..\..\..\terminal.h" />
     <ClInclude Include="..\..\..\tree234.h" />
+    <ClInclude Include="..\..\wincapi.h" />
     <ClInclude Include="..\..\winhelp.h" />
     <ClInclude Include="..\..\winsecur.h" />
     <ClInclude Include="..\..\winstuff.h" />

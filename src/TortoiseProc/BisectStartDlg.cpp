@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2014-2016 TortoiseGit
+// Copyright (C) 2014-2017 TortoiseGit
 
 // with code of PullFetchDlg.cpp
 
@@ -24,12 +24,12 @@
 #include "BisectStartDlg.h"
 #include "Git.h"
 #include "LogDlg.h"
-#include "MessageBox.h"
 #include "AppUtils.h"
+#include "StringUtils.h"
 
 IMPLEMENT_DYNAMIC(CBisectStartDlg, CHorizontalResizableStandAloneDialog)
 
-CBisectStartDlg::CBisectStartDlg(CWnd* pParent /*=NULL*/)
+CBisectStartDlg::CBisectStartDlg(CWnd* pParent /*=nullptr*/)
 	: CHorizontalResizableStandAloneDialog(CBisectStartDlg::IDD, pParent)
 {
 }
@@ -77,12 +77,15 @@ BOOL CBisectStartDlg::OnInitDialog()
 	AddAnchor(IDCANCEL, BOTTOM_RIGHT);
 	AddAnchor(IDHELP, BOTTOM_RIGHT);
 
+	AddAnchor(IDC_STATIC_LOCAL_BRANCH, TOP_LEFT);
+	AddAnchor(IDC_STATIC_REMOTE_BRANCH, TOP_LEFT);
+
 	AddAnchor(IDC_BUTTON_GOOD, TOP_RIGHT);
 	AddAnchor(IDC_BUTTON_BAD, TOP_RIGHT);
 	AddAnchor(IDC_COMBOBOXEX_GOOD, TOP_LEFT, TOP_RIGHT);
 	AddAnchor(IDC_COMBOBOXEX_BAD, TOP_LEFT, TOP_RIGHT);
 
-	EnableSaveRestore(_T("BisectStartDlg"));
+	EnableSaveRestore(L"BisectStartDlg");
 
 	CString sWindowTitle;
 	GetWindowText(sWindowTitle);
@@ -128,10 +131,10 @@ void CBisectStartDlg::OnBnClickedOk()
 	m_LastGoodRevision = m_cLastGoodRevision.GetString().Trim();
 	m_FirstBadRevision = m_cFirstBadRevision.GetString().Trim();
 
-	if(m_FirstBadRevision.Find(_T("remotes/")) == 0)
+	if (CStringUtils::StartsWith(m_FirstBadRevision, L"remotes/"))
 		m_FirstBadRevision = m_FirstBadRevision.Mid(8);
 
-	if(m_FirstBadRevision.Find(_T("remotes/")) == 0)
+	if (CStringUtils::StartsWith(m_FirstBadRevision, L"remotes/"))
 		m_FirstBadRevision = m_FirstBadRevision.Mid(8);
 
 	CHorizontalResizableStandAloneDialog::OnOK();
@@ -146,9 +149,10 @@ void CBisectStartDlg::OnBnClickedButtonGood()
 	dlg.SetParams(CTGitPath(), CTGitPath(), revision, revision, 0);
 	// tell the dialog to use mode for selecting revisions
 	dlg.SetSelect(true);
+	dlg.ShowWorkingTreeChanges(false);
 	// only one revision must be selected however
 	dlg.SingleSelection(true);
-	if (dlg.DoModal() == IDOK)
+	if (dlg.DoModal() == IDOK && !dlg.GetSelectedHash().empty())
 	{
 		m_cLastGoodRevision.SetWindowText(dlg.GetSelectedHash().at(0).ToString());
 		OnChangedRevision();
@@ -164,9 +168,10 @@ void CBisectStartDlg::OnBnClickedButtonBad()
 	dlg.SetParams(CTGitPath(), CTGitPath(), revision, revision, 0);
 	// tell the dialog to use mode for selecting revisions
 	dlg.SetSelect(true);
+	dlg.ShowWorkingTreeChanges(false);
 	// only one revision must be selected however
 	dlg.SingleSelection(true);
-	if (dlg.DoModal() == IDOK)
+	if (dlg.DoModal() == IDOK && !dlg.GetSelectedHash().empty())
 	{
 		m_cFirstBadRevision.SetWindowText(dlg.GetSelectedHash().at(0).ToString());
 		OnChangedRevision();

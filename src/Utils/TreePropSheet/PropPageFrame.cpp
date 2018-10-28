@@ -39,14 +39,21 @@ namespace TreePropSheet
 CPropPageFrame::CPropPageFrame()
 :	m_bShowCaption(FALSE),
 	m_nCaptionHeight(0),
-	m_hCaptionIcon(NULL),
-	m_dwMsgFormat(DT_CENTER|DT_VCENTER|DT_NOPREFIX|DT_SINGLELINE)
+	m_hCaptionIcon(nullptr),
+	m_dwMsgFormat(DT_CENTER|DT_VCENTER|DT_NOPREFIX|DT_SINGLELINE),
+	m_uiFont(nullptr)
 {
+	NONCLIENTMETRICS metrics = { 0 };
+	metrics.cbSize = sizeof(NONCLIENTMETRICS);
+	SystemParametersInfo(SPI_GETNONCLIENTMETRICS, 0, &metrics, FALSE);
+	m_uiFont = CreateFontIndirect(&metrics.lfMessageFont);
 }
 
 
 CPropPageFrame::~CPropPageFrame()
 {
+	if (m_uiFont)
+		DeleteObject(m_uiFont);
 }
 
 
@@ -67,7 +74,7 @@ BOOL CPropPageFrame::GetShowCaption() const
 }
 
 
-void CPropPageFrame::SetCaption(LPCTSTR lpszCaption, HICON hIcon /*= NULL*/)
+void CPropPageFrame::SetCaption(LPCTSTR lpszCaption, HICON hIcon /*= nullptr*/)
 {
 	m_strCaption = lpszCaption;
 	m_hCaptionIcon = hIcon;
@@ -75,7 +82,7 @@ void CPropPageFrame::SetCaption(LPCTSTR lpszCaption, HICON hIcon /*= NULL*/)
 }
 
 
-CString CPropPageFrame::GetCaption(HICON *pIcon /* = NULL */) const
+CString CPropPageFrame::GetCaption(HICON* pIcon /* = nullptr */) const
 {
 	if (pIcon)
 		*pIcon = m_hCaptionIcon;
@@ -148,13 +155,13 @@ CRect CPropPageFrame::CalcMsgArea()
 
 void CPropPageFrame::DrawMsg(CDC *pDc, CRect rect, LPCTSTR /*lpszMsg*/, DWORD /*dwFormat*/)
 {
-	CFont	*pPrevFont = dynamic_cast<CFont*>(pDc->SelectStockObject(DEFAULT_GUI_FONT));
+	auto hOldFont = pDc->SelectObject(m_uiFont);
 	int		nPrevBkMode = pDc->SetBkMode(TRANSPARENT);
 
 	pDc->DrawText(GetMsgText(), rect, GetMsgFormat());
 
 	pDc->SetBkMode(nPrevBkMode);
-	pDc->SelectObject(pPrevFont);
+	pDc->SelectObject(hOldFont);
 }
 
 
@@ -182,7 +189,7 @@ void CPropPageFrame::DrawCaption(CDC * /*pDc*/, CRect /*rect*/, LPCTSTR /*lpszCa
 /////////////////////////////////////////////////////////////////////
 // Implementation helpers
 
-void CPropPageFrame::SafeUpdateWindow(LPCRECT lpRect /* = NULL */)
+void CPropPageFrame::SafeUpdateWindow(LPCRECT lpRect /* = nullptr */)
 {
 	if (!IsWindow(GetWnd()->GetSafeHwnd()))
 		return;

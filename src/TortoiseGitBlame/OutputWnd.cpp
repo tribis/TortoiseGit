@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2013 - TortoiseGit
+// Copyright (C) 2008-2013, 2016, 2018 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -56,9 +56,6 @@ int COutputWnd::OnCreate(LPCREATESTRUCT lpCreateStruct)
 	if (CDockablePane::OnCreate(lpCreateStruct) == -1)
 		return -1;
 
-	TRACE(_T("%u\n"),LVN_ITEMCHANGED);
-	m_Font.CreateStockObject(DEFAULT_GUI_FONT);
-
 	CRect rectDummy;
 	rectDummy.SetRectEmpty();
 
@@ -71,10 +68,11 @@ int COutputWnd::OnCreate(LPCREATESTRUCT lpCreateStruct)
 		return -1;      // fail to create
 	}
 
-	m_LogList.SetFont(&m_Font);
+	// for some unknown reason, the SetExtendedStyle in OnCreate/PreSubclassWindow is not working here
+	m_LogList.SetStyle();
 
-	m_Gravatar.Create(_T(""), WS_CHILD | WS_VISIBLE, rectDummy, this);
-	bool bEnableGravatar = !!CRegDWORD(_T("Software\\TortoiseGit\\EnableGravatar"), FALSE);
+	m_Gravatar.Create(L"", WS_CHILD | WS_VISIBLE, rectDummy, this);
+	bool bEnableGravatar = !!CRegDWORD(L"Software\\TortoiseGit\\EnableGravatar", FALSE);
 	m_Gravatar.EnableGravatar(bEnableGravatar);
 	if (bEnableGravatar)
 		m_Gravatar.Init();
@@ -88,7 +86,7 @@ int COutputWnd::OnCreate(LPCREATESTRUCT lpCreateStruct)
 
 	m_LogList.m_IsIDReplaceAction=TRUE;
 	m_LogList.DeleteAllItems();
-	m_LogList.m_ColumnRegKey=_T("Blame");
+	m_LogList.m_ColumnRegKey = L"Blame";
 	m_LogList.InsertGitColumn();
 
 	m_LogList.hideUnimplementedCommands();
@@ -104,30 +102,11 @@ void COutputWnd::OnSize(UINT nType, int cx, int cy)
 	// Tab control should cover the whole client area:
 	if (m_Gravatar.IsGravatarEnabled())
 	{
-		m_LogList.SetWindowPos(NULL, -1, -1, cx - 80, cy, SWP_NOMOVE | SWP_NOACTIVATE | SWP_NOZORDER);
-		m_Gravatar.SetWindowPos(NULL, cx - 80, 0, 80, 80, SWP_NOACTIVATE | SWP_NOZORDER);
+		m_LogList.SetWindowPos(nullptr, -1, -1, cx - 80, cy, SWP_NOMOVE | SWP_NOACTIVATE | SWP_NOZORDER);
+		m_Gravatar.SetWindowPos(nullptr, cx - 80, 0, 80, 80, SWP_NOACTIVATE | SWP_NOZORDER);
 		return;
 	}
-	m_LogList.SetWindowPos(NULL, -1, -1, cx, cy, SWP_NOMOVE | SWP_NOACTIVATE | SWP_NOZORDER);
-}
-
-void COutputWnd::AdjustHorzScroll(CListBox& wndListBox)
-{
-	CClientDC dc(this);
-	CFont* pOldFont = dc.SelectObject(&m_Font);
-
-	int cxExtentMax = 0;
-
-	for (int i = 0; i < wndListBox.GetCount(); ++i)
-	{
-		CString strItem;
-		wndListBox.GetText(i, strItem);
-
-		cxExtentMax = max(cxExtentMax, dc.GetTextExtent(strItem).cx);
-	}
-
-	wndListBox.SetHorizontalExtent(cxExtentMax);
-	dc.SelectObject(pOldFont);
+	m_LogList.SetWindowPos(nullptr, -1, -1, cx, cy, SWP_NOMOVE | SWP_NOACTIVATE | SWP_NOZORDER);
 }
 
 int COutputWnd::LoadHistory(CString filename, CString revision, bool follow)
@@ -141,9 +120,9 @@ int COutputWnd::LoadHistory(CString filename, CString revision, bool follow)
 		return -1;
 	m_LogList.UpdateProjectProperties();
 	return 0;
-
 }
-int COutputWnd::LoadHistory(std::set<CGitHash>& hashes)
+
+int COutputWnd::LoadHistory(std::unordered_set<CGitHash>& hashes)
 {
 	m_LogList.Clear();
 	m_LogList.ShowGraphColumn(false);
@@ -151,8 +130,8 @@ int COutputWnd::LoadHistory(std::set<CGitHash>& hashes)
 		return -1;
 	m_LogList.UpdateProjectProperties();
 	return 0;
-
 }
+
 void COutputWnd::OnLvnItemchangedLoglist(NMHDR *pNMHDR, LRESULT *pResult)
 {
 	LPNMLISTVIEW pNMLV = reinterpret_cast<LPNMLISTVIEW>(pNMHDR);
@@ -219,12 +198,10 @@ void COutputList::OnViewOutput()
 	CDockablePane* pParentBar = DYNAMIC_DOWNCAST(CDockablePane, GetOwner());
 	CMDIFrameWndEx* pMainFrame = DYNAMIC_DOWNCAST(CMDIFrameWndEx, GetTopLevelFrame());
 
-	if (pMainFrame != NULL && pParentBar != NULL)
+	if (pMainFrame && pParentBar)
 	{
 		pMainFrame->SetFocus();
 		pMainFrame->ShowPane(pParentBar, FALSE, FALSE, FALSE);
 		pMainFrame->RecalcLayout();
-
 	}
 }
-

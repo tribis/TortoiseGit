@@ -1,5 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
+// Copyright (C) 2016-2018 - TortoiseGit
 // Copyright (C) 2003-2008, 2013-2014 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -30,20 +31,13 @@
 class CPathUtils
 {
 public:
+	CPathUtils() = delete;
 	static BOOL			MakeSureDirectoryPathExists(LPCTSTR path);
 	static void			ConvertToBackslash(LPTSTR dest, LPCTSTR src, size_t len);
-	/**
-	 * Replaces escaped sequences with the corresponding characters in a string.
-	 */
-	static void Unescape(char * psz);
-
-	/**
-	 * Replaces non-URI chars with the corresponding escape sequences.
-	 */
-	static CStringA PathEscape(const CStringA& path);
-
 
 #ifdef CSTRING_AVAILABLE
+	inline static void	ConvertToBackslash(CString& path);
+
 	/**
 	 * returns the filename of a full path
 	 */
@@ -80,13 +74,16 @@ public:
 	 * Returns the path to the installation folder, in our case the TortoiseSVN/bin folder.
 	 * \remark the path returned has a trailing backslash
 	 */
-	static CString GetAppDirectory(HMODULE hMod = NULL);
+	static CString GetAppDirectory(HMODULE hMod = nullptr);
 
 	/**
 	 * Returns the path to the installation parent folder, in our case the TortoiseSVN folder.
 	 * \remark the path returned has a trailing backslash
 	 */
-	static CString GetAppParentDirectory(HMODULE hMod = NULL);
+	static CString GetAppParentDirectory(HMODULE hMod = nullptr);
+
+	static CString GetDocumentsDirectory();
+	static CString GetProgramsDirectory();
 
 	/**
 	 * Returns the path to the application data folder, in our case the %APPDATA%TortoiseSVN folder.
@@ -96,10 +93,11 @@ public:
 	static CString GetLocalAppDataDirectory();
 
 	/**
-	 * Replaces escaped sequences with the corresponding characters in a string.
+	 * Removes any of the following namespace prefixes from a path, if found: "\??\", "\\?\", "\\?\UNC\".
 	 */
-	static CStringA PathUnescape(const CStringA& path);
-	static CStringW PathUnescape(const CStringW& path);
+	static void DropPathPrefixes(CString& path);
+
+	static int ReadLink(LPCTSTR filename, CStringA* target = nullptr);
 
 	/**
 	* Escapes regexp-specific chars.
@@ -117,6 +115,65 @@ public:
 	 */
 	static CString GetVersionFromFile(const CString & p_strFilename);
 
+	/**
+	 * Ensures that the path ends with a folder separator.
+	 * If the delimiter already exists, no additional delimiter will be added.
+	 * \param path to ensure
+	 */
+	static void EnsureTrailingPathDelimiter(CString& path);
 
+	/**
+	 * Returns a path guaranteeing that a valid path delimiter follows.
+	 * If the delimiter already exists, no additional delimiter will be added.
+	 * \param path to ensure
+	 * \return path including path delimiter
+	 */
+	static CString BuildPathWithPathDelimiter(const CString& path);
+
+	/**
+	 * Trims a possible included trailing folder separator from the provided path.
+	 * \param path to trim
+	 */
+	static void TrimTrailingPathDelimiter(CString& path);
+
+	/**
+	 * ExpandFileName converts the relative file name into a fully qualified path name.
+	 * ExpandFileName does not verify that the resulting fully qualified path name 
+	 * refers to an existing file, or even that the resulting path exists.
+	 * \param path to expand
+	 * \return fully qualified path name
+	 */
+	static CString CPathUtils::ExpandFileName(const CString& path);
+
+	/**
+	 * This method will make a path comparable to another path.
+	 * It will do the following:
+	 * 1.) Modify all characters in the path to be lower case
+	 * 2.) Account for ..\'s and .\'s that may occur in the middle of the path and remove them
+	 * 3.) Expand a path that has DOS 8.3 file/folder names
+	 * 4.) Remove the trailing path delimiter at the end
+	 * The function does not account for symlinks at this point in time.
+	 * \param path to normalize
+	 * \return normalized path
+	 */
+	static CString CPathUtils::NormalizePath(const CString& path);
+
+	/**
+	 * Compares two paths and returns true if they are logically the same path.
+	 * The function does not account for symlinks at this point in time.
+	 * \param path1 to compare
+	 * \param path2 to compare
+	 * \return true if they are the same path
+	 */
+	static bool CPathUtils::IsSamePath(const CString& path1, const CString& path2);
+
+	/**
+	 * Checks if two path strings are equal. No conversion of slashes is done!
+	 * \remark for slash-independent comparison, use IsEquivalentTo()
+	 */
+	static bool ArePathStringsEqual(const CString& sP1, const CString& sP2);
+	static bool ArePathStringsEqualWithCase(const CString& sP1, const CString& sP2);
+
+	static CString GetCopyrightForSelf();
 #endif
 };

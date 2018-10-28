@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2015 - TortoiseGit
+// Copyright (C) 2015-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -19,17 +19,18 @@
 
 #include "stdafx.h"
 #include "gtest/gtest.h"
-#include "gitindex.h"
 
 int _tmain(int argc, _TCHAR* argv[])
 {
 	git_libgit2_init();
-	testing::InitGoogleTest(&argc, argv);
+	// Since Google Mock depends on Google Test, InitGoogleMock() is
+	// also responsible for initializing Google Test. Therefore there's
+	// no need for calling testing::InitGoogleTest() separately.
+	testing::InitGoogleMock(&argc, argv);
 	int result = RUN_ALL_TESTS();
 	git_libgit2_shutdown();
 	return result;
 }
 
-CGitIndexFileMap g_IndexFileMap;
 CString g_sGroupingUUID;
 CString sOrigCWD;

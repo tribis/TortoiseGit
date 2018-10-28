@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2018 - TortoiseGit
 // Copyright (C) 2007-2009 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -77,29 +77,16 @@
 #include "RevisiongraphCommand.h"
 #include "ShowCompareCommand.h"
 #include "DaemonCommand.h"
-
-#if 0
-
-
-#include "CopyCommand.h"
-#include "CrashCommand.h"
-
-
-
-
-
-#include "PropertiesCommand.h"
-#include "RebuildIconCacheCommand.h"
-#include "RemoveCommand.h"
-
-
-
-#include "RevertCommand.h"
+#include "CommitIsOnRefsCommand.h"
 #include "RTFMCommand.h"
 
+#if 0
+#include "CrashCommand.h"
+#include "RebuildIconCacheCommand.h"
+#include "RemoveCommand.h"
 #include "UnIgnoreCommand.h"
-
 #endif
+
 typedef enum
 {
 	cmdAbout,
@@ -112,7 +99,6 @@ typedef enum
 	cmdClone,
 	cmdCommit,
 	cmdConflictEditor,
-	cmdCopy,
 	cmdCrash,
 	cmdDiff,
 	cmdDropCopy,
@@ -129,7 +115,6 @@ typedef enum
 	cmdPasteCopy,
 	cmdPasteMove,
 	cmdPrevDiff,
-	cmdProperties,
 	cmdPull,
 	cmdPush,
 	cmdRTFM,
@@ -168,6 +153,7 @@ typedef enum
 	cmdRevisionGraph,
 	cmdDaemon,
 	cmdPGPFP,
+	cmdCommitIsOnRefs,
 } TGitCommand;
 
 static const struct CommandInfo
@@ -176,72 +162,71 @@ static const struct CommandInfo
 	LPCTSTR pCommandName;
 } commandInfo[] =
 {
-	{	cmdAbout,			_T("about")				},
-	{	cmdAdd,				_T("add")				},
-	{	cmdAutoTextTest,	_T("autotexttest")		},
-	{	cmdBlame,			_T("blame")				},
-	{	cmdBranch,			_T("branch")			},
-	{	cmdCat,				_T("cat")				},
-	{	cmdCleanup,			_T("cleanup")			},
-	{	cmdClone,			_T("clone")				},
-	{	cmdCommit,			_T("commit")			},
-	{	cmdConflictEditor,	_T("conflicteditor")	},
-	{	cmdCopy,			_T("copy")				},
-	{	cmdCrash,			_T("crash")				},
-	{	cmdDiff,			_T("diff")				},
-	{	cmdDropCopy,		_T("dropcopy")			},
-	{	cmdDropCopyAdd,		_T("dropcopyadd")		},
-	{	cmdDropMove,		_T("dropmove")			},
-	{	cmdFetch,			_T("fetch")				},
-	{	cmdFormatPatch,		_T("formatpatch")		},
-	{	cmdExport,			_T("export")			},
-	{	cmdHelp,			_T("help")				},
-	{	cmdIgnore,			_T("ignore")			},
-	{	cmdImportPatch,		_T("importpatch")		},
-	{	cmdLog,				_T("log")				},
-	{	cmdMerge,			_T("merge")				},
-	{	cmdPasteCopy,		_T("pastecopy")			},
-	{	cmdPasteMove,		_T("pastemove")			},
-	{	cmdPrevDiff,		_T("prevdiff")			},
-	{	cmdProperties,		_T("properties")		},
-	{	cmdPull,			_T("pull")				},
-	{	cmdPush,			_T("push")				},
-	{	cmdRTFM,			_T("rtfm")				},
-	{	cmdRebuildIconCache,_T("rebuildiconcache")	},
-	{	cmdRemove,			_T("remove")			},
-	{	cmdRebase,			_T("rebase")			},
-	{	cmdRename,			_T("rename")			},
-	{	cmdRepoCreate,		_T("repocreate")		},
-	{	cmdRepoStatus,		_T("repostatus")		},
-	{	cmdResolve,			_T("resolve")			},
-	{	cmdRevert,			_T("revert")			},
-	{	cmdSendMail,		_T("sendmail")			},
-	{	cmdSettings,		_T("settings")			},
-	{	cmdShowCompare,		_T("showcompare")		},
-	{	cmdSwitch,			_T("switch")			},
-	{	cmdTag,				_T("tag")				},
-	{	cmdUnIgnore,		_T("unignore")			},
-	{	cmdUpdateCheck,		_T("updatecheck")		},
-	{	cmdStashSave,		_T("stashsave")			},
-	{	cmdStashApply,		_T("stashapply")		},
-	{	cmdStashPop,		_T("stashpop")			},
-	{	cmdStashList,		_T("stashlist")			},
-	{	cmdSubAdd,			_T("subadd")			},
-	{	cmdSubUpdate,		_T("subupdate")			},
-	{	cmdSubSync,			_T("subsync")			},
-	{	cmdRefLog,			_T("reflog")			},
-	{	cmdRefBrowse,		_T("refbrowse")			},
-	{	cmdSVNDCommit,		_T("svndcommit")		},
-	{	cmdSVNRebase,		_T("svnrebase")			},
-	{	cmdSVNFetch,		_T("svnfetch")			},
-	{	cmdSVNIgnore,		_T("svnignore")			},
-	{	cmdSync,			_T("sync")				},
-	{	cmdRequestPull,		_T("requestpull")		},
-	{	cmdBisect,			_T("bisect")			},
-	{	cmdRepoBrowser,		_T("repobrowser")		},
-	{	cmdRevisionGraph,	_T("revisiongraph")		},
-	{	cmdDaemon,			_T("daemon")			},
-	{	cmdPGPFP,			_T("pgpfp")				},
+	{	cmdAbout,			L"about"			},
+	{	cmdAdd,				L"add"				},
+	{	cmdAutoTextTest,	L"autotexttest"		},
+	{	cmdBlame,			L"blame"			},
+	{	cmdBranch,			L"branch"			},
+	{	cmdCat,				L"cat"				},
+	{	cmdCleanup,			L"cleanup"			},
+	{	cmdClone,			L"clone"			},
+	{	cmdCommit,			L"commit"			},
+	{	cmdConflictEditor,	L"conflicteditor"	},
+	{	cmdCrash,			L"crash"			},
+	{	cmdDiff,			L"diff"				},
+	{	cmdDropCopy,		L"dropcopy"			},
+	{	cmdDropCopyAdd,		L"dropcopyadd"		},
+	{	cmdDropMove,		L"dropmove"			},
+	{	cmdFetch,			L"fetch"			},
+	{	cmdFormatPatch,		L"formatpatch"		},
+	{	cmdExport,			L"export"			},
+	{	cmdHelp,			L"help"				},
+	{	cmdIgnore,			L"ignore"			},
+	{	cmdImportPatch,		L"importpatch"		},
+	{	cmdLog,				L"log"				},
+	{	cmdMerge,			L"merge"			},
+	{	cmdPasteCopy,		L"pastecopy"		},
+	{	cmdPasteMove,		L"pastemove"		},
+	{	cmdPrevDiff,		L"prevdiff"			},
+	{	cmdPull,			L"pull"				},
+	{	cmdPush,			L"push"				},
+	{	cmdRTFM,			L"rtfm"				},
+	{	cmdRebuildIconCache,L"rebuildiconcache"	},
+	{	cmdRemove,			L"remove"			},
+	{	cmdRebase,			L"rebase"			},
+	{	cmdRename,			L"rename"			},
+	{	cmdRepoCreate,		L"repocreate"		},
+	{	cmdRepoStatus,		L"repostatus"		},
+	{	cmdResolve,			L"resolve"			},
+	{	cmdRevert,			L"revert"			},
+	{	cmdSendMail,		L"sendmail"			},
+	{	cmdSettings,		L"settings"			},
+	{	cmdShowCompare,		L"showcompare"		},
+	{	cmdSwitch,			L"switch"			},
+	{	cmdTag,				L"tag"				},
+	{	cmdUnIgnore,		L"unignore"			},
+	{	cmdUpdateCheck,		L"updatecheck"		},
+	{	cmdStashSave,		L"stashsave"		},
+	{	cmdStashApply,		L"stashapply"		},
+	{	cmdStashPop,		L"stashpop"			},
+	{	cmdStashList,		L"stashlist"		},
+	{	cmdSubAdd,			L"subadd"			},
+	{	cmdSubUpdate,		L"subupdate"		},
+	{	cmdSubSync,			L"subsync"			},
+	{	cmdRefLog,			L"reflog"			},
+	{	cmdRefBrowse,		L"refbrowse"		},
+	{	cmdSVNDCommit,		L"svndcommit"		},
+	{	cmdSVNRebase,		L"svnrebase"		},
+	{	cmdSVNFetch,		L"svnfetch"			},
+	{	cmdSVNIgnore,		L"svnignore"		},
+	{	cmdSync,			L"sync"				},
+	{	cmdRequestPull,		L"requestpull"		},
+	{	cmdBisect,			L"bisect"			},
+	{	cmdRepoBrowser,		L"repobrowser"		},
+	{	cmdRevisionGraph,	L"revisiongraph"	},
+	{	cmdDaemon,			L"daemon"			},
+	{	cmdPGPFP,			L"pgpfp"			},
+	{	cmdCommitIsOnRefs,	L"commitisonrefs"	},
 };
 
 
@@ -326,8 +311,10 @@ Command * CommandServer::GetCommand(const CString& sCmd)
 		return new ResolveCommand;
 	case cmdDropMove:
 		return new DropMoveCommand;
+#if 0
 	case cmdDropCopy:
 		return new DropCopyCommand;
+#endif
 	case cmdDropCopyAdd:
 		return new DropCopyAddCommand;
 	case cmdHelp:
@@ -364,10 +351,12 @@ Command * CommandServer::GetCommand(const CString& sCmd)
 		return new RequestPullCommand;
 	case cmdUpdateCheck:
 		return new UpdateCheckCommand;
+#if 0
 	case cmdPasteCopy:
 		return new PasteCopyCommand;
 	case cmdPasteMove:
 		return new PasteMoveCommand;
+#endif
 	case cmdSVNIgnore:
 		return new SVNIgnoreCommand;
 	case cmdBisect:
@@ -380,24 +369,13 @@ Command * CommandServer::GetCommand(const CString& sCmd)
 		return new ShowCompareCommand;
 	case cmdDaemon:
 		return new DaemonCommand;
-
-#if 0
-
-
-
-	case cmdCopy:
-		return new CopyCommand;
-	case cmdCrash:
-		return new CrashCommand;
-
-
-
-	case cmdPrevDiff:
-		return new PrevDiffCommand;
-	case cmdProperties:
-		return new PropertiesCommand;
+	case cmdCommitIsOnRefs:
+		return new CommitIsOnRefsCommand;
 	case cmdRTFM:
 		return new RTFMCommand;
+#if 0
+	case cmdCrash:
+		return new CrashCommand;
 	case cmdRebuildIconCache:
 		return new RebuildIconCacheCommand;
 	case cmdUnIgnore:
@@ -405,11 +383,11 @@ Command * CommandServer::GetCommand(const CString& sCmd)
 #endif
 	case cmdPGPFP:
 		{
-			CMessageBox::Show(hWndExplorer, _T("This is the fingerprint of the TortoiseGit Release Signing Key.\nIt can be used to establish a trust path from this release to another one.\n\nTortoiseGit Release Signing Key, 4096-bit RSA:\n74A2 1AE3 01B3 CA5B D807  2F5E F7F1 7B3F 9DD9 539E"), _T("TortoiseGit"), MB_OK);
+			CMessageBox::Show(GetExplorerHWND(), L"This is the fingerprint of the TortoiseGit Release Signing Key.\nIt can be used to establish a trust path from this release to another one.\n\nTortoiseGit Release Signing Key, 4096-bit RSA:\n74A2 1AE3 01B3 CA5B D807  2F5E F7F1 7B3F 9DD9 539E", L"TortoiseGit", MB_OK);
 			return nullptr;
 		}
 	default:
-		CMessageBox::Show(hWndExplorer, _T("Command not implemented"), _T("TortoiseGit"), MB_ICONERROR);
+		CMessageBox::Show(GetExplorerHWND(), L"Command not implemented", L"TortoiseGit", MB_ICONERROR);
 		return new AboutCommand;
 	}
 }

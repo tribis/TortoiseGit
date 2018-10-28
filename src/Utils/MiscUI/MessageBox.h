@@ -1,5 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
+// Copyright (C) 2013-2017 - TortoiseGit
 // Copyright (C) 2003-2008 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -18,7 +19,6 @@
 //
 #pragma once
 
-#include "htmlformatter.h"
 #include "dlgtemplate.h"
 #include "cursor.h"
 
@@ -30,7 +30,7 @@
 #define MESSAGEBOX_BUTTONMARGIN 5
 #define MESSAGEBOX_ICONMARGIN 15
 #define MESSAGEBOX_BORDERMARGINX 10
-#define MESSAGEBOX_BORDERMARGINY 5
+#define MESSAGEBOX_BORDERMARGINY 10
 #define MESSAGEBOX_TEXTBUTTONMARGIN 15
 #define MESSAGEBOX_BUTTONCHECKMARGIN 5
 #define MESSAGEBOX_BUTTONX 20
@@ -39,13 +39,6 @@
 /**
  * \ingroup Utils
  * Implements an enhanced MessageBox().\n
- * It supports limited html formatting of the text (inherited from CHTMLFormatter).
- * Also it supports hyperlinks and starts the web browser if you click on a link.
- * \image html "CMessageBox_1.jpg"
- * \image html "CMessageBox_4.jpg"
- * \image html "CMessageBox_5.jpg"
- * and also a checkbox for "Do not show again" functionality.\n
- * \image html "CMessageBox_2.jpg"
  *
  * You can use CMessageBox::Show() as a replacement for the Platform SDK version of
  * MessageBox(). Most of the flags are supported (param uType):\n
@@ -233,7 +226,7 @@
  * \endcode
  * if you don't do that define then CMessageBox will use the default path "Software\\YourApplicationName\\"
  */
-class CMessageBox : public CDialog, public CHTMLFormatter
+class CMessageBox : public CDialog
 {
 public:
 	CMessageBox(void);
@@ -242,27 +235,27 @@ public:
 	 * Shows a message box. Use this as a replacement for the usual ::MessageBox() calls.
 	 * Most of the flags of the Platform SDK version are supported. See the class descriptions
 	 * for details.
-	 * \param hWnd handle to the parent window or NULL
+	 * \param hWnd handle to the parent window or nullptr
 	 * \param lpMessage the message string to show on the message box
 	 * \param lpCaption the dialog title
 	 * \param uType see class description for details
 	 * \param sHelpPath if uType has MB_HELP, the path for the help file
 	 * \return see class descriptions for details
 	 */
-	static UINT Show(HWND hWnd, LPCTSTR lpMessage, LPCTSTR lpCaption, UINT uType, LPCTSTR sHelpPath = NULL);
+	static UINT Show(HWND hWnd, LPCTSTR lpMessage, LPCTSTR lpCaption, UINT uType, LPCTSTR sHelpPath = nullptr);
 	/**
 	 * Shows a message box.
-	 * \param hWnd handle to the parent window or NULL
+	 * \param hWnd handle to the parent window or nullptr
 	 * \param nMessage resource ID of the message string
 	 * \param nCaption resource ID of the title string
 	 * \param uType see class description for details
 	 * \param sHelpPath if uType has MB_HELP, this is the path of the help file to use
 	 * \return see class description for details
 	 */
-	static UINT Show(HWND hWnd, UINT nMessage, UINT nCaption, UINT uType, LPCTSTR sHelpPath = NULL);
+	static UINT Show(HWND hWnd, UINT nMessage, UINT nCaption, UINT uType, LPCTSTR sHelpPath = nullptr);
 	/**
 	* Shows a message box.
-	* \param hWnd handle to the parent window or NULL
+	* \param hWnd handle to the parent window or nullptr
 	* \param nMessage resource ID of the message string
 	* \param nCaption resource ID of the title string
 	* \param uType see class description for details
@@ -275,11 +268,11 @@ public:
 	 * the message box isn't shown anymore - the method simply returns the same value as
 	 * the last time. Use this to give the user the possibility to ignore specific message
 	 * boxes ("Do not show again"-checkbox).
-	 * \param hWnd handle to the parent window or NULL
+	 * \param hWnd handle to the parent window or nullptr
 	 * \param lpMessage the message string to show on the message box
 	 * \param lpCaption the dialog title
 	 * \param uType see class description for details
-	 * \param lpRegistry a value string to store the return value of this specific message box. Put NULL or empty if you do not use registry.
+	 * \param lpRegistry a value string to store the return value of this specific message box. Put nullptr or empty if you do not use registry.
 	 * Each one of your message boxes must have it's own value string! Examples for such values
 	 * might be "WarnOverwrite", "InformAboutMissingMailSubject", ...
 	 * \param lpCheckMessage the message to show on the checkbox label. If this parameter is omitted
@@ -287,28 +280,28 @@ public:
 	 * \param bChecked get and set checkbox check state. This is optional.
 	 * \return see class description for details
 	 */
-	static UINT ShowCheck(HWND hWnd, LPCTSTR lpMessage, LPCTSTR lpCaption, UINT uType, LPCTSTR lpRegistry, LPCTSTR lpCheckMessage = NULL, BOOL *bChecked = NULL);
+	static UINT ShowCheck(HWND hWnd, LPCTSTR lpMessage, LPCTSTR lpCaption, UINT uType, LPCTSTR lpRegistry, LPCTSTR lpCheckMessage = nullptr, BOOL *bChecked = nullptr);
 	/**
 	 * Shows a message box with a checkbox. If the user checks it then the next time
 	 * the message box isn't shown anymore - the method simply returns the same value as
 	 * the last time. Use this to give the user the possibility to ignore specific message
 	 * boxes ("Do not show again"-checkbox).
-	 * \param hWnd handle to the parent window or NULL
+	 * \param hWnd handle to the parent window or nullptr
 	 * \param nMessage resource ID of the message string
 	 * \param nCaption resource ID of the title string
 	 * \param uType see class description for details
-	 * \param lpRegistry a value string to store the return value of this specific message box. Put NULL or empty if you do not use registry.
+	 * \param lpRegistry a value string to store the return value of this specific message box. Put nullptr or empty if you do not use registry.
 	 * Each one of your message boxes must have it's own value string! Examples for such values
 	 * might be "WarnOverwrite", "InformAboutMissingMailSubject", ...
 	 * \param nCheckMessage resource ID of the checkbox string
 	 * \param bChecked get and set checkbox check state. This is optional.
 	 * \return see class description for details
 	 */
-	static UINT ShowCheck(HWND hWnd, UINT nMessage, UINT nCaption, UINT uType, LPCTSTR lpRegistry, UINT nCheckMessage, BOOL *bChecked = NULL);
+	static UINT ShowCheck(HWND hWnd, UINT nMessage, UINT nCaption, UINT uType, LPCTSTR lpRegistry, UINT nCheckMessage, BOOL* bChecked = nullptr);
 
 	/**
 	 * Shows a message box with user defined button texts.
-	 * \param hWnd handle to the parent window or NULL
+	 * \param hWnd handle to the parent window or nullptr
 	 * \param lpMessage the message string
 	 * \param lpCaption the title string
 	 * \param nDef number of the default button (1,2 or 3)
@@ -319,10 +312,10 @@ public:
 	 * \param lpButton3 text for the third button
 	 * \return the number of the button pressed (1,2 or 3)
 	 */
-	static UINT Show(HWND hWnd, LPCTSTR lpMessage, LPCTSTR lpCaption, int nDef, LPCTSTR icon, LPCTSTR lpButton1, LPCTSTR lpButton2 = NULL, LPCTSTR lpButton3 = NULL);
+	static UINT Show(HWND hWnd, LPCTSTR lpMessage, LPCTSTR lpCaption, int nDef, LPCTSTR icon, LPCTSTR lpButton1, LPCTSTR lpButton2 = nullptr, LPCTSTR lpButton3 = nullptr);
 	/**
 	 * Shows a message box with user defined button texts.
-	 * \param hWnd handle to the parent window or NULL
+	 * \param hWnd handle to the parent window or nullptr
 	 * \param nMessage resource ID of the message string
 	 * \param nCaption resource ID of the title string
 	 * \param nDef number of the default button (1,2 or 3)
@@ -336,7 +329,7 @@ public:
 	static UINT Show(HWND hWnd, UINT nMessage, UINT nCaption, int nDef, LPCTSTR icon, UINT nButton1, UINT nButton2 = NULL, UINT nButton3 = NULL);
 	/**
 	 * Shows a message box with user defined button texts and a checkbox.
-	 * \param hWnd handle to the parent window or NULL
+	 * \param hWnd handle to the parent window or nullptr
 	 * \param lpMessage the message string
 	 * \param lpCaption the title string
 	 * \param nDef number of the default button (1,2 or 3)
@@ -345,7 +338,7 @@ public:
 	 * \param lpButton1 string for the first button
 	 * \param lpButton2 string for the second button
 	 * \param lpButton3 string for the third button
-	 * \param lpRegistry  a value string to store the return value of this specific message box. Put NULL or empty if you do not use registry.
+	 * \param lpRegistry  a value string to store the return value of this specific message box. Put nullptr or empty if you do not use registry.
 	 * Each one of your message boxes must have it's own value string! Examples for such values
 	 * might be "WarnOverwrite", "InformAboutMissingMailSubject", ...
 	 * \param lpCheckMessage the message to show on the checkbox label. If this parameter is omitted
@@ -353,10 +346,10 @@ public:
 	 * \param bChecked get and set checkbox check state. This is optional.
 	 * \return the number of the button pressed (1,2 or 3)
 	 */
-	static UINT ShowCheck(HWND hWnd, LPCTSTR lpMessage, LPCTSTR lpCaption, int nDef, LPCTSTR icon, LPCTSTR lpButton1, LPCTSTR lpButton2, LPCTSTR lpButton3, LPCTSTR lpRegistry, LPCTSTR lpCheckMessage = NULL, BOOL *bChecked = NULL);
+	static UINT ShowCheck(HWND hWnd, LPCTSTR lpMessage, LPCTSTR lpCaption, int nDef, LPCTSTR icon, LPCTSTR lpButton1, LPCTSTR lpButton2, LPCTSTR lpButton3, LPCTSTR lpRegistry, LPCTSTR lpCheckMessage = nullptr, BOOL* bChecked = nullptr);
 	/**
 	 * Shows a message box with user defined button texts and a checkbox.
-	 * \param hWnd handle to the parent window or NULL
+	 * \param hWnd handle to the parent window or nullptr
 	 * \param nMessage resource ID of the message string
 	 * \param nCaption resource ID of the title string
 	 * \param nDef number of the default button (1,2 or 3)
@@ -365,30 +358,31 @@ public:
 	 * \param nButton1 resource ID of string for the first button
 	 * \param nButton2 resource ID of string for the second button
 	 * \param nButton3 resource ID of string for the third button
-	 * \param lpRegistry  a value string to store the return value of this specific message box. Put NULL or empty if you do not use registry.
+	 * \param lpRegistry  a value string to store the return value of this specific message box. Put nullptr or empty if you do not use registry.
 	 * Each one of your message boxes must have it's own value string! Examples for such values
 	 * might be "WarnOverwrite", "InformAboutMissingMailSubject", ...
 	 * \param nCheckMessage resource ID of the checkbox string
 	 * \param bChecked get and set checkbox check state. This is optional.
 	 * \return the number of the button pressed (1,2 or 3)
 	 */
-	static UINT ShowCheck(HWND hWnd, UINT nMessage, UINT nCaption, int nDef, LPCTSTR icon, UINT nButton1, UINT nButton2, UINT nButton3, LPCTSTR lpRegistry, UINT nCheckMessage = NULL, BOOL *bChecked = NULL);
+	static UINT ShowCheck(HWND hWnd, UINT nMessage, UINT nCaption, int nDef, LPCTSTR icon, UINT nButton1, UINT nButton2, UINT nButton3, LPCTSTR lpRegistry, UINT nCheckMessage = NULL, BOOL* bChecked = nullptr);
 
 	/**
 	 * Removes the registry key
 	 */
 	static bool RemoveRegistryKey(LPCTSTR lpRegistry);
 
-protected:
 	/**
 	 * Stores the value in the registry
 	 * \param sValue the value name
 	 * \param value DWORD to store
 	 */
 	static void SetRegistryValue(const CString& sValue, DWORD value);
+
+protected:
 	/**
 	 * Shows the modal dialog
-	 * \param pWnd handle to the parent window or NULL
+	 * \param pWnd handle to the parent window or nullptr
 	 * \param title message box title
 	 * \param msg message to show
 	 * \param nDefaultButton number of the default button
@@ -438,6 +432,7 @@ protected:
 	CSize m_szIcon;
 	CSize m_szAllButtons;
 	CSize m_szButtons;
+	CSize m_szText;
 
 	BOOL m_bShowCheck;
 	CString m_sRegistryValue;
@@ -447,15 +442,13 @@ protected:
 public:
 	DECLARE_MESSAGE_MAP()
 	afx_msg void OnPaint();
-	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
-	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
 	afx_msg void OnButton1();
 	afx_msg void OnButton2();
 	afx_msg void OnButton3();
-	virtual BOOL OnInitDialog();
+	virtual BOOL OnInitDialog() override;
 
 	BOOL m_bChecked;
 protected:
-	virtual void OnCancel();
-	virtual BOOL PreTranslateMessage(MSG* pMsg);
+	virtual void OnCancel() override;
+	virtual BOOL PreTranslateMessage(MSG* pMsg) override;
 };

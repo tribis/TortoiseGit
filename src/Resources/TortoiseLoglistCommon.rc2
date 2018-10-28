@@ -11,7 +11,7 @@
 // Add manually edited resources here...
 
 /////////////////////////////////////////////////////////////////////////////
-#include "..\Resources\LoglistCommonResource.h"
+#include "../Resources/LoglistCommonResource.h"
 
 /////////////////////////////////////////////////////////////////////////////
 STRINGTABLE 
@@ -42,7 +42,14 @@ STRINGTABLE
 BEGIN
     IDS_LOG_POPUP_REVERTREVS "&Revert changes by these commits"
     IDS_LOG_POPUP_COPYTOCLIPBOARD "Copy to clipboard"
-    IDS_LOG_POPUP_COPYTOCLIPBOARDMESSAGES "Copy log messages to clipboard"
+    IDS_LOG_POPUP_CLIPBOARD_FULL "Full data"
+    IDS_LOG_POPUP_CLIPBOARD_FULLNOPATHS "Full commit data without changed paths"
+    IDS_LOG_POPUP_CLIPBOARD_AUTHORSFULL "Authors (full)"
+    IDS_LOG_POPUP_CLIPBOARD_AUTHORSNAME "Author names"
+    IDS_LOG_POPUP_CLIPBOARD_AUTHORSEMAIL "Author email addresses"
+    IDS_LOG_POPUP_CLIPBOARD_SUBJECTS "Subjects"
+    IDS_LOG_POPUP_CLIPBOARD_MSGS "Messages"
+    IDS_LOG_POPUP_CLIPBOARD_TAGBRANCHES "Tag/branch names"
     IDS_LOG_POPUP_REVERTTOREV "R&evert to this revision"
     IDS_LOG_POPUP_REVERTTOPARENT "Revert to parent revision"
     IDS_LOG_POPUP_EXPORT "Export selection to..."
@@ -73,7 +80,7 @@ BEGIN
     IDS_LOG_POPUP_OPENWITH  "Open with..."
     IDS_LOG_BROWSEREPO      "&Browse repository"
     IDS_REPOBROWSE_SHOWREVPROP "Show revision properties"
-    IDS_LOG_WORKINGDIRCHANGES "Working dir changes"
+    IDS_LOG_WORKINGDIRCHANGES "Working tree changes"
     IDS_FILESCHANGES        "%d files changed"
     IDS_ONLYMERGEDFILES     "Only Merged Files"
     IDS_ALLPARENTS          "All Parents"
@@ -98,6 +105,7 @@ BEGIN
     IDS_LOG_POPUP_COMMIT    "Commit..."
     IDS_SWITCH_BRANCH       "Switch/Checkout to"
     IDS_NOTFOUND            "not found"
+    IDS_LOG_POPUP_COMPARECHANGESET "Compare change sets"
 END 
 
 
@@ -182,7 +190,7 @@ END
 IDD_FIND DIALOGEX 0, 0, 287, 209
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
 CAPTION "Find"
-FONT 8, "MS Shell Dlg", 400, 0, 0x1
+FONT 9, "MS Shell Dlg 2", 400, 0, 0x1
 BEGIN
     DEFPUSHBUTTON   "&Find",IDOK,217,16,56,14,WS_DISABLED
     PUSHBUTTON      "Cancel",IDCANCEL,218,37,56,14

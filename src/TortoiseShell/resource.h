@@ -5,7 +5,6 @@
 #define IDI_PULL                        5
 #define IDD_PROPPAGE                    107
 #define IDI_APP                         108
-#define IDI_CHECKOUT                    121
 #define IDS_MENUUPDATE                  121
 #define IDS_MENUCOMMIT                  122
 #define IDI_UPDATE                      122
@@ -24,7 +23,6 @@
 #define IDS_MENUMERGE                   129
 #define IDI_MERGE                       129
 #define IDS_MENUBRANCH                  130
-#define IDI_IMPORT                      130
 #define IDS_MENUIMPORT                  131
 #define IDI_EXPORT                      131
 #define IDS_MENUEXPORT                  132
@@ -82,6 +80,8 @@
 #define IDS_MENUUPDATEEXT               170
 #define IDS_MENUDESCUPDATEEXT           171
 #define IDS_MENUBISECTRESET             171
+#define IDS_MENUBISECTSKIP              172
+#define IDS_MENUDESCBISECTSKIP          173
 #define IDS_MENUDIFF                    176
 #define IDS_MENUDESCDIFF                177
 #define IDS_DROPCOPYADDMENU             178
@@ -132,7 +132,6 @@
 #define IDS_MENUREPOBROWSE              227
 #define IDS_MENUDESCREPOBROWSE          228
 #define IDS_MENUDESCMERGEABORT          229
-#define IDS_ERR_PROPNOTONFILE           230
 #define IDS_MENUIGNOREMULTIPLE          231
 #define IDS_MENUDIFFLATER               232
 #define IDS_MENUDESCDIFFLATER           233
@@ -147,12 +146,10 @@
 #define IDS_MENUDESCREMOVEKEEP          272
 #define IDS_YES                         273
 #define IDS_NO                          274
-#define IDS_git_DEPTH_INFINITE          300
-#define IDS_git_DEPTH_IMMEDIATE         301
-#define IDS_git_DEPTH_FILES             302
-#define IDS_git_DEPTH_EMPTY             303
-#define IDS_git_DEPTH_UNKNOWN           305
-#define IDS_git_DEPTH_WORKING           306
+#define IDS_MENUIGNOREMULTIPLEMASK2     282
+#define IDS_MENUIGNOREMULTIPLE2         283
+#define IDS_MENUDELETEIGNOREMULTIPLE2   284
+#define IDS_MENUDELETEIGNOREMULTIPLEMASK2 285
 #define IDS_MENUTAG                     307
 #define IDS_MENUFORMATPATCH             308
 #define IDS_MENUIMPORTPATCH             309
@@ -216,8 +213,9 @@
 #define IDI_MENUFOLDER                  5155
 #define IDI_MENULINK                    5156
 #define IDI_MENUMULTIPLE                5157
-#define IDI_PROPERTIES                  5158
 #define IDI_APPSMALL                    5160
+#define IDI_SHELVE                      5161
+#define IDI_UNSHELVE                    5162
 #define IDI_CLIPPASTE                   5164
 #define IDI_PUSH                        5166
 #define IDI_CLONE                       5167

@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2009-2016 - TortoiseGit
+// Copyright (C) 2009-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -18,11 +18,12 @@
 //
 #pragma once
 
-#include <map>
 #include "StandAloneDlg.h"
 #include "FilterEdit.h"
-#include "GitStatusListCtrl.h"
+#include "ResizableColumnsListCtrl.h"
 #include "gittype.h"
+#include "HistoryCombo.h"
+#include "GestureEnabledControl.h"
 
 const int gPickRef_Head		= 1;
 const int gPickRef_Tag		= 2;
@@ -35,14 +36,17 @@ class CShadowTree
 public:
 	typedef std::map<CString,CShadowTree> TShadowTreeMap;
 
-	CShadowTree():m_hTree(NULL),m_pParent(NULL){}
+	CShadowTree()
+	: m_hTree(nullptr)
+	, m_pParent(nullptr)
+	{}
 
 	CShadowTree*	GetNextSub(CString& nameLeft, bool bCreateIfNotExist);
 
 	bool			IsLeaf()const {return m_ShadowTree.empty();}
 	CString			GetRefName()const
 	{
-		if(m_pParent==NULL)
+		if (!m_pParent)
 			return m_csRefName;
 		return m_pParent->GetRefName()+"/"+m_csRefName;
 	}
@@ -97,7 +101,7 @@ class CBrowseRefsDlg : public CResizableStandAloneDialog
 	DECLARE_DYNAMIC(CBrowseRefsDlg)
 
 public:
-	CBrowseRefsDlg(CString cmdPath, CWnd* pParent = NULL);   // standard constructor
+	CBrowseRefsDlg(CString cmdPath, CWnd* pParent = nullptr);   // standard constructor
 	virtual ~CBrowseRefsDlg();
 
 	enum eCmd
@@ -125,6 +129,8 @@ public:
 		eCmd_UnifiedDiff,
 		eCmd_UpstreamDrop,
 		eCmd_UpstreamSet,
+		eCmd_DiffWC,
+		eCmd_Copy,
 	};
 
 	enum eCol
@@ -139,21 +145,21 @@ public:
 	};
 
 // Dialog Data
-	enum { IDD = IDD_DIALOG_BROWSE_REFS };
+	enum { IDD = IDD_BROWSE_REFS };
 
 protected:
-	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
+	virtual void DoDataExchange(CDataExchange* pDX) override;    // DDX/DDV support
 
 	DECLARE_MESSAGE_MAP()
 
 	afx_msg void OnBnClickedOk();
-	virtual BOOL OnInitDialog();
+	virtual BOOL OnInitDialog() override;
 
 	CString			GetSelectedRef(bool onlyIfLeaf, bool pickFirstSelIfMultiSel = false);
 
 	void			Refresh(CString selectRef = CString());
 
-	CShadowTree&	GetTreeNode(CString refName, CShadowTree* pTreePos=NULL, bool bCreateIfNotExist=false);
+	CShadowTree&	GetTreeNode(CString refName, CShadowTree* pTreePos = nullptr, bool bCreateIfNotExist = false);
 
 	void			FillListCtrlForTreeNode(HTREEITEM treeNode);
 
@@ -167,6 +173,9 @@ protected:
 
 	CString			GetFullRefName(CString partialRefName);
 
+	CShadowTree*	GetListEntry(int index);
+	CShadowTree*	GetTreeEntry(HTREEITEM treeItem);
+
 private:
 	bool			m_bHasWC;
 
@@ -176,9 +185,8 @@ private:
 
 	CShadowTree		m_TreeRoot;
 	CShadowTree*	m_pListCtrlRoot;
-	CTreeCtrl		m_RefTreeCtrl;
-	CListCtrl		m_ListRefLeafs;
-	ColumnManager	m_ColumnManager;
+	CGestureEnabledControlTmpl<CTreeCtrl>	m_RefTreeCtrl;
+	CGestureEnabledControlTmpl<CResizableColumnsListCtrl<CListCtrl>>	m_ListRefLeafs;
 
 	CFilterEdit		m_ctrlFilter;
 	afx_msg void OnEnChangeEditFilter();
@@ -188,6 +196,7 @@ private:
 	afx_msg LRESULT OnClickedInfoIcon(WPARAM wParam, LPARAM lParam);
 	afx_msg LRESULT OnClickedCancelFilter(WPARAM wParam, LPARAM lParam);
 	bool			IsMatchFilter(const CShadowTree* pTree, const CString &ref, const CString &filter, bool positive);
+	CComboBox		m_cBranchFilter;
 
 	int				m_currSortCol;
 	bool			m_currSortDesc;
@@ -204,7 +213,7 @@ private:
 
 	bool		AreAllFrom(VectorPShadowTree& leafs, const wchar_t* from);
 	void		ShowContextMenu(CPoint point, HTREEITEM hTreePos, VectorPShadowTree& selectedLeafs);
-	virtual BOOL PreTranslateMessage(MSG* pMsg);
+	virtual BOOL PreTranslateMessage(MSG* pMsg) override;
 	afx_msg void OnLvnColumnclickListRefLeafs(NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void OnDestroy();
 	afx_msg void OnNMDblclkListRefLeafs(NMHDR *pNMHDR, LRESULT *pResult);
@@ -213,6 +222,7 @@ private:
 	afx_msg void OnLvnBeginlabeleditListRefLeafs(NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void OnBnClickedCurrentbranch();
 	afx_msg void OnBnClickedIncludeNestedRefs();
+	afx_msg void OnCbnSelchangeBrowseRefsBranchfilter();
 	BOOL		m_bIncludeNestedRefs;
 	CRegDWORD	m_regIncludeNestedRefs;
 	void		UpdateInfoLabel();
@@ -229,5 +239,5 @@ private:
 
 public:
 	static CString	PickRef(bool returnAsHash = false, CString initialRef = CString(), int pickRef_Kind = gPickRef_All, bool pickMultipleRefsOrRange = false);
-	static bool		PickRefForCombo(CComboBoxEx* pComboBox, int pickRef_Kind = gPickRef_All);
+	static bool		PickRefForCombo(CHistoryCombo& refComboBox, int pickRef_Kind = gPickRef_All, int useShortName = gPickRef_Head);
 };

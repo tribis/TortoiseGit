@@ -24,7 +24,7 @@
 
 CMassiveGitTask::CMassiveGitTask(CString gitParameters, BOOL isPath, bool ignoreErrors)
 	: CMassiveGitTaskBase(gitParameters, isPath, ignoreErrors)
-	, m_NotifyCallbackInstance(NULL)
+	, m_NotifyCallbackInstance(nullptr)
 	, m_NotifyCallbackAction(CGitProgressList::WC_File_NotificationData::git_wc_notify_add)
 {
 }
@@ -44,9 +44,7 @@ void CMassiveGitTask::ReportError(const CString& out, int exitCode)
 		dlg.m_PreText += GetParams();
 		dlg.m_PreText += L" [...]\r\n\r\n";
 		dlg.m_PreText += out;
-		CString resultText;
-		resultText.Format(IDS_PROC_PROGRESS_GITUNCLEANEXIT, exitCode);
-		dlg.m_PreFailText = resultText;
+		dlg.m_PreFailText.Format(IDS_PROC_PROGRESS_GITUNCLEANEXIT, exitCode);
 		dlg.DoModal();
 	}
 }

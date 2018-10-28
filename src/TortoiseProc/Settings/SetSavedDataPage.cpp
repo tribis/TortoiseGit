@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2012-2013-2016 - TortoiseGit
+// Copyright (C) 2012-2018 - TortoiseGit
 // Copyright (C) 2003-2008,2014 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -34,7 +34,7 @@ CSetSavedDataPage::CSetSavedDataPage()
 	: ISettingsPropPage(CSetSavedDataPage::IDD)
 	, m_maxLines(0)
 {
-	m_regMaxLines = CRegDWORD(_T("Software\\TortoiseGit\\MaxLinesInLogfile"), 4000);
+	m_regMaxLines = CRegDWORD(L"Software\\TortoiseGit\\MaxLinesInLogfile", 4000);
 	m_maxLines = m_regMaxLines;
 }
 
@@ -65,16 +65,16 @@ BOOL CSetSavedDataPage::OnInitDialog()
 	int nUrlHistWC = 0;
 	INT_PTR nUrlHistItems = 0;
 	int nLogHistRepo = 0;
-	CRegistryKey regloghist(_T("Software\\TortoiseGit\\History"));
+	CRegistryKey regloghist(L"Software\\TortoiseGit\\History");
 	CStringList loghistlist;
 	regloghist.getSubKeys(loghistlist);
-	for (POSITION pos = loghistlist.GetHeadPosition(); pos != NULL; )
+	for (POSITION pos = loghistlist.GetHeadPosition(); pos; )
 	{
 		CString sHistName = loghistlist.GetNext(pos);
-		if (sHistName.Left(6).CompareNoCase(_T("commit")) == 0 || sHistName.Left(5).CompareNoCase(_T("merge")) == 0)
+		if (CStringUtils::StartsWithI(sHistName, L"commit") || CStringUtils::StartsWithI(sHistName, L"merge"))
 		{
 			nLogHistWC++;
-			CRegistryKey regloghistwc(_T("Software\\TortoiseGit\\History\\")+sHistName);
+			CRegistryKey regloghistwc(L"Software\\TortoiseGit\\History\\"+sHistName);
 			CStringList loghistlistwc;
 			regloghistwc.getValues(loghistlistwc);
 			nLogHistMsg += loghistlistwc.GetCount();
@@ -84,16 +84,16 @@ BOOL CSetSavedDataPage::OnInitDialog()
 			// repoURLs
 			CStringList urlhistlistmain;
 			CStringList urlhistlistmainvalues;
-			CRegistryKey regurlhistlist(_T("Software\\TortoiseGit\\History\\repoURLS"));
+			CRegistryKey regurlhistlist(L"Software\\TortoiseGit\\History\\repoURLS");
 			regurlhistlist.getSubKeys(urlhistlistmain);
 			regurlhistlist.getValues(urlhistlistmainvalues);
 			nUrlHistItems += urlhistlistmainvalues.GetCount();
-			for (POSITION urlpos = urlhistlistmain.GetHeadPosition(); urlpos != NULL; )
+			for (POSITION urlpos = urlhistlistmain.GetHeadPosition(); urlpos; )
 			{
 				CString sWCUID = urlhistlistmain.GetNext(urlpos);
 				nUrlHistWC++;
 				CStringList urlhistlistwc;
-				CRegistryKey regurlhistlistwc(_T("Software\\TortoiseGit\\History\\repoURLS\\")+sWCUID);
+				CRegistryKey regurlhistlistwc(L"Software\\TortoiseGit\\History\\repoURLS\\"+sWCUID);
 				regurlhistlistwc.getValues(urlhistlistwc);
 				nUrlHistItems += urlhistlistwc.GetCount();
 			}
@@ -102,7 +102,7 @@ BOOL CSetSavedDataPage::OnInitDialog()
 
 	// find out how many dialog sizes / positions we've stored
 	INT_PTR nResizableDialogs = 0;
-	CRegistryKey regResizable(_T("Software\\TortoiseGit\\TortoiseProc\\ResizableState"));
+	CRegistryKey regResizable(L"Software\\TortoiseGit\\TortoiseProc\\ResizableState");
 	CStringList resizablelist;
 	regResizable.getValues(resizablelist);
 	nResizableDialogs += resizablelist.GetCount();
@@ -137,13 +137,13 @@ BOOL CSetSavedDataPage::OnInitDialog()
 			nUsername++;
 	}
 
-	CDirFileEnum logenum(CPathUtils::GetAppDataDirectory()+_T("logcache"));
+	CDirFileEnum logenum(CPathUtils::GetAppDataDirectory() + L"logcache");
 	while (logenum.NextFile(sFile, &bIsDir))
 		nLogHistRepo++;
 	// the "Repositories.dat" is not a cache file
 	nLogHistRepo--;
 
-	BOOL bActionLog = PathFileExists(CPathUtils::GetLocalAppDataDirectory() + _T("logfile.txt"));
+	BOOL bActionLog = PathFileExists(CPathUtils::GetLocalAppDataDirectory() + L"logfile.txt");
 
 	m_btnLogHistClear.EnableWindow(nLogHistMsg || nLogHistWC);
 	m_btnUrlHistClear.EnableWindow(nUrlHistItems || nUrlHistWC);
@@ -156,16 +156,16 @@ BOOL CSetSavedDataPage::OnInitDialog()
 	EnableToolTips();
 
 	CString sTT;
-	sTT.Format(IDS_SETTINGS_SAVEDDATA_LOGHIST_TT, nLogHistMsg, nLogHistWC);
+	sTT.FormatMessage(IDS_SETTINGS_SAVEDDATA_LOGHIST_TT, nLogHistMsg, nLogHistWC);
 	m_tooltips.AddTool(IDC_LOGHISTORY, sTT);
 	m_tooltips.AddTool(IDC_LOGHISTCLEAR, sTT);
-	sTT.Format(IDS_SETTINGS_SAVEDDATA_URLHIST_TT, nUrlHistItems, nUrlHistWC);
+	sTT.FormatMessage(IDS_SETTINGS_SAVEDDATA_URLHIST_TT, nUrlHistItems, nUrlHistWC);
 	m_tooltips.AddTool(IDC_URLHISTORY, sTT);
 	m_tooltips.AddTool(IDC_URLHISTCLEAR, sTT);
 	sTT.Format(IDS_SETTINGS_SAVEDDATA_RESIZABLE_TT, nResizableDialogs);
 	m_tooltips.AddTool(IDC_RESIZABLEHISTORY, sTT);
 	m_tooltips.AddTool(IDC_RESIZABLEHISTCLEAR, sTT);
-	sTT.Format(IDS_SETTINGS_SAVEDDATA_AUTH_TT, nSimple, nSSL, nUsername);
+	sTT.FormatMessage(IDS_SETTINGS_SAVEDDATA_AUTH_TT, nSimple, nSSL, nUsername);
 	m_tooltips.AddTool(IDC_AUTHHISTORY, sTT);
 	m_tooltips.AddTool(IDC_AUTHHISTCLEAR, sTT);
 	sTT.Format(IDS_SETTINGS_SAVEDDATA_REPOLOGHIST_TT, nLogHistRepo);
@@ -196,7 +196,7 @@ END_MESSAGE_MAP()
 
 void CSetSavedDataPage::OnBnClickedUrlhistclear()
 {
-	CRegistryKey reg(_T("Software\\TortoiseGit\\History\\repoURLS"));
+	CRegistryKey reg(L"Software\\TortoiseGit\\History\\repoURLS");
 	reg.removeKey();
 	m_btnUrlHistClear.EnableWindow(FALSE);
 	m_tooltips.DelTool(GetDlgItem(IDC_URLHISTCLEAR));
@@ -205,15 +205,15 @@ void CSetSavedDataPage::OnBnClickedUrlhistclear()
 
 void CSetSavedDataPage::OnBnClickedLoghistclear()
 {
-	CRegistryKey reg(_T("Software\\TortoiseGit\\History"));
+	CRegistryKey reg(L"Software\\TortoiseGit\\History");
 	CStringList histlist;
 	reg.getSubKeys(histlist);
-	for (POSITION pos = histlist.GetHeadPosition(); pos != NULL; )
+	for (POSITION pos = histlist.GetHeadPosition(); pos; )
 	{
 		CString sHist = histlist.GetNext(pos);
-		if (sHist.Left(6).CompareNoCase(_T("commit"))==0)
+		if (CStringUtils::StartsWithI(sHist, L"commit"))
 		{
-			CRegistryKey regkey(_T("Software\\TortoiseGit\\History\\")+sHist);
+			CRegistryKey regkey(L"Software\\TortoiseGit\\History\\"+sHist);
 			regkey.removeKey();
 		}
 	}
@@ -225,7 +225,7 @@ void CSetSavedDataPage::OnBnClickedLoghistclear()
 
 void CSetSavedDataPage::OnBnClickedResizablehistclear()
 {
-	CRegistryKey reg(_T("Software\\TortoiseGit\\TortoiseProc\\ResizableState"));
+	CRegistryKey reg(L"Software\\TortoiseGit\\TortoiseProc\\ResizableState");
 	reg.removeKey();
 	m_btnResizableHistClear.EnableWindow(FALSE);
 	m_tooltips.DelTool(GetDlgItem(IDC_RESIZABLEHISTCLEAR));
@@ -234,7 +234,7 @@ void CSetSavedDataPage::OnBnClickedResizablehistclear()
 
 void CSetSavedDataPage::OnBnClickedAuthhistclear()
 {
-	CRegStdString auth = CRegStdString(_T("Software\\TortoiseGit\\Auth\\"));
+	CRegStdString auth = CRegStdString(L"Software\\TortoiseGit\\Auth\\");
 	auth.removeKey();
 	PWSTR pszPath = nullptr;
 	if (SHGetKnownFolderPath(FOLDERID_RoamingAppData, KF_FLAG_CREATE, nullptr, &pszPath) == S_OK)
@@ -251,11 +251,7 @@ void CSetSavedDataPage::OnBnClickedAuthhistclear()
 
 void CSetSavedDataPage::OnBnClickedRepologclear()
 {
-	CString path = CPathUtils::GetAppDataDirectory()+_T("logcache");
-	TCHAR pathbuf[MAX_PATH] = {0};
-	_tcscpy_s(pathbuf, MAX_PATH, (LPCTSTR)path);
-
-	DeleteViaShell(pathbuf, IDS_SETTINGS_DELCACHE);
+	DeleteViaShell(CPathUtils::GetAppDataDirectory() + L"logcache", IDS_SETTINGS_DELCACHE);
 
 	m_btnRepoLogClear.EnableWindow(FALSE);
 	m_tooltips.DelTool(GetDlgItem(IDC_REPOLOG));
@@ -264,13 +260,13 @@ void CSetSavedDataPage::OnBnClickedRepologclear()
 
 void CSetSavedDataPage::OnBnClickedActionlogshow()
 {
-	CString logfile = CPathUtils::GetLocalAppDataDirectory() + _T("logfile.txt");
+	CString logfile = CPathUtils::GetLocalAppDataDirectory() + L"logfile.txt";
 	CAppUtils::StartTextViewer(logfile);
 }
 
 void CSetSavedDataPage::OnBnClickedActionlogclear()
 {
-	CString logfile = CPathUtils::GetLocalAppDataDirectory() + _T("logfile.txt");
+	CString logfile = CPathUtils::GetLocalAppDataDirectory() + L"logfile.txt";
 	DeleteFile(logfile);
 	m_btnActionLogClear.EnableWindow(FALSE);
 	m_btnActionLogShow.EnableWindow(FALSE);
@@ -282,7 +278,7 @@ void CSetSavedDataPage::OnBnClickedTempfileclear()
 		return;
 
 	int count = 0;
-	DWORD len = GetTortoiseGitTempPath(0, NULL);
+	DWORD len = GetTortoiseGitTempPath(0, nullptr);
 	auto path = std::make_unique<TCHAR[]>(len + 100);
 	len = GetTortoiseGitTempPath(len + 100, path.get());
 	if (len != 0)
@@ -341,7 +337,7 @@ void CSetSavedDataPage::DeleteViaShell(LPCTSTR path, UINT progressText)
 	fileop.hwnd = m_hWnd;
 	fileop.wFunc = FO_DELETE;
 	fileop.pFrom = buf.get();
-	fileop.pTo = NULL;
+	fileop.pTo = nullptr;
 	fileop.fFlags = FOF_NO_CONNECTED_ELEMENTS | FOF_NOCONFIRMATION;
 	fileop.lpszProgressTitle = progText;
 	SHFileOperation(&fileop);
@@ -351,6 +347,7 @@ void CSetSavedDataPage::OnBnClickedStoreddecisionsclear()
 {
 	static const CString tgitvalues[] = {
 		L"OldMsysgitVersionWarning",
+		L"OpenRebaseRemoteBranchEqualsHEAD",
 		L"OpenRebaseRemoteBranchUnchanged",
 		L"OpenRebaseRemoteBranchFastForwards",
 		L"DaemonNoSecurityWarning",
@@ -361,19 +358,26 @@ void CSetSavedDataPage::OnBnClickedStoreddecisionsclear()
 		L"NoStashIncludeUntrackedWarning",
 		L"CommitMergeHint",
 		L"AskSetTrackedBranch",
+		L"StashPopShowChanges",
+		L"StashPopShowConflictChanges",
+		L"CommitWarnOnUnresolved",
+		L"CommitAskBeforeCancel",
+		L"PushAllBranches",
+		L"CommitMessageContainsConflictHint",
+		L"MergeConflictsNeedsCommit",
 	};
 	for (const auto& value : tgitvalues)
 	{
-		CRegDWORD regkey(_T("Software\\TortoiseGit\\") + value);
+		CRegDWORD regkey(L"Software\\TortoiseGit\\" + value);
 		regkey.removeValue();
 	}
 
 	static const CString tmergevalues[] = {
 		L"DeleteFileWhenEmpty",
 	};
-	for (const auto& value : tgitvalues)
+	for (const auto& value : tmergevalues)
 	{
-		CRegDWORD regkey(_T("Software\\TortoiseGitMerge\\") + value);
+		CRegDWORD regkey(L"Software\\TortoiseGitMerge\\" + value);
 		regkey.removeValue();
 	}
 }

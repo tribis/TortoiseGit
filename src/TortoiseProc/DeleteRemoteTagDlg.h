@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2012 - TortoiseGit
+// Copyright (C) 2012, 2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -26,7 +26,7 @@ class CDeleteRemoteTagDlg : public CHorizontalResizableStandAloneDialog
 	DECLARE_DYNAMIC(CDeleteRemoteTagDlg)
 
 public:
-	CDeleteRemoteTagDlg(CWnd* pParent = NULL);   // standard constructor
+	CDeleteRemoteTagDlg(CWnd* pParent = nullptr);   // standard constructor
 	virtual ~CDeleteRemoteTagDlg();
 
 // Dialog Data
@@ -35,18 +35,17 @@ public:
 	CString m_sRemote;
 
 protected:
-	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
-	virtual BOOL OnInitDialog();
+	virtual void DoDataExchange(CDataExchange* pDX) override;    // DDX/DDV support
+	virtual BOOL OnInitDialog() override;
 
 	DECLARE_MESSAGE_MAP()
 
 	CListCtrl m_ctrlTags;
 	CButton	m_SelectAll;
-	STRING_VECTOR m_taglist;
 
 	void Refresh();
 
-	virtual BOOL PreTranslateMessage(MSG* pMsg);
+	virtual BOOL PreTranslateMessage(MSG* pMsg) override;
 
 	afx_msg void OnBnClickedSelectall();
 	afx_msg void OnBnClickedOk();

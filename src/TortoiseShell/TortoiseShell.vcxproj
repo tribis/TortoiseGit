@@ -37,78 +37,30 @@
   <Import Project="$(SolutionDir)TortoiseGit.common.props" />
   <Import Project="$(SolutionDir)TortoiseGit.common-dll.props" />
   <PropertyGroup Label="UserMacros" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+  <PropertyGroup Condition="'$(Platform)'=='Win32'">
     <TargetName>TortoiseGit32</TargetName>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+  <PropertyGroup Condition="'$(Platform)'=='x64'">
     <TargetName>TortoiseGit</TargetName>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <TargetName>TortoiseGit32</TargetName>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <TargetName>TortoiseGit</TargetName>
-  </PropertyGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <ClCompile>
-      <AdditionalIncludeDirectories>..\..\ext\gitdll;..\Git;..\Utils;..\TortoiseShell;..\Utils\MiscUI;..\..\ext\libgit2\include;..\..\ext\zlib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>TORTOISESHELL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-    </ClCompile>
-    <ResourceCompile>
-      <PreprocessorDefinitions>TSVNSHELL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-    </ResourceCompile>
-    <Link>
-      <AdditionalDependencies>Crypt32.lib;shfolder.lib;shell32.lib;comctl32.lib;ws2_32.lib;rpcrt4.lib;shlwapi.lib;wininet.lib;version.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <ModuleDefinitionFile>ShellExt.def</ModuleDefinitionFile>
-      <BaseAddress>0x5960000</BaseAddress>
-    </Link>
-  </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <ClCompile>
-      <AdditionalIncludeDirectories>..\..\ext\gitdll;..\Git;..\Utils;..\TortoiseShell;..\Utils\MiscUI;..\..\ext\libgit2\include;..\..\ext\zlib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>TORTOISESHELL;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-    </ClCompile>
-    <ResourceCompile>
-      <PreprocessorDefinitions>TSVNSHELL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-    </ResourceCompile>
-    <Link>
-      <AdditionalDependencies>Crypt32.lib;shfolder.lib;shell32.lib;comctl32.lib;ws2_32.lib;rpcrt4.lib;shlwapi.lib;wininet.lib;version.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <ModuleDefinitionFile>ShellExt.def</ModuleDefinitionFile>
-      <BaseAddress>0x5960000</BaseAddress>
-    </Link>
-  </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <ClCompile>
-      <AdditionalIncludeDirectories>..\..\ext\gitdll;..\Git;..\Utils;..\TortoiseShell;..\Utils\MiscUI;..\..\ext\libgit2\include;..\..\ext\zlib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>TORTOISESHELL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-    </ClCompile>
-    <ResourceCompile>
-      <PreprocessorDefinitions>TSVNSHELL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-    </ResourceCompile>
-    <Link>
-      <AdditionalDependencies>Crypt32.lib;shfolder.lib;shell32.lib;comctl32.lib;ws2_32.lib;rpcrt4.lib;shlwapi.lib;wininet.lib;version.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <ModuleDefinitionFile>ShellExt.def</ModuleDefinitionFile>
-      <BaseAddress>0x5960000</BaseAddress>
-    </Link>
-  </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+  <ItemDefinitionGroup>
     <ClCompile>
       <AdditionalIncludeDirectories>$(ProjectDir);..\..\ext\gitdll;..\Git;..\Utils;..\Utils\MiscUI;..\..\ext\libgit2\include;..\..\ext\zlib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>TORTOISESHELL;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>TORTOISESHELL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <ResourceCompile>
       <PreprocessorDefinitions>TSVNSHELL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ResourceCompile>
     <Link>
-      <AdditionalDependencies>Crypt32.lib;shfolder.lib;shell32.lib;comctl32.lib;ws2_32.lib;rpcrt4.lib;shlwapi.lib;wininet.lib;version.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>comctl32.lib;shlwapi.lib;version.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <ModuleDefinitionFile>ShellExt.def</ModuleDefinitionFile>
-      <BaseAddress>0x5960000</BaseAddress>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\Git\MassiveGitTaskBase.cpp" />
     <ClCompile Include="..\TGitCache\CacheInterface.cpp" />
     <ClCompile Include="..\Utils\DebugOutput.cpp" />
+    <ClCompile Include="..\Utils\LoadIconEx.cpp" />
     <ClCompile Include="..\Utils\MiscUI\IconBitmapUtils.cpp" />
     <ClCompile Include="..\Utils\ReaderWriterLock.cpp" />
     <ClCompile Include="ContextMenu.cpp" />
@@ -117,7 +69,6 @@
     <ClCompile Include="..\Git\GitFolderStatus.cpp" />
     <ClCompile Include="..\Git\GitIndex.cpp" />
     <ClCompile Include="GITPropertyPage.cpp" />
-    <ClCompile Include="..\Git\GitRev.cpp" />
     <ClCompile Include="..\Git\GitStatus.cpp" />
     <ClCompile Include="IconOverlay.cpp" />
     <ClCompile Include="ItemIDList.cpp" />
@@ -127,6 +78,7 @@
     <ClCompile Include="PreserveChdir.cpp" />
     <ClCompile Include="..\Utils\Registry.cpp" />
     <ClCompile Include="RemoteCacheLink.cpp" />
+    <ClCompile Include="ShellCache.cpp" />
     <ClCompile Include="ShellExt.cpp" />
     <ClCompile Include="ShellExtClassFactory.cpp" />
     <ClCompile Include="ShellObjects.cpp" />
@@ -150,13 +102,14 @@
     <ClInclude Include="..\Git\GitForWindows.h" />
     <ClInclude Include="..\Git\GitHash.h" />
     <ClInclude Include="..\Git\gitindex.h" />
-    <ClInclude Include="..\Git\GitRev.h" />
     <ClInclude Include="..\Git\GitStatus.h" />
     <ClInclude Include="..\Git\gittype.h" />
     <ClInclude Include="..\Git\MassiveGitTaskBase.h" />
     <ClInclude Include="..\Git\TGitPath.h" />
     <ClInclude Include="..\TGitCache\CacheInterface.h" />
+    <ClInclude Include="..\Utils\CreateProcessHelper.h" />
     <ClInclude Include="..\Utils\DebugOutput.h" />
+    <ClInclude Include="..\Utils\LoadIconEx.h" />
     <ClInclude Include="..\Utils\MiscUI\IconBitmapUtils.h" />
     <ClInclude Include="..\Utils\ReaderWriterLock.h" />
     <ClInclude Include="GITPropertyPage.h" />
@@ -164,6 +117,7 @@
     <ClInclude Include="Guids.h" />
     <ClInclude Include="ItemIDList.h" />
     <ClInclude Include="..\Utils\PathUtils.h" />
+    <ClInclude Include="MenuInfo.h" />
     <ClInclude Include="PIDL.h" />
     <ClInclude Include="PreserveChdir.h" />
     <ClInclude Include="..\Utils\registry.h" />
@@ -186,7 +140,6 @@
     <Image Include="..\Resources\menuadd.ico" />
     <Image Include="..\Resources\menubisect.ico" />
     <Image Include="..\Resources\menubisectreset.ico" />
-    <Image Include="..\Resources\menublame.ico" />
     <Image Include="..\Resources\menucheckout.ico" />
     <Image Include="..\Resources\menucleanup.ico" />
     <Image Include="..\Resources\menucombine.ico" />
@@ -197,19 +150,16 @@
     <Image Include="..\Resources\menucreaterepos.ico" />
     <Image Include="..\Resources\menudaemon.ico" />
     <Image Include="..\Resources\menudelete.ico" />
-    <Image Include="..\Resources\menudelunversioned.ico" />
     <Image Include="..\Resources\menudiff.ico" />
     <Image Include="..\Resources\menuedit.ico" />
     <Image Include="..\Resources\menuexport.ico" />
     <Image Include="..\Resources\menuhelp.ico" />
     <Image Include="..\Resources\menuignore.ico" />
-    <Image Include="..\Resources\menuimport.ico" />
     <Image Include="..\Resources\menulog.ico" />
     <Image Include="..\Resources\menumerge.ico" />
     <Image Include="..\Resources\menumergeabort.ico" />
     <Image Include="..\Resources\menupatch.ico" />
     <Image Include="..\Resources\menupick.ico" />
-    <Image Include="..\Resources\menuproperties.ico" />
     <Image Include="..\Resources\menurebase.ico" />
     <Image Include="..\Resources\menurelocate.ico" />
     <Image Include="..\Resources\menurename.ico" />
@@ -236,7 +186,6 @@
     <Image Include="..\Resources\tsvnmenufolder.ico" />
     <Image Include="..\Resources\tsvnmenulink.ico" />
     <Image Include="..\Resources\tsvnmenumultiple.ico" />
-    <Image Include="..\Resources\update1.ico" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="resourceshell.rc" />

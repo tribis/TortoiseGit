@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2009-2013, 2015 - TortoiseGit
+// Copyright (C) 2009-2013, 2015-2017 - TortoiseGit
 // Copyright (C) 2007-2008 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -38,7 +38,6 @@ typedef CComCritSecLock<CComCriticalSection> CAutoLocker;
 
 void CLogDataVector::ClearAll()
 {
-
 	clear();
 	m_HashMap.clear();
 	m_Lns.clear();
@@ -46,9 +45,7 @@ void CLogDataVector::ClearAll()
 	m_FirstFreeLane=0;
 	m_Lns.clear();
 	if (m_pLogCache)
-	{
 		m_pLogCache->ClearAllLanes();
-	}
 }
 
 //CLogDataVector Class
@@ -56,10 +53,10 @@ int CLogDataVector::ParserFromLog(CTGitPath* path, DWORD count, DWORD infomask, 
 {
 	ATLASSERT(m_pLogCache);
 	// only enable --follow on files
-	if ((path == NULL || path->IsDirectory()) && (infomask & CGit::LOG_INFO_FOLLOW))
+	if ((!path || path->IsDirectory()) && (infomask & CGit::LOG_INFO_FOLLOW))
 		infomask = infomask ^ CGit::LOG_INFO_FOLLOW;
 
-	CString gitrange = _T("HEAD");
+	CString gitrange = L"HEAD";
 	if (range != nullptr)
 		gitrange = *range;
 	CFilterData filter;
@@ -70,7 +67,7 @@ int CLogDataVector::ParserFromLog(CTGitPath* path, DWORD count, DWORD infomask, 
 		filter.m_NumberOfLogs = count;
 		filter.m_NumberOfLogsScale = CFilterData::SHOW_LAST_N_COMMITS;
 	}
-	CString cmd = g_Git.GetLogCmd(gitrange, path, infomask, &filter);
+	CString cmd = g_Git.GetLogCmd(gitrange, path, infomask, &filter, m_logOrderBy);
 
 	if (!g_Git.CanParseRev(gitrange))
 		return -1;
@@ -81,7 +78,7 @@ int CLogDataVector::ParserFromLog(CTGitPath* path, DWORD count, DWORD infomask, 
 	}
 	catch (const char* msg)
 	{
-		MessageBox(NULL, _T("Could not initialize libgit.\nlibgit reports:\n") + CString(msg), _T("TortoiseGit"), MB_ICONERROR);
+		MessageBox(nullptr, L"Could not initialize libgit.\nlibgit reports:\n" + CString(msg), L"TortoiseGit", MB_ICONERROR);
 		return -1;
 	}
 
@@ -90,13 +87,11 @@ int CLogDataVector::ParserFromLog(CTGitPath* path, DWORD count, DWORD infomask, 
 	{
 		CAutoLocker lock(g_Git.m_critGitDllSec);
 		if (git_open_log(&handle,CUnicodeUtils::GetMulti(cmd, CP_UTF8).GetBuffer()))
-		{
 			return -1;
-		}
 	}
 	catch (char* msg)
 	{
-		MessageBox(NULL, _T("Could not open log.\nlibgit reports:\n") + CString(msg), _T("TortoiseGit"), MB_ICONERROR);
+		MessageBox(nullptr, L"Could not open log.\nlibgit reports:\n" + CString(msg), L"TortoiseGit", MB_ICONERROR);
 		return -1;
 	}
 
@@ -107,7 +102,7 @@ int CLogDataVector::ParserFromLog(CTGitPath* path, DWORD count, DWORD infomask, 
 	}
 	catch (char* msg)
 	{
-		MessageBox(NULL, _T("Could not get first commit.\nlibgit reports:\n") + CString(msg), _T("TortoiseGit"), MB_ICONERROR);
+		MessageBox(nullptr, L"Could not get first commit.\nlibgit reports:\n" + CString(msg), L"TortoiseGit", MB_ICONERROR);
 		return -1;
 	}
 
@@ -123,14 +118,14 @@ int CLogDataVector::ParserFromLog(CTGitPath* path, DWORD count, DWORD infomask, 
 		}
 		catch (char* msg)
 		{
-			MessageBox(NULL, _T("Could not get next commit.\nlibgit reports:\n") + CString(msg), _T("TortoiseGit"), MB_ICONERROR);
+			MessageBox(nullptr, L"Could not get next commit.\nlibgit reports:\n" + CString(msg), L"TortoiseGit", MB_ICONERROR);
 			break;
 		}
 
 		if (ret)
 		{
 			if (ret != -2) // other than end of revision walking
-				MessageBox(nullptr, (_T("Could not get next commit.\nlibgit returns:") + std::to_wstring(ret)).c_str(), _T("TortoiseGit"), MB_ICONERROR);
+				MessageBox(nullptr, (L"Could not get next commit.\nlibgit returns:" + std::to_wstring(ret)).c_str(), L"TortoiseGit", MB_ICONERROR);
 			break;
 		}
 
@@ -140,7 +135,7 @@ int CLogDataVector::ParserFromLog(CTGitPath* path, DWORD count, DWORD infomask, 
 			continue;
 		}
 
-		CGitHash hash = (char*)commit.m_hash ;
+		CGitHash hash(commit.m_hash);
 
 		GitRevLoglist* pRev = this->m_pLogCache->GetCacheData(hash);
 
@@ -166,7 +161,7 @@ int CLogDataVector::ParserFromLog(CTGitPath* path, DWORD count, DWORD infomask, 
 		{
 			if (pRev->SafeFetchFullInfo(&g_Git))
 			{
-				MessageBox(nullptr, pRev->GetLastErr(), _T("TortoiseGit"), MB_ICONERROR);
+				MessageBox(nullptr, pRev->GetLastErr(), L"TortoiseGit", MB_ICONERROR);
 				return -1;
 			}
 		}
@@ -174,7 +169,6 @@ int CLogDataVector::ParserFromLog(CTGitPath* path, DWORD count, DWORD infomask, 
 		this->push_back(pRev->m_CommitHash);
 
 		m_HashMap[pRev->m_CommitHash] = (int)size() - 1;
-
 	}
 
 	{
@@ -205,7 +199,7 @@ struct SortByParentDate
 	}
 };
 
-int CLogDataVector::Fill(std::set<CGitHash>& hashes)
+int CLogDataVector::Fill(std::unordered_set<CGitHash>& hashes)
 {
 	ATLASSERT(m_pLogCache);
 	try
@@ -214,7 +208,7 @@ int CLogDataVector::Fill(std::set<CGitHash>& hashes)
 	}
 	catch (const char* msg)
 	{
-		MessageBox(nullptr, _T("Could not initialize libgit.\nlibgit reports:\n") + CString(msg), _T("TortoiseGit"), MB_ICONERROR);
+		MessageBox(nullptr, L"Could not initialize libgit.\nlibgit reports:\n" + CString(msg), L"TortoiseGit", MB_ICONERROR);
 		return -1;
 	}
 
@@ -227,13 +221,11 @@ int CLogDataVector::Fill(std::set<CGitHash>& hashes)
 		{
 			CAutoLocker lock(g_Git.m_critGitDllSec);
 			if (git_get_commit_from_hash(&commit, hash.m_hash))
-			{
 				return -1;
-			}
 		}
 		catch (char * msg)
 		{
-			MessageBox(nullptr, _T("Could not get commit \"") + hash.ToString() + _T("\".\nlibgit reports:\n") + CString(msg), _T("TortoiseGit"), MB_ICONERROR);
+			MessageBox(nullptr, L"Could not get commit \"" + hash.ToString() + L"\".\nlibgit reports:\n" + CString(msg), L"TortoiseGit", MB_ICONERROR);
 			return -1;
 		}
 
@@ -277,7 +269,6 @@ void CLogDataVector::setLane(CGitHash& sha)
 //	const ShaVect& shaVec(fh->revOrder);
 
 	for (int cnt = (int)size(); i < cnt; ++i) {
-
 		GitRevLoglist* r = &this->GetGitRevAt(i);
 		CGitHash curSha=r->m_CommitHash;
 
@@ -298,7 +289,6 @@ void CLogDataVector::setLane(CGitHash& sha)
 	const ShaVect& shaVec(fh->revOrder);
 
 	for (uint cnt = shaVec.count(); i < cnt; ++i) {
-
 		const ShaString& curSha = shaVec[i];
 		Rev* r = m_HashMap[curSha]const_cast<Rev*>(revLookup(curSha, fh));
 		if (r->lanes.count() == 0)
@@ -310,7 +300,6 @@ void CLogDataVector::setLane(CGitHash& sha)
 	fh->firstFreeLane = ++i;
 #endif
 }
-
 
 void CLogDataVector::updateLanes(GitRevLoglist& c, Lanes& lns, CGitHash& sha)
 {
@@ -328,8 +317,8 @@ void CLogDataVector::updateLanes(GitRevLoglist& c, Lanes& lns, CGitHash& sha)
 	if (isDiscontinuity)
 		lns.changeActiveLane(sha); // uses previous isBoundary state
 
-	lns.setBoundary(c.IsBoundary() == TRUE); // update must be here
-	TRACE(_T("%s %d"), (LPCTSTR)c.m_CommitHash.ToString(), c.IsBoundary());
+	lns.setBoundary(c.IsBoundary() == TRUE, isInitial); // update must be here
+	TRACE(L"%s %d", (LPCTSTR)c.m_CommitHash.ToString(), c.IsBoundary());
 
 	if (isFork)
 		lns.setFork(sha);
@@ -353,7 +342,11 @@ void CLogDataVector::updateLanes(GitRevLoglist& c, Lanes& lns, CGitHash& sha)
 	if (isMerge)
 		lns.afterMerge();
 	if (isFork)
+	{
 		lns.afterFork();
+		if (isInitial)
+			lns.setInitial();
+	}
 	if (lns.isBranch())
 		lns.afterBranch();
 }

@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2009, 2015 - TortoiseGit
+// Copyright (C) 2009, 2015-2016 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -28,10 +28,9 @@
 
 IMPLEMENT_DYNAMIC(CAddRemoteDlg, CDialog)
 
-CAddRemoteDlg::CAddRemoteDlg(CWnd* pParent /*=NULL*/)
+CAddRemoteDlg::CAddRemoteDlg(CWnd* pParent /*=nullptr*/)
 	: CDialog(CAddRemoteDlg::IDD, pParent)
 {
-
 }
 
 CAddRemoteDlg::~CAddRemoteDlg()
@@ -45,19 +44,15 @@ void CAddRemoteDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Text(pDX, IDC_EDIT_URL, m_Url);
 }
 
-
 BEGIN_MESSAGE_MAP(CAddRemoteDlg, CDialog)
 	ON_BN_CLICKED(IDOK, &CAddRemoteDlg::OnBnClickedOk)
 END_MESSAGE_MAP()
-
 
 // CAddRemoteDlg message handlers
 
 void CAddRemoteDlg::OnBnClickedOk()
 {
 	UpdateData();
-
-
 
 	OnOK();
 }

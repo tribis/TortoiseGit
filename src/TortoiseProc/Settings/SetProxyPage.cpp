@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2010-2015 - TortoiseGit
+// Copyright (C) 2010-2017 - TortoiseGit
 // Copyright (C) 2003-2007 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -24,7 +24,6 @@
 #include "StringUtils.h"
 #include "Git.h"
 #include "SetProxyPage.h"
-#include "MessageBox.h"
 
 IMPLEMENT_DYNAMIC(CSetProxyPage, ISettingsPropPage)
 CSetProxyPage::CSetProxyPage()
@@ -32,13 +31,12 @@ CSetProxyPage::CSetProxyPage()
 	, m_serverport(0)
 	, m_isEnabled(FALSE)
 {
-	m_regServeraddress = CRegString(_T("Software\\TortoiseGit\\Git\\Servers\\global\\http-proxy-host"), _T(""));
-	m_regServerport = CRegString(_T("Software\\TortoiseGit\\Git\\Servers\\global\\http-proxy-port"), _T(""));
-	m_regUsername = CRegString(_T("Software\\TortoiseGit\\Git\\Servers\\global\\http-proxy-username"), _T(""));
-	m_regPassword = CRegString(_T("Software\\TortoiseGit\\Git\\Servers\\global\\http-proxy-password"), _T(""));
-	m_regSSHClient = CRegString(_T("Software\\TortoiseGit\\SSH"));
+	m_regServeraddress = CRegString(L"Software\\TortoiseGit\\Git\\Servers\\global\\http-proxy-host", L"");
+	m_regServerport = CRegString(L"Software\\TortoiseGit\\Git\\Servers\\global\\http-proxy-port", L"");
+	m_regUsername = CRegString(L"Software\\TortoiseGit\\Git\\Servers\\global\\http-proxy-username", L"");
+	m_regPassword = CRegString(L"Software\\TortoiseGit\\Git\\Servers\\global\\http-proxy-password", L"");
+	m_regSSHClient = CRegString(L"Software\\TortoiseGit\\SSH");
 	m_SSHClient = m_regSSHClient;
-
 }
 
 CSetProxyPage::~CSetProxyPage()
@@ -74,13 +72,10 @@ HRESULT StringEscape(const CString& str_in, CString* escaped_string) {
 		return E_INVALIDARG;
 
 	DWORD buf_len = INTERNET_MAX_URL_LENGTH + 1;
-	HRESULT hr = ::UrlEscape(str_in, escaped_string->GetBufferSetLength(buf_len), &buf_len, URL_ESCAPE_PERCENT | URL_ESCAPE_SEGMENT_ONLY);
-	if (SUCCEEDED(hr)) {
-		escaped_string->ReleaseBuffer();
-	}
+	HRESULT hr = ::UrlEscape(str_in, CStrBuf(*escaped_string, buf_len), &buf_len, URL_ESCAPE_PERCENT | URL_ESCAPE_SEGMENT_ONLY);
 
-	escaped_string->Replace(_T("@"), _T("%40"));
-	escaped_string->Replace(_T(":"), _T("%3a"));
+	escaped_string->Replace(L"@", L"%40");
+	escaped_string->Replace(L":", L"%3a");
 
 	return hr;
 }
@@ -91,12 +86,7 @@ HRESULT StringUnescape(const CString& str_in, CString* unescaped_string) {
 
 	DWORD buf_len = INTERNET_MAX_URL_LENGTH + 1;
 	ATL::CComBSTR temp(str_in);
-	HRESULT hr = ::UrlUnescape(temp, unescaped_string->GetBufferSetLength(buf_len), &buf_len, 0);
-	if (SUCCEEDED(hr)) {
-		unescaped_string->ReleaseBuffer();
-	}
-
-	return hr;
+	return ::UrlUnescape(temp, CStrBuf(*unescaped_string, buf_len), &buf_len, 0);
 }
 
 BOOL CSetProxyPage::OnInitDialog()
@@ -107,24 +97,24 @@ BOOL CSetProxyPage::OnInitDialog()
 
 	m_tooltips.AddTool(IDC_SERVERADDRESS, IDS_SETTINGS_PROXYSERVER_TT);
 
-	CString proxy = g_Git.GetConfigValue(_T("http.proxy"));
+	CString proxy = g_Git.GetConfigValue(L"http.proxy");
 
 	m_SSHClient = m_regSSHClient;
 	if (m_SSHClient.IsEmpty())
-		m_SSHClient = CRegString(_T("Software\\TortoiseGit\\SSH"), _T(""), FALSE, HKEY_LOCAL_MACHINE);
+		m_SSHClient = CRegString(L"Software\\TortoiseGit\\SSH", L"", FALSE, HKEY_LOCAL_MACHINE);
 	if (m_SSHClient.IsEmpty())
 	{
 		TCHAR sPlink[MAX_PATH] = {0};
-		GetModuleFileName(NULL, sPlink, _countof(sPlink));
-		LPTSTR ptr = _tcsrchr(sPlink, _T('\\'));
+		GetModuleFileName(nullptr, sPlink, _countof(sPlink));
+		LPTSTR ptr = wcsrchr(sPlink, L'\\');
 		if (ptr)
 		{
-			_tcscpy_s(ptr + 1, MAX_PATH - (ptr - sPlink + 1), _T("TortoiseGitPlink.exe"));
+			wcscpy_s(ptr + 1, _countof(sPlink) - (ptr - sPlink + 1), L"TortoiseGitPlink.exe");
 			m_SSHClient = CString(sPlink);
 		}
 	}
 	m_serveraddress = m_regServeraddress;
-	m_serverport = _ttoi((LPCTSTR)(CString)m_regServerport);
+	m_serverport = _wtoi((LPCTSTR)(CString)m_regServerport);
 	m_username = m_regUsername;
 	m_password = m_regPassword;
 
@@ -136,20 +126,20 @@ BOOL CSetProxyPage::OnInitDialog()
 	else
 	{
 		int start=0;
-		start = proxy.Find(_T("://"),start);
+		start = proxy.Find(L"://", start);
 		if(start<0)
 			start =0;
 		else
 			start+=3;
 
-		int at = proxy.Find(_T("@"), 0);
+		int at = proxy.Find(L'@');
 		int port;
 
 		if(at<0)
 		{
-			m_username=_T("");
-			m_password=_T("");
-			port=proxy.Find(_T(":"),start);
+			m_username.Empty();
+			m_password.Empty();
+			port = proxy.Find(L':', start);
 			if(port<0)
 				m_serveraddress = proxy.Mid(start);
 			else
@@ -159,11 +149,11 @@ BOOL CSetProxyPage::OnInitDialog()
 		else
 		{
 			int username;
-			username = proxy.Find(_T(":"),start);
+			username = proxy.Find(L':', start);
 			if(username<=0 || username >at)
 			{
 				StringUnescape(proxy.Mid(start, at - start), &m_username);
-				m_password=_T("");
+				m_password.Empty();
 			}
 			else if(username < at)
 			{
@@ -171,7 +161,7 @@ BOOL CSetProxyPage::OnInitDialog()
 				StringUnescape(proxy.Mid(username + 1, at - username - 1), &m_password);
 			}
 
-			port=proxy.Find(_T(":"),at);
+			port = proxy.Find(L':', at);
 			if(port<0)
 				m_serveraddress = proxy.Mid(at+1);
 			else
@@ -179,11 +169,9 @@ BOOL CSetProxyPage::OnInitDialog()
 		}
 
 		if(port<0)
-		{
 			m_serverport= 0;
-		}
 		else
-			m_serverport = _ttoi(proxy.Mid(port+1));
+			m_serverport = _wtoi(proxy.Mid(port + 1));
 
 		m_isEnabled = TRUE;
 		EnableGroup(TRUE);
@@ -200,13 +188,9 @@ void CSetProxyPage::OnBnClickedEnable()
 {
 	UpdateData();
 	if (m_isEnabled)
-	{
 		EnableGroup(TRUE);
-	}
 	else
-	{
 		EnableGroup(FALSE);
-	}
 	SetModified();
 }
 
@@ -233,7 +217,7 @@ BOOL CSetProxyPage::OnApply()
 
 	CString temp;
 	Store(m_serveraddress, m_regServeraddress);
-	temp.Format(_T("%u"), m_serverport);
+	temp.Format(L"%u", m_serverport);
 	Store(temp, m_regServerport);
 	Store(m_username, m_regUsername);
 	Store(m_password, m_regPassword);
@@ -242,16 +226,16 @@ BOOL CSetProxyPage::OnApply()
 	CString http_proxy;
 	if(!m_serveraddress.IsEmpty())
 	{
-		if (m_serveraddress.Find(_T("://")) == -1)
-			http_proxy=_T("http://");
+		if (m_serveraddress.Find(L"://") == -1)
+			http_proxy = L"http://";
 
 		if(!m_username.IsEmpty())
 		{
 			CString escapedUsername;
 
-			if (StringEscape(m_username, &escapedUsername))
+			if (FAILED(StringEscape(m_username, &escapedUsername)))
 			{
-				::MessageBox(NULL, _T("Could not encode username."), _T("TortoiseGit"), MB_ICONERROR);
+				::MessageBox(nullptr, L"Could not encode username.", L"TortoiseGit", MB_ICONERROR);
 				return FALSE;
 			}
 
@@ -260,33 +244,32 @@ BOOL CSetProxyPage::OnApply()
 			if(!m_password.IsEmpty())
 			{
 				CString escapedPassword;
-				if (StringEscape(m_password, &escapedPassword))
+				if (FAILED(StringEscape(m_password, &escapedPassword)))
 				{
-					::MessageBox(NULL, _T("Could not encode password."), _T("TortoiseGit"), MB_ICONERROR);
+					::MessageBox(nullptr, L"Could not encode password.", L"TortoiseGit", MB_ICONERROR);
 					return FALSE;
 				}
-				http_proxy += _T(":") + escapedPassword;
+				http_proxy += L':' + escapedPassword;
 			}
 
-			http_proxy += _T("@");
+			http_proxy += L'@';
 		}
 		http_proxy+=m_serveraddress;
 
 		if(m_serverport)
 		{
-			temp.Format(_T("%u"), m_serverport);
-			http_proxy  += _T(":")+temp;
+			http_proxy += L':';
+			http_proxy.AppendFormat(L"%u", m_serverport);
 		}
 	}
 
 	if (m_isEnabled)
 	{
-		g_Git.SetConfigValue(_T("http.proxy"),http_proxy,CONFIG_GLOBAL);
+		if (g_Git.SetConfigValue(L"http.proxy",http_proxy,CONFIG_GLOBAL))
+			return FALSE;
 	}
 	else
-	{
-		g_Git.UnsetConfigValue(_T("http.proxy"), CONFIG_GLOBAL);
-	}
+		g_Git.UnsetConfigValue(L"http.proxy", CONFIG_GLOBAL);
 	m_regSSHClient = m_SSHClient;
 	SetModified(FALSE);
 	return ISettingsPropPage::OnApply();
@@ -294,11 +277,13 @@ BOOL CSetProxyPage::OnApply()
 
 void CSetProxyPage::OnBnClickedSshbrowse()
 {
-	CString openPath;
-	if (CAppUtils::FileOpenSave(openPath, NULL, IDS_SETTINGS_SELECTSSH, IDS_PROGRAMSFILEFILTER, true, m_hWnd))
+	UpdateData();
+	CString filename = m_SSHClient;
+	if (!PathFileExists(filename))
+		filename.Empty();
+	if (CAppUtils::FileOpenSave(filename, nullptr, IDS_SETTINGS_SELECTSSH, IDS_PROGRAMSFILEFILTER, true, m_hWnd))
 	{
-		UpdateData();
-		m_SSHClient = openPath;
+		m_SSHClient = filename;
 		UpdateData(FALSE);
 		SetModified();
 	}

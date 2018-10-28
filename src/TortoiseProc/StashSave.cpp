@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2011-2015 - TortoiseGit
+// Copyright (C) 2011-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -26,7 +26,7 @@
 
 IMPLEMENT_DYNAMIC(CStashSaveDlg, CHorizontalResizableStandAloneDialog)
 
-CStashSaveDlg::CStashSaveDlg(CWnd* pParent /*=NULL*/)
+CStashSaveDlg::CStashSaveDlg(CWnd* pParent /*=nullptr*/)
 	: CHorizontalResizableStandAloneDialog(CStashSaveDlg::IDD, pParent)
 	, m_bIncludeUntracked(FALSE)
 	, m_bAll(FALSE)
@@ -56,15 +56,15 @@ BOOL CStashSaveDlg::OnInitDialog()
 	CHorizontalResizableStandAloneDialog::OnInitDialog();
 	CAppUtils::MarkWindowAsUnpinnable(m_hWnd);
 
+	AdjustControlSize(IDC_CHECK_UNTRACKED);
+	AdjustControlSize(IDC_CHECK_ALL);
+
 	AddAnchor(IDOK,BOTTOM_RIGHT);
 	AddAnchor(IDCANCEL, BOTTOM_RIGHT);
 	AddAnchor(IDHELP, BOTTOM_RIGHT);
 	AddAnchor(IDC_GROUP_STASHMESSAGE, TOP_LEFT, TOP_RIGHT);
 	AddAnchor(IDC_STASHMESSAGE, TOP_LEFT, TOP_RIGHT);
 	AddAnchor(IDC_GROUP_OPTION, TOP_LEFT, TOP_RIGHT);
-
-	AdjustControlSize(IDC_CHECK_UNTRACKED);
-	AdjustControlSize(IDC_CHECK_ALL);
 
 	CString sWindowTitle;
 	GetWindowText(sWindowTitle);
@@ -81,9 +81,9 @@ void CStashSaveDlg::OnBnClickedOk()
 
 	if (m_bIncludeUntracked)
 	{
-		if (CMessageBox::ShowCheck(GetSafeHwnd(), IDS_STASHSAVE_INCLUDEUNTRACKED, IDS_APPNAME, 2, IDI_WARNING, IDS_CONTINUEBUTTON, IDS_ABORTBUTTON, NULL, _T("NoStashIncludeUntrackedWarning"), IDS_PROC_NOTSHOWAGAINCONTINUE) == 2)
+		if (CMessageBox::ShowCheck(GetSafeHwnd(), IDS_STASHSAVE_INCLUDEUNTRACKED, IDS_APPNAME, 2, IDI_WARNING, IDS_CONTINUEBUTTON, IDS_ABORTBUTTON, NULL, L"NoStashIncludeUntrackedWarning", IDS_PROC_NOTSHOWAGAINCONTINUE) == 2)
 		{
-			CMessageBox::RemoveRegistryKey(_T("NoStashIncludeUntrackedWarning")); // only store answer if it is "Continue"
+			CMessageBox::RemoveRegistryKey(L"NoStashIncludeUntrackedWarning"); // only store answer if it is "Continue"
 			return;
 		}
 	}

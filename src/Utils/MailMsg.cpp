@@ -54,8 +54,8 @@
 
 CMailMsg::CMailMsg()
 {
-	m_hMapi					= NULL;
-	m_lpMapiSendMail		= NULL;
+	m_hMapi					= nullptr;
+	m_lpMapiSendMail		= nullptr;
 	m_bReady				= FALSE;
 	m_bShowComposeDialog	= FALSE;
 }
@@ -78,7 +78,7 @@ static void addAdresses(std::vector<MailAddress>& recipients, const CString& sAd
 	int start = 0;
 	while (start >= 0)
 	{
-		CString address = sAddresses.Tokenize(_T(";"), start);
+		CString address = sAddresses.Tokenize(L";", start);
 		CString name;
 		CStringUtils::ParseEmailAddress(address, address, &name);
 		if (address.IsEmpty())
@@ -116,7 +116,7 @@ void CMailMsg::AddAttachment(const CString& sAttachment, CString sTitle)
 {
 	if (sTitle.IsEmpty())
 	{
-		int position = sAttachment.ReverseFind(_T('\\'));
+		int position = sAttachment.ReverseFind(L'\\');
 		if(position >=0)
 		{
 			sTitle = sAttachment.Mid(position+1);
@@ -132,21 +132,21 @@ void CMailMsg::AddAttachment(const CString& sAttachment, CString sTitle)
 BOOL CMailMsg::DetectMailClient(CString& sMailClientName)
 {
 	CRegKey regKey;
-	TCHAR buf[1024] = _T("");
+	TCHAR buf[1024] = L"";
 	ULONG buf_size = 0;
 	LONG lResult;
 
-	lResult = regKey.Open(HKEY_CURRENT_USER, _T("SOFTWARE\\Clients\\Mail"), KEY_READ);
+	lResult = regKey.Open(HKEY_CURRENT_USER, L"SOFTWARE\\Clients\\Mail", KEY_READ);
 	if(lResult!=ERROR_SUCCESS)
 	{
-		lResult = regKey.Open(HKEY_LOCAL_MACHINE, _T("SOFTWARE\\Clients\\Mail"), KEY_READ);
+		lResult = regKey.Open(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Clients\\Mail", KEY_READ);
 	}
 
 	if(lResult==ERROR_SUCCESS)
 	{
 		buf_size = 1023;
 #pragma warning(disable:4996)
-		LONG result = regKey.QueryValue(buf, _T(""), &buf_size);
+		LONG result = regKey.QueryValue(buf, L"", &buf_size);
 #pragma warning(default:4996)
 		if(result==ERROR_SUCCESS)
 		{
@@ -170,20 +170,20 @@ BOOL CMailMsg::MAPIInitialize()
 	CString sMailClientName;
 	if(!DetectMailClient(sMailClientName))
 	{
-		m_sErrorMsg = _T("Error detecting E-mail client");
+		m_sErrorMsg = L"Error detecting E-mail client";
 		return FALSE;
 	}
 	else
 	{
-		m_sErrorMsg = _T("Detected E-mail client ") + sMailClientName;
+		m_sErrorMsg = L"Detected E-mail client " + sMailClientName;
 	}
 
 	// Load MAPI.dll
 
-	m_hMapi = AtlLoadSystemLibraryUsingFullPath(_T("mapi32.dll"));
+	m_hMapi = AtlLoadSystemLibraryUsingFullPath(L"mapi32.dll");
 	if (!m_hMapi)
 	{
-		m_sErrorMsg = _T("Error loading mapi32.dll");
+		m_sErrorMsg = L"Error loading mapi32.dll";
 		return FALSE;
 	}
 
@@ -193,7 +193,7 @@ BOOL CMailMsg::MAPIInitialize()
 
 	if(!m_bReady)
 	{
-		m_sErrorMsg = _T("Not found required function entries in mapi32.dll");
+		m_sErrorMsg = L"Not found required function entries in mapi32.dll";
 	}
 
 	return m_bReady;
@@ -211,107 +211,58 @@ CString CMailMsg::GetEmailClientName()
 
 BOOL CMailMsg::Send()
 {
-	if(m_lpMapiSendMail==NULL)
+	if (!m_lpMapiSendMail)
 		return FALSE;
-
-	TStrStrMap::iterator	p;
-	int						nIndex = 0;
-	MapiRecipDesc*			pRecipients = NULL;
-	int						nAttachments = 0;
-	MapiFileDesc*			pAttachments = NULL;
-	ULONG					status = 0;
-	MapiMessage				message;
 
 	if(!m_bReady && !MAPIInitialize())
 		return FALSE;
 
-	pRecipients = new MapiRecipDesc[1 + m_to.size() + m_cc.size()];
-	if(!pRecipients)
-	{
-		m_sErrorMsg = _T("Error allocating memory");
-		return FALSE;
-	}
-
-	nAttachments = (int)m_attachments.size();
-	if (nAttachments)
-	{
-		pAttachments = new MapiFileDesc[nAttachments];
-		if(!pAttachments)
-		{
-			m_sErrorMsg = _T("Error allocating memory");
-			delete[] pRecipients;
-			return FALSE;
-		}
-	}
-
 	// set from
-	pRecipients[0].ulReserved = 0;
-	pRecipients[0].ulRecipClass = MAPI_ORIG;
-	pRecipients[0].lpszAddress = (LPSTR)m_from.email.c_str();
-	pRecipients[0].lpszName = (LPSTR)m_from.name.c_str();
-	pRecipients[0].ulEIDSize = 0;
-	pRecipients[0].lpEntryID = NULL;
+	MapiRecipDesc originator = { 0 };
+	originator.ulRecipClass = MAPI_ORIG;
+	originator.lpszAddress = (LPSTR)m_from.email.c_str();
+	originator.lpszName = (LPSTR)m_from.name.c_str();
 
+	std::vector<MapiRecipDesc> recipients;
+	auto addRecipient = [&recipients](ULONG ulRecipClass, const MailAddress& recipient)
+	{
+		MapiRecipDesc repipDesc = { 0 };
+		repipDesc.ulRecipClass = ulRecipClass;
+		repipDesc.lpszAddress = (LPSTR)recipient.email.c_str();
+		repipDesc.lpszName = (LPSTR)recipient.name.c_str();
+		recipients.emplace_back(repipDesc);
+	};
 	// add to recipients
-	for (size_t i = 0; i < m_to.size(); ++i)
-	{
-		++nIndex;
-		pRecipients[nIndex].ulReserved = 0;
-		pRecipients[nIndex].ulRecipClass = MAPI_TO;
-		pRecipients[nIndex].lpszAddress = (LPSTR)m_to.at(i).email.c_str();
-		pRecipients[nIndex].lpszName = (LPSTR)m_to.at(i).name.c_str();
-		pRecipients[nIndex].ulEIDSize = 0;
-		pRecipients[nIndex].lpEntryID = NULL;
-	}
-
+	std::for_each(m_to.cbegin(), m_to.cend(), std::bind(addRecipient, MAPI_TO, std::placeholders::_1));
 	// add cc receipients
-	for (size_t i = 0; i < m_cc.size(); ++i)
-	{
-		++nIndex;
-		pRecipients[nIndex].ulReserved = 0;
-		pRecipients[nIndex].ulRecipClass = MAPI_CC;
-		pRecipients[nIndex].lpszAddress = (LPSTR)m_cc.at(i).email.c_str();
-		pRecipients[nIndex].lpszName = (LPSTR)m_cc.at(i).name.c_str();
-		pRecipients[nIndex].ulEIDSize = 0;
-		pRecipients[nIndex].lpEntryID = NULL;
-	}
+	std::for_each(m_cc.cbegin(), m_cc.cend(), std::bind(addRecipient, MAPI_CC, std::placeholders::_1));
 
-	nIndex=0;
 	// add attachments
-	for (p = m_attachments.begin(), nIndex = 0;
-		p != m_attachments.end(); p++, nIndex++)
+	std::vector<MapiFileDesc> attachments;
+	std::for_each(m_attachments.cbegin(), m_attachments.cend(), [&attachments](auto& attachment)
 	{
-		pAttachments[nIndex].ulReserved		= 0;
-		pAttachments[nIndex].flFlags		= 0;
-		pAttachments[nIndex].nPosition		= 0xFFFFFFFF;
-		pAttachments[nIndex].lpszPathName	= (LPSTR)p->first.c_str();
-		pAttachments[nIndex].lpszFileName	= (LPSTR)p->second.c_str();
-		pAttachments[nIndex].lpFileType		= NULL;
-	}
+		MapiFileDesc fileDesc = { 0 };
+		fileDesc.nPosition = 0xFFFFFFFF;
+		fileDesc.lpszPathName = (LPSTR)attachment.first.c_str();
+		fileDesc.lpszFileName = (LPSTR)attachment.second.c_str();
+		attachments.emplace_back(fileDesc);
+	});
 
-	message.ulReserved						= 0;
+	MapiMessage message = { 0 };
 	message.lpszSubject						= (LPSTR)m_sSubject.c_str();
 	message.lpszNoteText					= (LPSTR)m_sMessage.c_str();
-	message.lpszMessageType					= NULL;
-	message.lpszDateReceived				= NULL;
-	message.lpszConversationID				= NULL;
-	message.flFlags							= 0;
-	message.lpOriginator					= pRecipients;
-	message.nRecipCount						= (ULONG)(m_to.size() + m_cc.size());
-	message.lpRecips						= &pRecipients[1];
-	message.nFileCount						= nAttachments;
-	message.lpFiles							= nAttachments ? pAttachments : NULL;
+	message.lpOriginator					= &originator;
+	message.nRecipCount						= (ULONG)recipients.size();
+	message.lpRecips						= recipients.data();
+	message.nFileCount						= (ULONG)attachments.size();
+	message.lpFiles							= attachments.data();
 
-	status = m_lpMapiSendMail(NULL, 0, &message, (m_bShowComposeDialog?MAPI_DIALOG:0)|MAPI_LOGON_UI, 0);
+	ULONG status = m_lpMapiSendMail(NULL, 0, &message, (m_bShowComposeDialog ? MAPI_DIALOG : 0) | MAPI_LOGON_UI, 0);
 
 	if(status!=SUCCESS_SUCCESS)
 	{
-		m_sErrorMsg.Format(_T("MAPISendMail has failed with code %lu."), status);
+		m_sErrorMsg.Format(L"MAPISendMail has failed with code %lu.", status);
 	}
-
-	delete[] pRecipients;
-
-	delete[] pAttachments;
 
 	return (SUCCESS_SUCCESS == status);
 }

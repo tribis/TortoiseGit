@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -19,26 +19,25 @@
 
 #pragma once
 #include "gittype.h"
-#include "GitStatus.h"
 #include "AtlTime.h"
 #include "GitHash.h"
 #include "GitDll.h"
 
 typedef std::vector<CGitHash> GIT_REV_LIST;
 
-#define LOG_REV_AUTHOR_NAME		_T('0')
-#define LOG_REV_AUTHOR_EMAIL	_T('1')
-#define LOG_REV_AUTHOR_DATE		_T('2')
-#define LOG_REV_COMMIT_NAME		_T('3')
-#define LOG_REV_COMMIT_EMAIL	_T('4')
-#define LOG_REV_COMMIT_DATE		_T('5')
-#define LOG_REV_COMMIT_SUBJECT	_T('6')
-#define LOG_REV_COMMIT_BODY		_T('7')
-#define LOG_REV_COMMIT_HASH		_T('8')
-#define LOG_REV_COMMIT_PARENT	_T('9')
-#define LOG_REV_COMMIT_FILE		_T('A')
-#define LOG_REV_ITEM_BEGIN		_T('B')
-#define LOG_REV_ITEM_END		_T('C')
+#define LOG_REV_AUTHOR_NAME		L'0'
+#define LOG_REV_AUTHOR_EMAIL	L'1'
+#define LOG_REV_AUTHOR_DATE		L'2'
+#define LOG_REV_COMMIT_NAME		L'3'
+#define LOG_REV_COMMIT_EMAIL	L'4'
+#define LOG_REV_COMMIT_DATE		L'5'
+#define LOG_REV_COMMIT_SUBJECT	L'6'
+#define LOG_REV_COMMIT_BODY		L'7'
+#define LOG_REV_COMMIT_HASH		L'8'
+#define LOG_REV_COMMIT_PARENT	L'9'
+#define LOG_REV_COMMIT_FILE		L'A'
+#define LOG_REV_ITEM_BEGIN		L'B'
+#define LOG_REV_ITEM_END		L'C'
 
 class GitRev
 {
@@ -56,47 +55,47 @@ protected:
 
 public:
 	GitRev(void);
-	CString GetAuthorName()
+	CString GetAuthorName() const
 	{
 		return m_AuthorName;
 	}
 
-	CString GetAuthorEmail()
+	CString GetAuthorEmail() const
 	{
 		return m_AuthorEmail;
 	}
 
-	CTime GetAuthorDate()
+	CTime GetAuthorDate() const
 	{
 		return m_AuthorDate;
 	}
 
-	CString GetCommitterName()
+	CString GetCommitterName() const
 	{
 		return m_CommitterName;
 	}
 
-	CString GetCommitterEmail()
+	CString GetCommitterEmail() const
 	{
 		return m_CommitterEmail;
 	}
 
-	CTime GetCommitterDate()
+	CTime GetCommitterDate() const
 	{
 		return m_CommitterDate;
 	}
 
-	CString GetSubject()
+	CString GetSubject() const
 	{
 		return m_Subject;
 	}
 
-	CString GetBody()
+	CString GetBody() const
 	{
 		return m_Body;
 	}
 
-	~GitRev(void);
+	virtual ~GitRev(void);
 
 	enum
 	{
@@ -106,8 +105,8 @@ public:
 		REV_UNSPECIFIED = -4,	///< unspecified revision
 	};
 
-	static CString GetHead(){return CString(_T("HEAD"));};
-	static CString GetWorkingCopy(){return CString(GIT_REV_ZERO);};
+	static CString GetHead() { return L"HEAD"; };
+	static CString GetWorkingCopy() { return GIT_REV_ZERO; };
 
 	CGitHash m_CommitHash;
 	GIT_REV_LIST m_ParentHash;
@@ -127,7 +126,7 @@ public:
 	int GetCommitFromHash(const CGitHash& hash);
 	int GetCommit(const CString& rev);
 
-	CString GetLastErr() { return m_sErr; }
+	CString GetLastErr() const { return m_sErr; }
 
 	void DbgPrint();
 

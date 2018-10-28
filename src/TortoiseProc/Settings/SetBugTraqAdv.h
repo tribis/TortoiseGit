@@ -1,5 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
+// Copyright (C) 2016 - TortoiseGit
 // Copyright (C) 2008,2010 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -31,8 +32,8 @@ class CSetBugTraqAdv : public CResizableStandAloneDialog
 	DECLARE_DYNAMIC(CSetBugTraqAdv)
 
 public:
-	CSetBugTraqAdv(CWnd* pParent = NULL);
-	CSetBugTraqAdv(const CBugTraqAssociation &assoc, CWnd* pParent = NULL);
+	CSetBugTraqAdv(CWnd* pParent = nullptr);
+	CSetBugTraqAdv(const CBugTraqAssociation &assoc, CWnd* pParent = nullptr);
 	virtual ~CSetBugTraqAdv();
 
 	CBugTraqAssociation GetAssociation() const;
@@ -41,9 +42,9 @@ public:
 	enum { IDD = IDD_SETTINGSBUGTRAQADV };
 
 protected:
-	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
-	virtual BOOL OnInitDialog();
-	virtual void OnOK();
+	virtual void DoDataExchange(CDataExchange* pDX) override;    // DDX/DDV support
+	virtual BOOL OnInitDialog() override;
+	virtual void OnOK() override;
 	afx_msg void OnDestroy();
 	afx_msg void OnBnClickedBugTraqbrowse();
 	afx_msg void OnCbnSelchangeBugtraqprovidercombo();
@@ -53,6 +54,7 @@ protected:
 
 	void CheckHasOptions();
 
+	BOOL			m_bEnabled;
 	CString			m_sPath;
 	CLSID			m_provider_clsid;
 	CString			m_sParameters;

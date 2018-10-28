@@ -1,7 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
 // Copyright (C) 2003-2006, 2008 - Stefan Kueng
-// Copyright (C) 2008-2011, 2013, 2015 - TortoiseGit
+// Copyright (C) 2008-2011, 2013, 2015-2016 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -31,17 +31,17 @@ class CExportDlg : public CHorizontalResizableStandAloneDialog, public CChooseVe
 	DECLARE_DYNAMIC(CExportDlg)
 
 public:
-	CExportDlg(CWnd* pParent = NULL);   ///< standard constructor
+	CExportDlg(CWnd* pParent = nullptr);   ///< standard constructor
 	virtual ~CExportDlg();
 
 	// Dialog Data
 	enum { IDD = IDD_EXPORT };
 
 protected:
-	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
+	virtual void DoDataExchange(CDataExchange* pDX) override;    // DDX/DDV support
 
-	virtual BOOL OnInitDialog();
-	virtual void OnOK();
+	virtual BOOL OnInitDialog() override;
+	virtual void OnOK() override;
 	afx_msg void OnDestroy();
 	afx_msg void OnBnClickedCheckoutdirectoryBrowse();
 	afx_msg void OnEnChangeCheckoutdirectory();

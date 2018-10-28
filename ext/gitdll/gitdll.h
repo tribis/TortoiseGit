@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -52,6 +52,10 @@ public:
 
 typedef unsigned char GIT_HASH[GIT_HASH_SIZE];
 
+struct GIT_OBJECT_OID {
+	unsigned char hash[GIT_HASH_SIZE];
+};
+
 typedef void *  GIT_HANDLE;
 typedef void *  GIT_LOG;
 
@@ -97,7 +101,7 @@ GITDLL_API int git_get_sha1(const char *name, GIT_HASH sha1);
  *  @remark, this function must be call before other function.
  *	@return			0	success
  */
-GITDLL_API int git_init();
+GITDLL_API int git_init(void);
 
 GITDLL_API int git_open_log(GIT_LOG * handle, char * arg);
 GITDLL_API int git_get_log_firstcommit(GIT_LOG handle);
@@ -123,7 +127,7 @@ GITDLL_API int git_close_log(GIT_LOG handle);
  */
 GITDLL_API int git_get_commit_from_hash(GIT_COMMIT* commit, const GIT_HASH hash);
 GITDLL_API int git_parse_commit(GIT_COMMIT *commit);
-
+GITDLL_API int git_commit_is_root(const GIT_COMMIT* commit);
 GITDLL_API int git_get_commit_first_parent(GIT_COMMIT *commit,GIT_COMMIT_LIST *list);
 GITDLL_API int git_get_commit_next_parent(GIT_COMMIT_LIST *list, GIT_HASH hash);
 
@@ -136,12 +140,7 @@ GITDLL_API int git_diff_flush(GIT_DIFF diff);
 GITDLL_API int git_close_diff(GIT_DIFF diff);
 
 
-GITDLL_API int git_get_diff_file(GIT_DIFF diff,GIT_FILE file, int i,char **newname, char **oldname,  int *mode, int *IsBin, int *inc, int *dec);
-
-#define READ_TREE_RECURSIVE 1
-typedef int (*read_tree_fn_t)(const unsigned char*, struct strbuf*, const char*, unsigned int, int, void*);
-
-GITDLL_API int git_read_tree(GIT_HASH hash,read_tree_fn_t fn, void *context);
+GITDLL_API int git_get_diff_file(GIT_DIFF diff, GIT_FILE file, int i, char** newname, char** oldname, int* IsDir, int* status, int* IsBin, int* inc, int* dec);
 
 
 typedef void * EXCLUDE_LIST;
@@ -153,7 +152,7 @@ GITDLL_API int git_add_exclude(const char *string, const char *base,
 
 GITDLL_API int git_check_excluded_1(const char *pathname,
 							int pathlen, const char *basename, int *dtype,
-							EXCLUDE_LIST el);
+							EXCLUDE_LIST el, int ignorecase);
 
 #define DT_UNKNOWN	0
 #define DT_DIR		1
@@ -163,18 +162,17 @@ GITDLL_API int git_check_excluded_1(const char *pathname,
 GITDLL_API int git_free_exclude_list(EXCLUDE_LIST which);
 
 //caller need free p_note
-GITDLL_API int git_get_notes(GIT_HASH hash, char **p_note);
+GITDLL_API int git_get_notes(const GIT_HASH hash, char** p_note);
 
 GITDLL_API int git_run_cmd(char *cmd, char *arg);
-GITDLL_API void git_exit_cleanup();
+GITDLL_API void git_exit_cleanup(void);
 
 #define REF_ISSYMREF 01
 #define REF_ISPACKED 02
 
-typedef int each_ref_fn(const char *refname, const unsigned char *sha1, int flags, void *cb_data);
-GITDLL_API int git_head_ref(each_ref_fn, void *);
+typedef int each_ref_fn(const char* refname, const struct GIT_OBJECT_OID* oid, int flags, void* cb_data);
 
-typedef int each_reflog_ent_fn(unsigned char *osha1, unsigned char *nsha1, const char *, unsigned long, int, const char *, void *);
+typedef int each_reflog_ent_fn(struct GIT_OBJECT_OID* old_oid, struct GIT_OBJECT_OID* new_oid, const char* committer, unsigned long long timestamp, int tz, const char* msg, void* cb_data);
 GITDLL_API int git_for_each_reflog_ent(const char *ref, each_reflog_ent_fn fn, void *cb_data);
 
 GITDLL_API int git_checkout_file(const char* ref, const char* path, char* outputpath);
@@ -196,11 +194,14 @@ const char *get_windows_home_directory(void);
 
 GITDLL_API const wchar_t *wget_windows_home_directory(void);
 GITDLL_API const wchar_t *wget_msysgit_etc(void);
+GITDLL_API const wchar_t *wget_program_data_config(void);
 
 typedef void *GIT_MAILMAP;
 
 GITDLL_API int git_read_mailmap(GIT_MAILMAP *mailmap);
-GITDLL_API const char * git_get_mailmap_author(GIT_MAILMAP mailmap, const char *email2, void *payload, const char *(*author2_cb)(void *));
+GITDLL_API int git_lookup_mailmap(GIT_MAILMAP mailmap, const char** email1, const char** name1, const char* email2, void* payload, const char* (*author2_cb)(void*));
 GITDLL_API void git_free_mailmap(GIT_MAILMAP mailmap);
+
+GITDLL_API int git_mkdir(const char* path);
 
 #endif

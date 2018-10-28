@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2017 - TortoiseGit
 // Copyright (C) 2003-2008 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -21,15 +21,15 @@
 #include "afxcmn.h"
 #include "StandAloneDlg.h"
 #include "Git.h"
+#include "GitRev.h"
 #include "TGitPath.h"
-#include "Git.h"
-#include "HintListCtrl.h"
+#include "HintCtrl.h"
 #include "Colors.h"
 #include "FilterEdit.h"
-#include "MessageBox.h"
 #include "ProgressDlg.h"
 #include "MenuButton.h"
 #include "ACEdit.h"
+#include "GestureEnabledControl.h"
 #define IDT_FILTER		101
 #define IDT_INPUT		102
 
@@ -45,22 +45,22 @@ class CFileDiffDlg : public CResizableStandAloneDialog
 {
 	DECLARE_DYNAMIC(CFileDiffDlg)
 public:
-	CFileDiffDlg(CWnd* pParent = NULL);
+	CFileDiffDlg(CWnd* pParent = nullptr);
 	virtual ~CFileDiffDlg();
 
-	void SetDiff(const CTGitPath * path, const GitRev &rev1, const GitRev &rev2);
-	void SetDiff(const CTGitPath * path, const GitRev &rev1);
-	void SetDiff(const CTGitPath * path, const CString &hash1, const CString &hash2);
+	void SetDiff(const CTGitPath* path, const GitRev& baseRev1, const GitRev& rev2);
+	void SetDiff(const CTGitPath* path, const GitRev& baseRev1);
+	void SetDiff(const CTGitPath* path, const CString& baseHash1, const CString& hash2);
 
 	void	DoBlame(bool blame = true) {m_bBlame = blame;}
 
 	enum { IDD = IDD_DIFFFILES };
 
 protected:
-	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
-	virtual void OnCancel();
-	virtual BOOL OnInitDialog();
-	virtual BOOL PreTranslateMessage(MSG* pMsg);
+	virtual void DoDataExchange(CDataExchange* pDX) override;    // DDX/DDV support
+	virtual void OnCancel() override;
+	virtual BOOL OnInitDialog() override;
+	virtual BOOL PreTranslateMessage(MSG* pMsg) override;
 	afx_msg LRESULT OnRefLoad(WPARAM wParam, LPARAM lParam);
 	afx_msg void OnNMDblclkFilelist(NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void OnLvnGetInfoTipFilelist(NMHDR *pNMHDR, LRESULT *pResult);
@@ -81,12 +81,12 @@ protected:
 	afx_msg void OnBnClickedLog();
 	afx_msg LRESULT OnDisableButtons(WPARAM, LPARAM);
 	afx_msg LRESULT OnDiffFinished(WPARAM, LPARAM);
+	afx_msg void OnLvnBegindrag(NMHDR* pNMHDR, LRESULT* pResult);
 
 	DECLARE_MESSAGE_MAP()
 
 	int					AddEntry(const CTGitPath * fd);
 	void				DoDiff(int selIndex, bool blame);
-	void				DiffProps(int selIndex);
 	void				SetURLLabels(int mask=0x3);
 	void				ClearURLabels(int mask);
 	void				Filter(CString sFilterText);
@@ -100,12 +100,12 @@ protected:
 
 	bool				CheckMultipleDiffs();
 
-	int					FillRevFromString(GitRev *rev, CString str)
+	int					FillRevFromString(GitRev* rev, const CString& str)
 	{
 		GitRev gitrev;
 		if (gitrev.GetCommit(str))
 		{
-			MessageBox(gitrev.GetLastErr(), _T("TortoiseGit"), MB_ICONERROR);
+			MessageBox(gitrev.GetLastErr(), L"TortoiseGit", MB_ICONERROR);
 			return -1;
 		}
 		*rev=gitrev;
@@ -121,24 +121,25 @@ private:
 
 	static UINT			LoadRefThreadEntry(LPVOID pVoid)
 	{
-		return ((CFileDiffDlg *)pVoid)->LoadRefThread();
+		return reinterpret_cast<CFileDiffDlg*>(pVoid)->LoadRefThread();
 	};
 
 	UINT				LoadRefThread();
 
 	STRING_VECTOR		m_Reflist;
 
-	virtual BOOL		Cancel() {return m_bCancelled;}
-	virtual BOOL DestroyWindow();
+	virtual BOOL DestroyWindow() override;
 	void OnTextUpdate(CACEdit *pEdit);
 
 	CMenuButton			m_cRev1Btn;
 	CMenuButton			m_cRev2Btn;
 	CFilterEdit			m_cFilter;
 
+	CMenuButton			m_cDiffOptionsBtn;
+
 	CMFCButton			m_SwitchButton;
 	CColors				m_colors;
-	CHintListCtrl		m_cFileList;
+	CGestureEnabledControlTmpl<CHintCtrl<CListCtrl>>	m_cFileList;
 	bool				m_bBlame;
 	CTGitPathList		m_arFileList;
 	std::vector<CTGitPath*> m_arFilteredList;
@@ -149,7 +150,6 @@ private:
 
 	bool				m_bIsBare;
 	CTGitPath			m_path1;
-	GitRev				m_peg;
 	GitRev				m_rev1;
 	CTGitPath			m_path2;
 	GitRev				m_rev2;
@@ -157,8 +157,6 @@ private:
 	volatile LONG		m_bThreadRunning;
 
 	volatile LONG		m_bLoadingRef;
-
-	bool				m_bCancelled;
 
 	void				Sort();
 	static bool			SortCompare(const CTGitPath& Data1, const CTGitPath& Data2);

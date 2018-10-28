@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -20,11 +20,10 @@
 //
 #pragma once
 
-#include "HintListCtrl.h"
+#include "HintCtrl.h"
 #include "GitHash.h"
-#include "Git.h"
 
-class CGitRefCompareList : public CHintListCtrl
+class CGitRefCompareList : public CHintCtrl<CListCtrl>
 {
 	DECLARE_DYNAMIC(CGitRefCompareList);
 
@@ -66,16 +65,18 @@ public:
 	int AddEntry(git_repository* repo, const CString& ref, const CGitHash* oldHash, const CGitHash* newHash);
 	void Show();
 	void Clear();
+	static CString GetCommitMessage(git_commit *commit);
 
 protected:
+	afx_msg void OnHdnItemclick(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg void OnContextMenu(CWnd *pWnd, CPoint point);
 	void OnContextMenuList(CWnd *pWnd, CPoint point);
 	void OnContextMenuHeader(CWnd *pWnd, CPoint point);
+	virtual ULONG GetGestureStatus(CPoint ptTouch) override;
 
 	DECLARE_MESSAGE_MAP()
 
 private:
-	static CString GetCommitMessage(git_commit *commit);
 	static bool SortPredicate(const RefEntry &e1, const RefEntry &e2);
 
 	std::vector<RefEntry>	m_RefList;
@@ -83,11 +84,13 @@ private:
 	static BOOL 			m_bSortLogical;
 
 	int colRef;
+	int colRefType;
 	int colChange;
 	int colOldHash;
 	int colOldMessage;
 	int colNewHash;
 	int colNewMessage;
+
+	bool	m_bAscending;		///< sort direction
+	int		m_nSortedColumn;	///< which column to sort
 };
-
-

@@ -23,9 +23,7 @@
 #include "CharacterSet.h"
 #include "LexerModule.h"
 
-#ifdef SCI_NAMESPACE
 using namespace Scintilla;
-#endif
 
 //XXX Identical to Perl, put in common area
 static inline bool isEOLChar(char ch) {
@@ -346,7 +344,7 @@ static bool RE_CanFollowKeyword(const char *keyword) {
 // Look at chars up to but not including endPos
 // Don't look at styles in case we're looking forward
 
-static int skipWhitespace(Sci_Position startPos,
+static Sci_Position skipWhitespace(Sci_Position startPos,
                           Sci_Position endPos,
                           Accessor &styler) {
     for (Sci_Position i = startPos; i < endPos; i++) {
@@ -433,6 +431,32 @@ static bool haveTargetMatch(Sci_Position currPos,
     return true;
 }
 
+// Finds the start position of the expression containing @p pos
+// @p min_pos should be a known expression start, e.g. the start of the line
+static Sci_Position findExpressionStart(Sci_Position pos,
+                                        Sci_Position min_pos,
+                                        Accessor &styler) {
+    int depth = 0;
+    for (; pos > min_pos; pos -= 1) {
+        int style = styler.StyleAt(pos - 1);
+        if (style == SCE_RB_OPERATOR) {
+            int ch = styler[pos - 1];
+            if (ch == '}' || ch == ')' || ch == ']') {
+                depth += 1;
+            } else if (ch == '{' || ch == '(' || ch == '[') {
+                if (depth == 0) {
+                    break;
+                } else {
+                    depth -= 1;
+                }
+            } else if (ch == ';' && depth == 0) {
+                break;
+            }
+        }
+    }
+    return pos;
+}
+
 // We need a check because the form
 // [identifier] <<[target]
 // is ambiguous.  The Ruby lexer/parser resolves it by
@@ -458,14 +482,18 @@ static bool sureThisIsNotHeredoc(Sci_Position lt2StartPos,
     const bool definitely_not_a_here_doc = true;
     const bool looks_like_a_here_doc = false;
 
+    // find the expression start rather than the line start
+    Sci_Position exprStartPosn = findExpressionStart(lt2StartPos, lineStartPosn, styler);
+
     // Find the first word after some whitespace
-    Sci_Position firstWordPosn = skipWhitespace(lineStartPosn, lt2StartPos, styler);
+    Sci_Position firstWordPosn = skipWhitespace(exprStartPosn, lt2StartPos, styler);
     if (firstWordPosn >= lt2StartPos) {
         return definitely_not_a_here_doc;
     }
     prevStyle = styler.StyleAt(firstWordPosn);
     // If we have '<<' following a keyword, it's not a heredoc
     if (prevStyle != SCE_RB_IDENTIFIER
+            && prevStyle != SCE_RB_SYMBOL
             && prevStyle != SCE_RB_INSTANCE_VAR
             && prevStyle != SCE_RB_CLASS_VAR) {
         return definitely_not_a_here_doc;
@@ -503,6 +531,16 @@ static bool sureThisIsNotHeredoc(Sci_Position lt2StartPos,
     }
     // Skip next batch of white-space
     firstWordPosn = skipWhitespace(firstWordPosn, lt2StartPos, styler);
+    // possible symbol for an implicit hash argument
+    if (firstWordPosn < lt2StartPos && styler.StyleAt(firstWordPosn) == SCE_RB_SYMBOL) {
+        for (; firstWordPosn <= lt2StartPos; firstWordPosn += 1) {
+            if (styler.StyleAt(firstWordPosn) != SCE_RB_SYMBOL) {
+                break;
+            }
+        }
+        // Skip next batch of white-space
+        firstWordPosn = skipWhitespace(firstWordPosn, lt2StartPos, styler);
+    }
     if (firstWordPosn != lt2StartPos) {
         // Have [[^ws[identifier]ws[*something_else*]ws<<
         return definitely_not_a_here_doc;
@@ -1088,6 +1126,10 @@ static void ColouriseRbDoc(Sci_PositionU startPos, Sci_Position length, int init
                     // <name>= is a name only when being def'd -- Get it the next time
                     // This means that <name>=<name> is always lexed as
                     // <name>, (op, =), <name>
+                } else if (ch == ':'
+                           && isSafeWordcharOrHigh(chPrev)
+                           && strchr(" \t\n\r", chNext) != NULL) {
+                    state = SCE_RB_SYMBOL;
                 } else if ((ch == '?' || ch == '!')
                            && isSafeWordcharOrHigh(chPrev)
                            && !isSafeWordcharOrHigh(chNext)) {

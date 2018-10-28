@@ -1,5 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
+// Copyright (C) 2009, 2011-2012, 2016-2017 - TortoiseGit
 // Copyright (C) 2003-2011, 2015 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -35,7 +36,7 @@ public:
 
 	/**
 	 * sets the title of the progress dialog box.
-	 * \param szTitle pointer to a NULL-terminated string that contains the dialog box title
+	 * \param szTitle pointer to a nullptr-terminated string that contains the dialog box title
 	 */
 	void SetTitle ( LPCTSTR szTitle );
 	/**
@@ -46,7 +47,7 @@ public:
 	/**
 	 * Displays a message.
 	 * \param dwLine line number on which the text is to be displayed. There are three lines possible, two lines if SetCalculateTime() is set to true.
-	 * \param szText NULL-terminated string that contains the line text.
+	 * \param szText nullptr-terminated string that contains the line text.
 	 * \param bCompactPath set to true if you want the text to be compacted (if it is a path) to fit on the line.
 	 *
 	 * \remark This call should be made *after* the dialog has been shown - this allows
@@ -63,13 +64,13 @@ public:
 	* the system to measure the space available for the text, and do path compaction properly
 	*/
 	void FormatPathLine ( DWORD dwLine, UINT idFormatText, ...);
-	void FormatPathLine ( DWORD dwLine, CString FormatText, ...);
+	void FormatPathLine(DWORD dwLine, LPCTSTR FormatText, ...);
 	void FormatNonPathLine ( DWORD dwLine, UINT idFormatText, ...);
-	void FormatNonPathLine(DWORD dwLine, CString FormatText, ...);
+	void FormatNonPathLine(DWORD dwLine, LPCTSTR FormatText, ...);
 #endif
 	/**
 	 * Sets a message to be displayed if the user clicks the cancel button.
-	 * \param szMessage pointer to a NULL-terminated string that contains the message.
+	 * \param szMessage pointer to a nullptr-terminated string that contains the message.
 	 * \remark Even though the user clicks Cancel, the application cannot immediately
 	 * call Stop() to close the dialog box. The application
 	 * must wait until the next time it calls HasUserCancelled() to
@@ -83,18 +84,7 @@ public:
 	void SetCancelMsg ( LPCTSTR szMessage );
 #ifdef _MFC_VER
 	void SetCancelMsg ( UINT idMessage );
-	/**
-	 * Specifies an AVI-clip that will run in the dialog box.
-	 * \param uRsrcID AVI resource identifier. To create this value use the MAKEINTRESOURCE macro.
-	 */
-	void SetAnimation ( UINT uRsrcID );
 #endif
-	/**
-	 * Specifies an AVI-clip that will run in the dialog box.
-	 * \param hinst instance handle to the module from which the avi resource should be loaded.
-	 * \param uRsrcID AVI resource identifier. To create this value use the MAKEINTRESOURCE macro.
-	 */
-	void SetAnimation ( HINSTANCE hinst, UINT uRsrcID );
 
 	/**
 	 * Specifies that the progress dialog should have a line indicating the time remaining to complete.
@@ -159,7 +149,7 @@ public:
 	 * Checks whether this object was created successfully. If the return value is false then
 	 * you MUST NOT use the current instance of this class.
 	 */
-	bool IsValid() const { return m_pIDlg != 0; }
+	bool IsValid() const { return m_pIDlg != nullptr; }
 
 	/**
 	 * Checks whether the window is shown.

@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2016 - TortoiseGit
+// Copyright (C) 2008-2018 - TortoiseGit
 // Copyright (C) 2003-2008 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -26,7 +26,7 @@
 #include "CmdLineParser.h"
 
 IMPLEMENT_DYNAMIC(CGitProgressDlg, CResizableStandAloneDialog)
-CGitProgressDlg::CGitProgressDlg(CWnd* pParent /*=NULL*/)
+CGitProgressDlg::CGitProgressDlg(CWnd* pParent /*=nullptr*/)
 	: CResizableStandAloneDialog(CGitProgressDlg::IDD, pParent)
 	, m_AutoClose(AUTOCLOSE_NO)
 	, m_hAccel(nullptr)
@@ -58,7 +58,7 @@ BEGIN_MESSAGE_MAP(CGitProgressDlg, CResizableStandAloneDialog)
 	ON_WM_CTLCOLOR()
 	ON_MESSAGE(WM_PROG_CMD_FINISH, OnCmdEnd)
 	ON_MESSAGE(WM_PROG_CMD_START, OnCmdStart)
-	ON_REGISTERED_MESSAGE(WM_TASKBARBTNCREATED, OnTaskbarBtnCreated)
+	ON_REGISTERED_MESSAGE(TaskBarButtonCreated, OnTaskbarBtnCreated)
 END_MESSAGE_MAP()
 
 
@@ -73,13 +73,13 @@ BOOL CGitProgressDlg::OnInitDialog()
 	// not elevated, this is a no-op.
 	CHANGEFILTERSTRUCT cfs = { sizeof(CHANGEFILTERSTRUCT) };
 	typedef BOOL STDAPICALLTYPE ChangeWindowMessageFilterExDFN(HWND hWnd, UINT message, DWORD action, PCHANGEFILTERSTRUCT pChangeFilterStruct);
-	CAutoLibrary hUser = AtlLoadSystemLibraryUsingFullPath(_T("user32.dll"));
+	CAutoLibrary hUser = AtlLoadSystemLibraryUsingFullPath(L"user32.dll");
 	if (hUser)
 	{
 		ChangeWindowMessageFilterExDFN *pfnChangeWindowMessageFilterEx = (ChangeWindowMessageFilterExDFN*)GetProcAddress(hUser, "ChangeWindowMessageFilterEx");
 		if (pfnChangeWindowMessageFilterEx)
 		{
-			pfnChangeWindowMessageFilterEx(m_hWnd, WM_TASKBARBTNCREATED, MSGFLT_ALLOW, &cfs);
+			pfnChangeWindowMessageFilterEx(m_hWnd, TaskBarButtonCreated, MSGFLT_ALLOW, &cfs);
 		}
 	}
 	m_ProgList.m_pTaskbarList.Release();
@@ -106,17 +106,17 @@ BOOL CGitProgressDlg::OnInitDialog()
 	m_ProgList.m_pPostWnd = this;
 	m_ProgList.m_bSetTitle = true;
 
-	if (hWndExplorer)
-		CenterWindow(CWnd::FromHandle(hWndExplorer));
-	EnableSaveRestore(_T("GITProgressDlg"));
+	if (GetExplorerHWND())
+		CenterWindow(CWnd::FromHandle(GetExplorerHWND()));
+	EnableSaveRestore(L"GITProgressDlg");
 
 	m_background_brush.CreateSolidBrush(GetSysColor(COLOR_WINDOW));
 	m_ProgList.Init();
 
-	int autoClose = CRegDWORD(_T("Software\\TortoiseGit\\AutoCloseGitProgress"), 0);
+	int autoClose = CRegDWORD(L"Software\\TortoiseGit\\AutoCloseGitProgress", 0);
 	CCmdLineParser parser(AfxGetApp()->m_lpCmdLine);
-	if (parser.HasKey(_T("closeonend")))
-		autoClose = parser.GetLongVal(_T("closeonend"));
+	if (parser.HasKey(L"closeonend"))
+		autoClose = parser.GetLongVal(L"closeonend");
 	switch (autoClose)
 	{
 	case 1:
@@ -133,12 +133,11 @@ BOOL CGitProgressDlg::OnInitDialog()
 	return TRUE;
 }
 
-LRESULT CGitProgressDlg::OnTaskbarBtnCreated(WPARAM /*wParam*/, LPARAM /*lParam*/)
+LRESULT CGitProgressDlg::OnTaskbarBtnCreated(WPARAM wParam, LPARAM lParam)
 {
 	m_ProgList.m_pTaskbarList.Release();
 	m_ProgList.m_pTaskbarList.CoCreateInstance(CLSID_TaskbarList);
-	SetUUIDOverlayIcon(m_hWnd);
-	return 0;
+	return __super::OnTaskbarButtonCreated(wParam, lParam);
 }
 
 void CGitProgressDlg::OnBnClickedLogbutton()
@@ -177,7 +176,6 @@ void CGitProgressDlg::OnCancel()
 	m_ProgList.Cancel();
 }
 
-
 BOOL CGitProgressDlg::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
 {
 	if (!GetDlgItem(IDOK)->IsWindowEnabled())
@@ -185,12 +183,14 @@ BOOL CGitProgressDlg::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
 		// only show the wait cursor over the list control
 		if ((pWnd)&&(pWnd == GetDlgItem(IDC_SVNPROGRESS)))
 		{
-			HCURSOR hCur = LoadCursor(NULL, IDC_WAIT);
+			HCURSOR hCur = LoadCursor(nullptr, IDC_WAIT);
 			SetCursor(hCur);
 			return TRUE;
 		}
 	}
-	HCURSOR hCur = LoadCursor(NULL, IDC_ARROW);
+	if (pWnd && pWnd == GetDlgItem(IDC_INFOTEXT))
+		return CResizableStandAloneDialog::OnSetCursor(pWnd, nHitTest, message);
+	HCURSOR hCur = LoadCursor(nullptr, IDC_ARROW);
 	SetCursor(hCur);
 	return CResizableStandAloneDialog::OnSetCursor(pWnd, nHitTest, message);
 }
@@ -220,8 +220,6 @@ BOOL CGitProgressDlg::PreTranslateMessage(MSG* pMsg)
 	return __super::PreTranslateMessage(pMsg);
 }
 
-
-
 void CGitProgressDlg::OnEnSetfocusInfotext()
 {
 	CString sTemp;
@@ -229,7 +227,6 @@ void CGitProgressDlg::OnEnSetfocusInfotext()
 	if (sTemp.IsEmpty())
 		GetDlgItem(IDC_INFOTEXT)->HideCaret();
 }
-
 
 LRESULT CGitProgressDlg::OnCtlColorStatic(WPARAM wParam, LPARAM lParam)
 {
@@ -279,7 +276,7 @@ LRESULT	CGitProgressDlg::OnCmdEnd(WPARAM /*wParam*/, LPARAM /*lParam*/)
 		for (const auto& entry : m_PostCmdList)
 		{
 			++i;
-			m_cMenuButton.AddEntry(entry.icon, entry.label);
+			m_cMenuButton.AddEntry(entry.label, entry.icon);
 			TCHAR accellerator = CStringUtils::GetAccellerator(entry.label);
 			if (accellerator == L'\0')
 				continue;
@@ -319,6 +316,7 @@ LRESULT	CGitProgressDlg::OnCmdEnd(WPARAM /*wParam*/, LPARAM /*lParam*/)
 
 	return 0;
 }
+
 LRESULT	CGitProgressDlg::OnCmdStart(WPARAM /*wParam*/, LPARAM /*lParam*/)
 {
 	DialogEnableWindow(IDOK, FALSE);

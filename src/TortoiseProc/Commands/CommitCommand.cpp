@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2013, 2015 - TortoiseGit
+// Copyright (C) 2008-2018 - TortoiseGit
 // Copyright (C) 2007-2008 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -21,20 +21,17 @@
 #include "CommitCommand.h"
 #include "CommitDlg.h"
 #include "StringUtils.h"
-#include "Hooks.h"
 #include "MessageBox.h"
 #include "AppUtils.h"
 
 CString CommitCommand::LoadLogMessage()
 {
 	CString msg;
-	if (parser.HasKey(_T("logmsg")))
+	if (parser.HasKey(L"logmsg"))
+		msg = parser.GetVal(L"logmsg");
+	if (parser.HasKey(L"logmsgfile"))
 	{
-		msg = parser.GetVal(_T("logmsg"));
-	}
-	if (parser.HasKey(_T("logmsgfile")))
-	{
-		CString logmsgfile = parser.GetVal(_T("logmsgfile"));
+		CString logmsgfile = parser.GetVal(L"logmsgfile");
 		CStringUtils::ReadStringFromTextFile(logmsgfile, msg);
 	}
 	return msg;
@@ -42,25 +39,24 @@ CString CommitCommand::LoadLogMessage()
 
 bool CommitCommand::Execute()
 {
-	CTGitPathList selectedList;
-	if (parser.HasKey(_T("logmsg")) && (parser.HasKey(_T("logmsgfile"))))
+	if (parser.HasKey(L"logmsg") && parser.HasKey(L"logmsgfile"))
 	{
-		CMessageBox::Show(hwndExplorer, IDS_ERR_TWOLOGPARAMS, IDS_APPNAME, MB_ICONERROR);
+		CMessageBox::Show(GetExplorerHWND(), IDS_ERR_TWOLOGPARAMS, IDS_APPNAME, MB_ICONERROR);
 		return false;
 	}
 	CString sLogMsg = LoadLogMessage();
-	bool bSelectFilesForCommit = !!DWORD(CRegStdDWORD(_T("Software\\TortoiseGit\\SelectFilesForCommit"), TRUE));
+	bool bSelectFilesForCommit = !!DWORD(CRegStdDWORD(L"Software\\TortoiseGit\\SelectFilesForCommit", TRUE));
 
 	if (!GitAdminDir::HasAdminDir(g_Git.m_CurrentDir))
 	{
-		CMessageBox::Show(hwndExplorer, IDS_NOWORKINGCOPY, IDS_APPNAME, MB_ICONERROR);
+		CMessageBox::Show(GetExplorerHWND(), IDS_NOWORKINGCOPY, IDS_APPNAME, MB_ICONERROR);
 		return false;
 	}
 
-	return !!CAppUtils::Commit(	parser.GetVal(_T("bugid")),
-								parser.HasKey(_T("wholeproject")),
+	return !!CAppUtils::Commit(GetExplorerHWND(),
+								parser.GetVal(L"bugid"),
+								parser.HasKey(L"wholeproject"),
 								sLogMsg,
 								pathList,
-								selectedList,
 								bSelectFilesForCommit);
 }

@@ -1,7 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
 // Copyright (C) 2003-2009 - TortoiseSVN
-// Copyright (C) 2008-2016 - TortoiseGit
+// Copyright (C) 2008-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -20,7 +20,6 @@
 #pragma once
 
 #include "resource.h"
-#include "Git.h"
 #include "StandAloneDlg.h"
 #include "TGitPath.h"
 #include "registry.h"
@@ -29,14 +28,14 @@
 #include "Colors.h"
 #include "LogDlgHelper.h"
 #include "FilterEdit.h"
-#include "GitRev.h"
 #include <regex>
 #include "GitLogList.h"
 #include "GitStatusListCtrl.h"
 #include "HyperLink.h"
-#include "Win7.h"
 #include "GravatarPictureBox.h"
 #include "PatchViewDlg.h"
+#include "MenuButton.h"
+#include "GestureEnabledControl.h"
 
 #define LOGFILTER_TIMER	101
 #define LOGFTIME_TIMER	102
@@ -65,7 +64,7 @@ class CLogDlg : public CResizableStandAloneDialog, IFilterEditValidator, IHasPat
 	friend class CStoreSelection;
 
 public:
-	CLogDlg(CWnd* pParent = NULL); // standard constructor
+	CLogDlg(CWnd* pParent = nullptr); // standard constructor
 	virtual ~CLogDlg();
 	void SetParams(const CTGitPath& orgPath, const CTGitPath& path, CString hightlightRevision, CString range, DWORD limit, int limitScale = -1);
 	void SetFilter(const CString& findstr, LONG findtype, bool findregex);
@@ -73,6 +72,7 @@ public:
 	void SetSelect(bool bSelect) {m_bSelect = bSelect;}
 	void ContinuousSelection(bool bCont = true) {m_bSelectionMustBeContinuous = bCont;}
 	void SingleSelection(bool bSingle = true) {m_bSelectionMustBeSingle = bSingle;}
+	void ShowWorkingTreeChanges(bool bShow = false) { m_bShowWC = bShow; }
 	void SetRange(const CString& range);
 	void ShowStartRef();
 	afx_msg LRESULT OnRefLogChanged(WPARAM wParam, LPARAM lParam);
@@ -95,10 +95,9 @@ public:
 	}
 protected:
 	//implement the virtual methods from Git base class
-	virtual BOOL Cancel();
-	virtual bool Validate(LPCTSTR string);
+	virtual bool Validate(LPCTSTR string) override;
 
-	virtual void DoDataExchange(CDataExchange* pDX); // DDX/DDV support
+	virtual void DoDataExchange(CDataExchange* pDX) override; // DDX/DDV support
 
 	afx_msg LRESULT	OnTaskbarBtnCreated(WPARAM wParam, LPARAM lParam);
 	CComPtr<ITaskbarList3>	m_pTaskbarList;
@@ -110,7 +109,6 @@ protected:
 
 	afx_msg BOOL OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message);
 	afx_msg void OnContextMenu(CWnd* pWnd, CPoint point);
-	afx_msg void OnNMDblclkLoglist(NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void OnLvnItemchangedLoglist(NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void OnLvnItemchangedLogmsg(NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void OnEnLinkMsgview(NMHDR *pNMHDR, LRESULT *pResult);
@@ -118,8 +116,6 @@ protected:
 	afx_msg void OnSelectSearchField();
 	afx_msg void OnExitClearFilter();
 
-	afx_msg void OnNMCustomdrawChangedFileList(NMHDR *pNMHDR, LRESULT *pResult);
-	afx_msg void OnLvnGetdispinfoChangedFileList(NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void OnEnChangeSearchedit();
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
 	afx_msg void OnDtnDatetimechangeDateto(NMHDR *pNMHDR, LRESULT *pResult);
@@ -153,16 +149,17 @@ protected:
 	afx_msg void OnEditCopy();
 	afx_msg void OnEnChangeFileFilter();
 	afx_msg void OnEnscrollMsgview();
+	afx_msg LRESULT OnResetWcRev(WPARAM, LPARAM);
 
-	virtual void OnCancel();
-	virtual void OnOK();
-	virtual BOOL OnInitDialog();
-	virtual BOOL PreTranslateMessage(MSG* pMsg);
+	virtual void OnCancel() override;
+	virtual void OnOK() override;
+	virtual BOOL OnInitDialog() override;
+	virtual BOOL PreTranslateMessage(MSG* pMsg) override;
 	afx_msg HBRUSH OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor);
 	afx_msg void OnPaint();
 
 	void OnPasteGitHash();
-	void JumpToGitHash(CString& hash);
+	void JumpToGitHash(CString hash);
 
 	DECLARE_MESSAGE_MAP()
 
@@ -171,8 +168,10 @@ private:
 	CRegDWORD m_regbShowTags;
 	CRegDWORD m_regbShowLocalBranches;
 	CRegDWORD m_regbShowRemoteBranches;
+	CRegDWORD m_regbShowOtherRefs;
 	CRegDWORD m_regbShowGravatar;
 	CRegDWORD m_regShowWholeProject;
+	CRegDWORD m_regAddBeforeCommit;
 
 	void Refresh (bool clearfilter = false);
 	void MoveToSameTop(CWnd *pWndRef, CWnd *pWndTarget);
@@ -180,11 +179,9 @@ private:
 	void RemoveMainAnchors();
 	void DoSizeV1(int delta);
 	void DoSizeV2(int delta);
-	void AdjustMinSize();
 	void SetSplitterRange();
 	void SetFilterCueText();
 
-	void CopySelectionToClipBoard();
 	void CopyChangedSelectionToClipBoard();
 	void SortShownListArray();
 
@@ -194,7 +191,6 @@ private:
 	void EnableOKButton();
 
 	void SaveSplitterPos();
-	bool ValidateRegexp(LPCTSTR regexp_str, std::tr1::wregex& pat, bool bMatchCase);
 	void CheckRegexpTooltip();
 	void SetDlgTitle();
 	CString GetAbsoluteUrlFromRelativeUrl(const CString& url);
@@ -203,12 +199,13 @@ private:
 	CPatchViewDlg		m_patchViewdlg;
 	void FillPatchView(bool onlySetTimer = false);
 	CWnd * GetPatchViewParentWnd() { return this; }
-	virtual void TogglePatchView();
+	void TogglePatchView();
 	LRESULT OnFileListCtrlItemChanged(WPARAM /*wparam*/, LPARAM /*lparam*/);
+	afx_msg LRESULT	OnGitStatusListCtrlNeedsRefresh(WPARAM, LPARAM);
 	afx_msg void OnMoving(UINT fwSide, LPRECT pRect);
 	afx_msg void OnSizing(UINT fwSide, LPRECT pRect);
 
-	virtual LRESULT DefWindowProc(UINT message, WPARAM wParam, LPARAM lParam);
+	virtual LRESULT DefWindowProc(UINT message, WPARAM wParam, LPARAM lParam) override;
 
 public:
 	CWnd *				m_pNotifyWindow;
@@ -219,16 +216,19 @@ private:
 	CGitLogList			m_LogList;
 	CGitStatusListCtrl  m_ChangedFileListCtrl;
 	CFilterEdit			m_cFilter;
-	CHyperLink			m_staticRef;
+	CGestureEnabledControlTmpl<CHyperLink> m_staticRef;
 	CProgressCtrl		m_LogProgress;
 	CTGitPath			m_path;
 	CTGitPath			m_orgPath;
 	CString				m_hightlightRevision;
 
+	CMenuButton			m_ctrlView;
+	CMenuButton			m_ctrlWalkBehavior;
+
 	std::vector<CGitHash>	m_sSelectedHash;	// set to selected commit hash on OK if appropriate
 	bool				m_bSelectionMustBeContinuous;
 	bool				m_bSelectionMustBeSingle;
-	bool				m_bCancelled;
+	bool				m_bShowWC;
 
 	CFilterEdit			m_cFileFilter;
 
@@ -242,12 +242,12 @@ private:
 	bool				m_bShowTags;
 	bool				m_bShowLocalBranches;
 	bool				m_bShowRemoteBranches;
+	bool				m_bShowOtherRefs;
 	bool				m_bShowGravatar;
 	bool				m_bShowDescribe;
 	bool				m_bShowBranchRevNo;
 	bool				m_bNoMerges;
 	int					m_iCompressedGraph;
-	BOOL				m_bWalkBehavior;
 	bool				m_bNavigatingWithSelect;
 	bool				m_bAsteriskLogPrefix;
 
@@ -263,7 +263,7 @@ private:
 	CRect				m_ChgOrigRect;
 
 	//volatile LONG		m_bNoDispUpdates;
-	CDateTimeCtrl		m_DateFrom;
+	CGestureEnabledControlTmpl<CDateTimeCtrl> m_DateFrom;
 	CRegString			m_regLastSelectedFromDate;
 	CDateTimeCtrl		m_DateTo;
 	CComboBox			m_JumpType;
@@ -288,6 +288,6 @@ private:
 
 	CBrush				m_Brush;
 };
-static UINT WM_REVSELECTED = RegisterWindowMessage(_T("TORTOISEGit_REVSELECTED_MSG"));
-static UINT WM_REVLIST = RegisterWindowMessage(_T("TORTOISEGit_REVLIST_MSG"));
-static UINT WM_REVLISTONERANGE = RegisterWindowMessage(_T("TORTOISEGit_REVLISTONERANGE_MSG"));
+static UINT WM_REVSELECTED = RegisterWindowMessage(L"TORTOISEGit_REVSELECTED_MSG");
+static UINT WM_REVLIST = RegisterWindowMessage(L"TORTOISEGit_REVLIST_MSG");
+static UINT WM_REVLISTONERANGE = RegisterWindowMessage(L"TORTOISEGit_REVLISTONERANGE_MSG");

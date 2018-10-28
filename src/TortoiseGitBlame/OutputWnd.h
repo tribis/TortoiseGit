@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2012 - TortoiseGit
+// Copyright (C) 2008-2012, 2016 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -23,6 +23,8 @@
 #include "GitBlameLogList.h"
 #include "ProjectProperties.h"
 #include "GravatarPictureBox.h"
+#include <unordered_set>
+
 /////////////////////////////////////////////////////////////////////////////
 // COutputList window
 
@@ -54,22 +56,15 @@ public:
 
 // Attributes
 public:
-	CFont m_Font;
-
 	CGitBlameLogList m_LogList;
 	CGravatar m_Gravatar;
-
-protected:
-	void AdjustHorzScroll(CListBox& wndListBox);
-
-private:
 
 // Implementation
 public:
 	virtual ~COutputWnd();
 	afx_msg void OnLvnItemchangedLoglist(NMHDR *pNMHDR, LRESULT *pResult);
 	int	LoadHistory(CString filename, CString revision, bool follow);
-	int	LoadHistory(std::set<CGitHash>& hashes);
+	int	LoadHistory(std::unordered_set<CGitHash>& hashes);
 
 protected:
 	afx_msg int OnCreate(LPCREATESTRUCT lpCreateStruct);

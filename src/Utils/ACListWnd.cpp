@@ -1,7 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
 // Copyright (c) 2003 by Andreas Kapust <info@akinstaller.de>; <http://www.codeproject.com/Articles/2607/AutoComplete-without-IAutoComplete>
-// Copyright (C) 2009,2012-2013,2015 - TortoiseGit
+// Copyright (C) 2009, 2012-2013, 2015-2016, 2018 - TortoiseGit
 
 // Licensed under: The Code Project Open License (CPOL); <http://www.codeproject.com/info/cpol10.aspx>
 
@@ -10,6 +10,7 @@
 
 #include "stdafx.h"
 #include "ACListWnd.h"
+#include "StringUtils.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -31,7 +32,7 @@ static UINT auIDStatusBar[] =
 void DoPaintMessageLoop()
 {
 	MSG message1;
-	while(::PeekMessage(&message1,NULL,WM_PAINT,WM_PAINT, PM_REMOVE))
+	while (::PeekMessage(&message1, nullptr, WM_PAINT, WM_PAINT, PM_REMOVE))
 	{
 		::TranslateMessage(&message1);
 		::DispatchMessage(&message1);
@@ -47,13 +48,18 @@ CACListWnd::CACListWnd()
 	m_ItemHeight = 16;
 	m_lSelItem = -1;
 	m_VisibleItems = 0;
-	m_pEditParent = NULL;
+	m_pEditParent = nullptr;
 	m_LastSize.SetRectEmpty();
 	m_PrefixChar = 0;
 	m_lMode = 0;
-	pFontDC = NULL;
+	pFontDC = nullptr;
 	m_nIDTimer = 0;
 	SecureZeroMemory(&logfont, sizeof(LOGFONT));
+
+	NONCLIENTMETRICS metrics = { 0 };
+	metrics.cbSize = sizeof(NONCLIENTMETRICS);
+	SystemParametersInfo(SPI_GETNONCLIENTMETRICS, 0, &metrics, FALSE);
+	m_uiFont.CreateFontIndirect(&metrics.lfMessageFont);
 }
 
 /**********************************************************************/
@@ -103,7 +109,7 @@ END_MESSAGE_MAP()
 
 
 /////////////////////////////////////////////////////////////////////////////
-// Behandlungsroutinen für Nachrichten CACListWnd
+// Behandlungsroutinen fÃ¼r Nachrichten CACListWnd
 
 void CACListWnd::DrawItem(CDC* pDC,long m_lItem,long width)
 {
@@ -135,7 +141,7 @@ void CACListWnd::OnPaint()
 {
 	CPaintDC dc(this);
 	CRect rcWnd,m_rect, rc;
-	CDC MemDC,*pDC=NULL;
+	CDC MemDC, *pDC = nullptr;
 	CBitmap  m_bitmap, *m_pOldBitmap;
 	int i;
 
@@ -157,7 +163,7 @@ void CACListWnd::OnPaint()
 	long width = rcWnd.Width() - ScrollBarWidth();
 
 	MemDC.FillSolidRect(rcWnd,::GetSysColor(COLOR_WINDOW));
-	MemDC.SelectObject(GetStockObject(DEFAULT_GUI_FONT));
+	MemDC.SelectObject(m_uiFont);
 	MemDC.SetBkMode(TRANSPARENT);
 
 	for(i = m_lTopIndex; i < m_lCount;i++)
@@ -225,7 +231,7 @@ void CACListWnd::Init(CWnd *pWnd)
 	if(m_pDC)
 	{
 		m_pDC->SelectObject(GetStockObject(DEFAULT_GUI_FONT));
-		CSize m_Size = m_pDC->GetOutputTextExtent(_T("Hg"));
+		CSize m_Size = m_pDC->GetOutputTextExtent(L"Hg");
 		m_ItemHeight = m_Size.cy;
 		ReleaseDC(m_pDC);
 	}
@@ -250,7 +256,6 @@ void CACListWnd::SetScroller()
 
 		m_VertBar.SetScrollPos(m_lTopIndex,true);
 	}
-
 }
 
 /*********************************************************************/
@@ -444,7 +449,7 @@ BOOL CACListWnd::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
 	GetCursorPos(&ptCursor);
 	ScreenToClient(&ptCursor);
 
-	if(rectClient.PtInRect(ptCursor)) // Vergrößerungs-Cursor
+	if(rectClient.PtInRect(ptCursor)) // VergrÃ¶ÃŸerungs-Cursor
 	{
 		return CWnd::OnSetCursor(pWnd, nHitTest, message);
 	}
@@ -609,7 +614,7 @@ int CACListWnd::FindString(int nStartAfter, LPCTSTR lpszString, bool m_bDisplayO
 			}
 			else  // _MODE_FIND_EXACT_
 			{
-				if(m_Str1.Find(m_Str2) == 0)
+				if (CStringUtils::StartsWith(m_Str1, m_Str2))
 				{
 					m_DisplayList.Add(m_SearchList.GetAt(i));
 				}
@@ -695,7 +700,7 @@ void CACListWnd::OnShowWindow(BOOL bShow, UINT nStatus)
 {
 	if(bShow)
 	{
-		m_nIDTimer = (long)SetTimer( IDTimerInstall, 200, NULL);
+		m_nIDTimer = (long)SetTimer(IDTimerInstall, 200, nullptr);
 		m_pEditParent->GetParent()->GetWindowRect(m_ParentRect);
 	}
 	else
@@ -715,7 +720,6 @@ void CACListWnd::OnShowWindow(BOOL bShow, UINT nStatus)
 
 void CACListWnd::OnNcLButtonDown(UINT nHitTest, CPoint point)
 {
-
 	if(OnNcHitTest(point) == HTBOTTOMRIGHT)
 		GetWindowRect(m_LastSize);
 	CWnd::OnNcLButtonDown(nHitTest, point);
@@ -728,7 +732,7 @@ CString CACListWnd::GetString()
 	int i = (int)m_DisplayList.GetSize();
 
 	if(!i)
-		return _T("");
+		return L"";
 	if(i <= m_lSelItem || m_lSelItem == -1)
 		i = 0;
 	else
@@ -875,7 +879,7 @@ void CACListWnd::OnGetMinMaxInfo(MINMAXINFO FAR* lpMMI)
 
 
 		// Vers. 1.2
-		if(m_pEditParent != NULL)
+		if (m_pEditParent)
 		{
 			RECT rc;
 			m_pEditParent->GetWindowRect (&rc);
@@ -936,7 +940,7 @@ void CACListWnd::CopyList()
 	m_DisplayList.Copy(m_SearchList);
 	m_lCount = (long)m_DisplayList.GetSize();
 	if(m_lCount)
-		FindString(0,_T(""),true);
+		FindString(0, L"", true);
 }
 
 /*********************************************************************/

@@ -1,6 +1,6 @@
-// TortoiseGit - a Windows shell extension for easy version control
+﻿// TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2009,2012-2015 - TortoiseGit
+// Copyright (C) 2008-2009, 2012-2016, 2018 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -36,24 +36,24 @@ bool SubmoduleAddCommand::Execute()
 	if( dlg.DoModal() == IDOK )
 	{
 		if (dlg.m_bAutoloadPuttyKeyFile)
-			CAppUtils::LaunchPAgent(&dlg.m_strPuttyKeyFile);
+			CAppUtils::LaunchPAgent(GetExplorerHWND(), &dlg.m_strPuttyKeyFile);
 
 		CString cmd;
-		if(dlg.m_strPath.Left(g_Git.m_CurrentDir.GetLength()) == g_Git.m_CurrentDir)
+		if (CStringUtils::StartsWith(dlg.m_strPath, g_Git.m_CurrentDir))
 			dlg.m_strPath = dlg.m_strPath.Right(dlg.m_strPath.GetLength()-g_Git.m_CurrentDir.GetLength()-1);
 
 		CString branch;
 		if(dlg.m_bBranch)
-			branch.Format(_T(" -b %s "), (LPCTSTR)dlg.m_strBranch);
+			branch.Format(L" -b %s ", (LPCTSTR)dlg.m_strBranch);
 
 		CString force;
 		if (dlg.m_bForce)
-			force = _T("--force");
+			force = L"--force";
 
-		dlg.m_strPath.Replace(_T('\\'),_T('/'));
-		dlg.m_strRepos.Replace(_T('\\'),_T('/'));
+		dlg.m_strPath.Replace(L'\\', L'/');
+		dlg.m_strRepos.Replace(L'\\', L'/');
 
-		cmd.Format(_T("git.exe submodule add %s %s -- \"%s\"  \"%s\""),
+		cmd.Format(L"git.exe submodule add %s %s -- \"%s\" \"%s\"",
 						(LPCTSTR)branch, (LPCTSTR)force,
 						(LPCTSTR)dlg.m_strRepos, (LPCTSTR)dlg.m_strPath);
 
@@ -67,12 +67,12 @@ bool SubmoduleAddCommand::Execute()
 			{
 				SetCurrentDirectory(g_Git.m_CurrentDir);
 				CGit subgit;
-				dlg.m_strPath.Replace(_T('/'), _T('\\'));
+				dlg.m_strPath.Replace(L'/', L'\\');
 				subgit.m_CurrentDir = PathIsRelative(dlg.m_strPath) ? g_Git.CombinePath(dlg.m_strPath) : dlg.m_strPath;
 
-				if (subgit.SetConfigValue(_T("remote.origin.puttykeyfile"), dlg.m_strPuttyKeyFile, CONFIG_LOCAL))
+				if (subgit.SetConfigValue(L"remote.origin.puttykeyfile", dlg.m_strPuttyKeyFile, CONFIG_LOCAL))
 				{
-					CMessageBox::Show(NULL, _T("Fail set config remote.origin.puttykeyfile"), _T("TortoiseGit"), MB_OK| MB_ICONERROR);
+					CMessageBox::Show(GetExplorerHWND(), L"Fail set config remote.origin.puttykeyfile", L"TortoiseGit", MB_OK | MB_ICONERROR);
 					return FALSE;
 				}
 			}
@@ -86,12 +86,12 @@ bool SubmoduleAddCommand::Execute()
 bool SubmoduleUpdateCommand::Execute()
 {
 	CString bkpath;
-	if (parser.HasKey(_T("bkpath")))
-		bkpath = parser.GetVal(_T("bkpath"));
+	if (parser.HasKey(L"bkpath"))
+		bkpath = parser.GetVal(L"bkpath");
 	else
 	{
 		bkpath = this->orgPathList[0].GetWinPathString();
-		int start = bkpath.ReverseFind(_T('\\'));
+		int start = bkpath.ReverseFind(L'\\');
 		if (start >= 0)
 			bkpath = bkpath.Left(start);
 	}
@@ -99,7 +99,7 @@ bool SubmoduleUpdateCommand::Execute()
 	CString super = GitAdminDir::GetSuperProjectRoot(bkpath);
 	if (super.IsEmpty())
 	{
-		CMessageBox::Show(NULL,IDS_ERR_NOTFOUND_SUPER_PRJECT,IDS_APPNAME,MB_OK|MB_ICONERROR);
+		CMessageBox::Show(GetExplorerHWND(), IDS_ERR_NOTFOUND_SUPER_PRJECT, IDS_APPNAME, MB_OK | MB_ICONERROR);
 		//change current project root to super project
 		return false;
 	}
@@ -117,60 +117,76 @@ bool SubmoduleUpdateCommand::Execute()
 
 	CSubmoduleUpdateDlg submoduleUpdateDlg;
 	submoduleUpdateDlg.m_PathFilterList = pathFilterList;
-	if (parser.HasKey(_T("selectedpath")))
+	if (parser.HasKey(L"selectedpath"))
 	{
-		CString selectedPath = parser.GetVal(_T("selectedpath"));
-		selectedPath.Replace(_T('\\'), _T('/'));
+		CString selectedPath = parser.GetVal(L"selectedpath");
+		selectedPath.Replace(L'\\', L'/');
 		submoduleUpdateDlg.m_PathList.push_back(selectedPath);
 	}
 	if (submoduleUpdateDlg.DoModal() != IDOK)
 		return false;
 
 	CProgressDlg progress;
+	theApp.m_pMainWnd = &progress;
 
 	g_Git.m_CurrentDir = super;
 
-	CString params;
+	CString params = L" --progress";
 	if (submoduleUpdateDlg.m_bInit)
-		params = _T(" --init");
+		params += L" --init";
 	if (submoduleUpdateDlg.m_bRecursive)
-		params += _T(" --recursive");
+		params += L" --recursive";
 	if (submoduleUpdateDlg.m_bForce)
-		params += _T(" --force");
+		params += L" --force";
 	if (submoduleUpdateDlg.m_bNoFetch)
-		params += _T(" --no-fetch");
+		params += L" --no-fetch";
 	if (submoduleUpdateDlg.m_bMerge)
-		params += _T(" --merge");
+		params += L" --merge";
 	if (submoduleUpdateDlg.m_bRebase)
-		params += _T(" --rebase");
+		params += L" --rebase";
 	if (submoduleUpdateDlg.m_bRemote)
-		params += _T(" --remote");
+		params += L" --remote";
 
 	for (size_t i = 0; i < submoduleUpdateDlg.m_PathList.size(); ++i)
 	{
 		CString str;
-		str.Format(_T("git.exe submodule update%s -- \"%s\""), (LPCTSTR)params, (LPCTSTR)submoduleUpdateDlg.m_PathList[i]);
+		str.Format(L"git.exe submodule update%s -- \"%s\"", (LPCTSTR)params, (LPCTSTR)submoduleUpdateDlg.m_PathList[i]);
 		progress.m_GitCmdList.push_back(str);
 	}
+
+	progress.m_PostCmdCallback = [&](DWORD status, PostCmdList& postCmdList)
+	{
+		if (status)
+			return;
+
+		CTGitPath gitPath = g_Git.m_CurrentDir;
+		if (gitPath.IsBisectActive())
+		{
+			postCmdList.emplace_back(IDI_THUMB_UP, IDS_MENUBISECTGOOD, [] { CAppUtils::RunTortoiseGitProc(L"/command:bisect /good"); });
+			postCmdList.emplace_back(IDI_THUMB_DOWN, IDS_MENUBISECTBAD, [] { CAppUtils::RunTortoiseGitProc(L"/command:bisect /bad"); });
+			postCmdList.emplace_back(IDI_BISECT, IDS_MENUBISECTSKIP, [] { CAppUtils::RunTortoiseGitProc(L"/command:bisect /skip"); });
+			postCmdList.emplace_back(IDI_BISECT_RESET, IDS_MENUBISECTRESET, [] { CAppUtils::RunTortoiseGitProc(L"/command:bisect /reset"); });
+		}
+	};
 
 	progress.DoModal();
 
 	return !progress.m_GitStatus;
 }
 
-bool SubmoduleCommand::Execute(CString cmd,  CString arg)
+bool SubmoduleSyncCommand::Execute()
 {
 	CProgressDlg progress;
+	theApp.m_pMainWnd = &progress;
+
 	CString bkpath;
 
-	if(parser.HasKey(_T("bkpath")))
-	{
-		bkpath=parser.GetVal(_T("bkpath"));
-	}
+	if (parser.HasKey(L"bkpath"))
+		bkpath=parser.GetVal(L"bkpath");
 	else
 	{
 		bkpath=this->orgPathList[0].GetWinPathString();
-		int start = bkpath.ReverseFind(_T('\\'));
+		int start = bkpath.ReverseFind(L'\\');
 		if( start >= 0 )
 			bkpath=bkpath.Left(start);
 	}
@@ -178,21 +194,23 @@ bool SubmoduleCommand::Execute(CString cmd,  CString arg)
 	CString super = GitAdminDir::GetSuperProjectRoot(bkpath);
 	if(super.IsEmpty())
 	{
-		CMessageBox::Show(NULL,IDS_ERR_NOTFOUND_SUPER_PRJECT,IDS_APPNAME,MB_OK|MB_ICONERROR);
+		CMessageBox::Show(GetExplorerHWND(), IDS_ERR_NOTFOUND_SUPER_PRJECT, IDS_APPNAME, MB_OK | MB_ICONERROR);
 		//change current project root to super project
 		return false;
 	}
 
 	g_Git.m_CurrentDir=super;
 
-	//progress.m_GitCmd.Format(_T("git.exe submodule update --init "));
-
 	CString str;
 	for (int i = 0; i < this->orgPathList.GetCount(); ++i)
 	{
 		if(orgPathList[i].IsDirectory())
 		{
-			str.Format(_T("git.exe submodule %s %s -- \"%s\""), (LPCTSTR)cmd, (LPCTSTR)arg, (LPCTSTR)((CTGitPath &)orgPathList[i]).GetSubPath(CTGitPath(super)).GetGitPathString());
+			CString path = ((CTGitPath &)orgPathList[i]).GetSubPath(CTGitPath(super)).GetGitPathString();
+			if (path.IsEmpty())
+				str = L"git.exe submodule sync";
+			else
+				str.Format(L"git.exe submodule sync -- \"%s\"", (LPCTSTR)path);
 			progress.m_GitCmdList.push_back(str);
 		}
 	}

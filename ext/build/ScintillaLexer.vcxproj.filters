@@ -451,6 +451,27 @@
     <ClCompile Include="..\scintilla\lexers\LexProps.cxx">
       <Filter>lexers</Filter>
     </ClCompile>
+    <ClCompile Include="..\scintilla\lexers\LexJSON.cxx">
+      <Filter>lexers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\scintilla\lexers\LexEDIFACT.cxx">
+      <Filter>lexers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\scintilla\lexers\LexIndent.cxx">
+      <Filter>lexers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\scintilla\lexlib\DefaultLexer.cxx">
+      <Filter>lexlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\scintilla\src\DBCS.cxx">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\scintilla\win32\ScintillaDLL.cxx">
+      <Filter>win32</Filter>
+    </ClCompile>
+    <ClCompile Include="..\scintilla\lexers\LexMaxima.cxx">
+      <Filter>lexers</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\scintilla\src\AutoComplete.h">
@@ -579,9 +600,6 @@
     <ClInclude Include="..\scintilla\src\CaseFolder.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\scintilla\src\UnicodeFromUTF8.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\scintilla\src\EditModel.h">
       <Filter>Source Files</Filter>
     </ClInclude>
@@ -591,14 +609,47 @@
     <ClInclude Include="..\scintilla\src\MarginView.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\scintilla\win32\HanjaDic.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\scintilla\src\Position.h">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="..\scintilla\include\Sci_Position.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\scintilla\win32\HanjaDic.h">
+      <Filter>win32</Filter>
+    </ClInclude>
+    <ClInclude Include="..\scintilla\src\SparseVector.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\scintilla\src\UniqueString.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\scintilla\lexlib\DefaultLexer.h">
+      <Filter>lexlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\scintilla\include\ILexer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\scintilla\include\ILoader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\scintilla\include\SciLexer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\scintilla\include\Scintilla.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\scintilla\src\DBCS.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\scintilla\win32\ScintillaWin.h">
+      <Filter>win32</Filter>
+    </ClInclude>
+    <ClInclude Include="..\scintilla\src\ElapsedPeriod.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\scintilla\src\IntegerRectangle.h">
+      <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

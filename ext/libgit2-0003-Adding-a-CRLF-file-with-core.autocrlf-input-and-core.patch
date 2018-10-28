@@ -1,33 +1,19 @@
-From 15d05a0c3e9ad4dfe75d17e23304e338726de9f8 Mon Sep 17 00:00:00 2001
+From 4a3f2fa9ed7260ed0d8fca1aa6130521d8cedb49 Mon Sep 17 00:00:00 2001
 From: Sven Strickroth <email@cs-ware.de>
 Date: Fri, 23 Jan 2015 15:34:14 +0100
-Subject: [PATCH 3/6] Adding a CRLF-file with core.autocrlf=input and
+Subject: [PATCH 3/7] Adding a CRLF-file with core.autocrlf=input and
  core.safecrlf=true does not fail as with vanilla git
 
 Signed-off-by: Sven Strickroth <email@cs-ware.de>
 ---
- CHANGELOG.md       |  1 +
- src/crlf.c         | 13 +++++++++++++
- tests/index/crlf.c |  6 ++++++
- 3 files changed, 20 insertions(+)
+ src/crlf.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/CHANGELOG.md b/CHANGELOG.md
-index 8fb39cd..c31d921 100644
---- a/CHANGELOG.md
-+++ b/CHANGELOG.md
-@@ -12,6 +12,7 @@ v0.22 + 1
- 
- * LF -> CRLF filter now correctly honors core.safecrlf=true errors
-   * LF only files were accepted with core.autocrlf=true on CRLF platforms
-+  * files containig CRLF in combination with core.autocrlf=input were accepted
- 
- * Rename and copy detection is enabled for small files.
- 
 diff --git a/src/crlf.c b/src/crlf.c
-index 1290c01..29bbb5f 100644
+index c1f87485e..d88ad00f3 100644
 --- a/src/crlf.c
 +++ b/src/crlf.c
-@@ -156,6 +156,19 @@ static int crlf_apply_to_odb(
+@@ -160,6 +160,19 @@ static int crlf_apply_to_odb(
  			default:
  				break;
  			}
@@ -47,30 +33,6 @@ index 1290c01..29bbb5f 100644
  		}
  
  		/*
-diff --git a/tests/index/crlf.c b/tests/index/crlf.c
-index d2f01d1..490d43a 100644
---- a/tests/index/crlf.c
-+++ b/tests/index/crlf.c
-@@ -358,6 +358,9 @@ void test_index_crlf__safecrlf_true_autocrlf_input_text_auto_attr(void)
- 
- 	cl_git_pass(git_oid_fromstr(&oid, FILE_OID_LF));
- 	cl_assert_equal_oid(&oid, &entry->id);
-+
-+	cl_git_mkfile("./crlf/newfile2.txt", FILE_CONTENTS_CRLF);
-+	cl_git_fail(git_index_add_bypath(g_index, "newfile2.txt"));
- }
- 
- void test_index_crlf__safecrlf_true_autocrlf_input_text__no_attr(void)
-@@ -375,6 +378,9 @@ void test_index_crlf__safecrlf_true_autocrlf_input_text__no_attr(void)
- 
- 	cl_git_pass(git_oid_fromstr(&oid, FILE_OID_LF));
- 	cl_assert_equal_oid(&oid, &entry->id);
-+
-+	cl_git_mkfile("./crlf/newfile2.txt", FILE_CONTENTS_CRLF);
-+	cl_git_fail(git_index_add_bypath(g_index, "newfile2.txt"));
- }
- 
- void test_index_crlf__safecrlf_true_no_attrs(void)
 -- 
-2.4.4.windows.2
+2.16.1.windows.4
 

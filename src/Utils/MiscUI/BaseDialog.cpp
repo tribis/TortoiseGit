@@ -1,5 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
+// Copyright (C) 2016 - TortoiseGit
 // Copyright (C) 2003-2007 - Stefan Kueng
 
 // This program is free software; you can redistribute it and/or
@@ -18,7 +19,7 @@
 //
 #include "stdafx.h"
 #include "BaseDialog.h"
-
+#include "LoadIconEx.h"
 
 INT_PTR CDialog::DoModal(HINSTANCE hInstance, int resID, HWND hWndParent)
 {
@@ -39,7 +40,7 @@ void CDialog::InitDialog(HWND hwndDlg, UINT iconID)
 	RECT rc, rcDlg, rcOwner;
 
 	hwndOwner = ::GetParent(hwndDlg);
-	if (hwndOwner == NULL)
+	if (!hwndOwner)
 		hwndOwner = ::GetDesktopWindow();
 
 	GetWindowRect(hwndOwner, &rcOwner);
@@ -51,8 +52,9 @@ void CDialog::InitDialog(HWND hwndDlg, UINT iconID)
 	OffsetRect(&rc, -rcDlg.right, -rcDlg.bottom);
 
 	SetWindowPos(hwndDlg, HWND_TOP, rcOwner.left + (rc.right / 2), rcOwner.top + (rc.bottom / 2), 0, 0,	SWP_NOSIZE);
-	HICON hIcon = (HICON)::LoadImage(hResource, MAKEINTRESOURCE(iconID), IMAGE_ICON, 0, 0, LR_DEFAULTSIZE|LR_SHARED);
+	auto hIcon = LoadIconEx(hResource, MAKEINTRESOURCE(iconID), ::GetSystemMetrics(SM_CXICON), ::GetSystemMetrics(SM_CYICON));
 	::SendMessage(hwndDlg, WM_SETICON, ICON_BIG, (LPARAM)hIcon);
+	hIcon = LoadIconEx(hResource, MAKEINTRESOURCE(iconID), ::GetSystemMetrics(SM_CXSMICON), ::GetSystemMetrics(SM_CYSMICON));
 	::SendMessage(hwndDlg, WM_SETICON, ICON_SMALL, (LPARAM)hIcon);
 }
 
@@ -63,7 +65,7 @@ INT_PTR CALLBACK CDialog::stDlgFunc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPAR
 	{
 		// get the pointer to the window from lpCreateParams
 		SetWindowLongPtr(hwndDlg, GWLP_USERDATA, lParam);
-		pWnd = (CDialog*)lParam;
+		pWnd = reinterpret_cast<CDialog*>(lParam);
 		pWnd->m_hwnd = hwndDlg;
 	}
 	// get the pointer to the window

@@ -1,5 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
+// Copyright (C) 2018 - TortoiseGit
 // Copyright (C) 2007-2008 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -23,10 +24,10 @@
 
 bool ExportCommand::Execute()
 {
-	CString base=parser.GetVal(_T("rev"));
+	CString base = parser.GetVal(L"rev");
 	CString *p=&base;
 	if(base.IsEmpty())
-		p=NULL;
+		p = nullptr;
 
-	return CAppUtils::Export(p, &orgCmdLinePath);
+	return CAppUtils::Export(GetExplorerHWND(), p, &orgCmdLinePath);
 }

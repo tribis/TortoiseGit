@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2011-2015 - TortoiseGit
+// Copyright (C) 2011-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -23,6 +23,7 @@
 #include "StandAloneDlg.h"
 #include "LoglistCommonResource.h"
 #include "registry.h"
+#include "GestureEnabledControl.h"
 
 // CFindDlg dialog
 
@@ -33,9 +34,9 @@ class CFindDlg : public CResizableStandAloneDialog
 	DECLARE_DYNAMIC(CFindDlg)
 
 public:
-	CFindDlg(CWnd* pParent = NULL);   // standard constructor
+	CFindDlg(CWnd* pParent = nullptr);   // standard constructor
 	virtual ~CFindDlg();
-	void Create(CWnd * pParent = NULL) {m_pParent = pParent; CDialog::Create(IDD, pParent);ShowWindow(SW_SHOW);UpdateWindow();}
+	void Create(CWnd* pParent = nullptr) { m_pParent = pParent; CDialog::Create(IDD, pParent); ShowWindow(SW_SHOW); UpdateWindow(); }
 
 	bool IsTerminating() {return m_bTerminating;}
 	bool FindNext() {return m_bFindNext;}
@@ -51,12 +52,15 @@ public:
 	enum { IDD = IDD_FIND };
 
 protected:
-	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
-	virtual void OnCancel();
-	virtual void PostNcDestroy();
-	virtual void OnOK();
-	virtual BOOL OnInitDialog();
+	virtual void DoDataExchange(CDataExchange* pDX) override;    // DDX/DDV support
+	virtual void OnCancel() override;
+	virtual void PostNcDestroy() override;
+	virtual void OnOK() override;
+	virtual BOOL OnInitDialog() override;
 	afx_msg void OnCbnEditchangeFindcombo();
+	afx_msg void OnNMClickListRef(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnEnChangeEditFilter();
+	afx_msg void OnTimer(UINT_PTR nIDEvent);
 
 	DECLARE_MESSAGE_MAP()
 
@@ -79,9 +83,6 @@ protected:
 	void AddToList();
 
 public:
-	CListCtrl m_ctrlRefList;
+	CGestureEnabledControlTmpl<CListCtrl> m_ctrlRefList;
 	CEdit m_ctrlFilter;
-	afx_msg void OnNMClickListRef(NMHDR *pNMHDR, LRESULT *pResult);
-	afx_msg void OnEnChangeEditFilter();
-	afx_msg void OnTimer(UINT_PTR nIDEvent);
 };

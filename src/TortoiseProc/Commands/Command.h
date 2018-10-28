@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2009,2011,2013-2014 - TortoiseGit
+// Copyright (C) 2008-2009, 2011, 2013-2014, 2016, 2018 - TortoiseGit
 // Copyright (C) 2007 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -45,32 +45,24 @@ public:
 							{
 								orgCmdLinePath = path;
 								CString WinPath=path.GetWinPath();
-								if(WinPath.Left(g_Git.m_CurrentDir.GetLength())==g_Git.m_CurrentDir)
+								if (CStringUtils::StartsWith(WinPath, g_Git.m_CurrentDir))
 								{
-									if(g_Git.m_CurrentDir[g_Git.m_CurrentDir.GetLength()-1] == _T('\\'))
-									{
+									if (g_Git.m_CurrentDir[g_Git.m_CurrentDir.GetLength() - 1] == L'\\')
 										cmdLinePath.SetFromWin( WinPath.Right(WinPath.GetLength()-g_Git.m_CurrentDir.GetLength()));
-									}
 									else
-									{
 										cmdLinePath.SetFromWin( WinPath.Right(WinPath.GetLength()-g_Git.m_CurrentDir.GetLength()-1));
-									}
 								}
 								orgPathList = plist;
 								for (int i = 0; i < plist.GetCount(); ++i)
 								{
 									WinPath=plist[i].GetWinPath();
 									CTGitPath p;
-									if(WinPath.Left(g_Git.m_CurrentDir.GetLength())==g_Git.m_CurrentDir)
+									if (CStringUtils::StartsWith(WinPath, g_Git.m_CurrentDir))
 									{
-										if(g_Git.m_CurrentDir[g_Git.m_CurrentDir.GetLength()-1] == _T('\\'))
-										{
+										if (g_Git.m_CurrentDir[g_Git.m_CurrentDir.GetLength() - 1] == L'\\')
 											p.SetFromWin( WinPath.Right(WinPath.GetLength()-g_Git.m_CurrentDir.GetLength()));
-										}
 										else
-										{
 											p.SetFromWin( WinPath.Right(WinPath.GetLength()-g_Git.m_CurrentDir.GetLength()-1));
-										}
 									}
 									else
 										p=plist[i];
@@ -79,12 +71,16 @@ public:
 								}
 							}
 	void					SetExplorerHwnd(HWND hWnd) {hwndExplorer = hWnd;}
+	HWND					GetExplorerHWND() const { return ::IsWindow(hwndExplorer) ? hwndExplorer : nullptr; }
+
 protected:
 	CCmdLineParser			parser;
 	CTGitPathList			pathList;
 	CTGitPathList			orgPathList;
 	CTGitPath				cmdLinePath;
 	CTGitPath				orgCmdLinePath;
+
+private:
 	HWND					hwndExplorer;
 };
 

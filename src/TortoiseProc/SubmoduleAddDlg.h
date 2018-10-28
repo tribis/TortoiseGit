@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2011,2013 - TortoiseGit
+// Copyright (C) 2008-2013, 2015-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -18,7 +18,6 @@
 //
 
 #pragma once
-#include "afxcmn.h"
 #include "HorizontalResizableStandAloneDialog.h"
 #include "HistoryCombo.h"
 // CSubmoduleAddDlg dialog
@@ -28,20 +27,20 @@ class CSubmoduleAddDlg : public CHorizontalResizableStandAloneDialog
 	DECLARE_DYNAMIC(CSubmoduleAddDlg)
 
 public:
-	CSubmoduleAddDlg(CWnd* pParent = NULL);   // standard constructor
+	CSubmoduleAddDlg(CWnd* pParent = nullptr);   // standard constructor
 	virtual ~CSubmoduleAddDlg();
 	BOOL OnInitDialog();
 // Dialog Data
 	enum { IDD = IDD_SUBMODULE_ADD };
 
 protected:
-	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
-	void OnRepBrowse();
-	void OnPathBrowse();
-	void OnBranchCheck();
-	void OnBnClickedPuttykeyfileBrowse();
-	void OnBnClickedPuttykeyAutoload();
-	virtual void OnOK();
+	virtual void DoDataExchange(CDataExchange* pDX) override;    // DDX/DDV support
+	afx_msg void OnRepBrowse();
+	afx_msg void OnPathBrowse();
+	afx_msg void OnBranchCheck();
+	afx_msg void OnBnClickedPuttykeyfileBrowse();
+	afx_msg void OnBnClickedPuttykeyAutoload();
+	virtual void OnOK() override;
 	DECLARE_MESSAGE_MAP()
 public:
 	CHistoryCombo m_Repository;

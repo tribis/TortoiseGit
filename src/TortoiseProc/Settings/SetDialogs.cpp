@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2018 - TortoiseGit
 // Copyright (C) 2003-2008 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -21,7 +21,6 @@
 #include "TortoiseProc.h"
 #include "SetMainPage.h"
 #include "AppUtils.h"
-#include "GitProgressDlg.h"
 #include "SetDialogs.h"
 
 IMPLEMENT_DYNAMIC(CSetDialogs, ISettingsPropPage)
@@ -43,29 +42,33 @@ CSetDialogs::CSetDialogs()
 	, m_DescribeStrategy(GIT_DESCRIBE_DEFAULT)
 	, m_DescribeAbbreviatedSize(GIT_DESCRIBE_DEFAULT_ABBREVIATED_SIZE)
 	, m_bDescribeAlwaysLong(FALSE)
+	, m_bDescribeOnlyFollowFirstParent(FALSE)
 	, m_bFullCommitMessageOnLogLine(FALSE)
+	, m_bMailmapOnLog(FALSE)
 {
-	m_regDefaultLogs = CRegDWORD(_T("Software\\TortoiseGit\\LogDialog\\NumberOfLogs"), 1);
-	m_regDefaultLogsScale = CRegDWORD(_T("Software\\TortoiseGit\\LogDialog\\NumberOfLogsScale"), CFilterData::SHOW_NO_LIMIT);
-	m_regShortDateFormat = CRegDWORD(_T("Software\\TortoiseGit\\LogDateFormat"), TRUE);
-	m_regRelativeTimes = CRegDWORD(_T("Software\\TortoiseGit\\RelativeTimes"), FALSE);
-	m_regAsteriskLogPrefix = CRegDWORD(_T("Software\\TortoiseGit\\AsteriskLogPrefix"), TRUE);
-	m_regUseSystemLocaleForDates = CRegDWORD(_T("Software\\TortoiseGit\\UseSystemLocaleForDates"), TRUE);
-	m_regFontName = CRegString(_T("Software\\TortoiseGit\\LogFontName"), _T("Courier New"));
-	m_regFontSize = CRegDWORD(_T("Software\\TortoiseGit\\LogFontSize"), 8);
-	m_regDiffByDoubleClick = CRegDWORD(_T("Software\\TortoiseGit\\DiffByDoubleClickInLog"), FALSE);
-	m_regAbbreviateRenamings = CRegDWORD(_T("Software\\TortoiseGit\\AbbreviateRenamings"), FALSE);
-	m_regSymbolizeRefNames = CRegDWORD(_T("Software\\TortoiseGit\\SymbolizeRefNames"), FALSE);
-	m_regEnableLogCache = CRegDWORD(_T("Software\\TortoiseGit\\EnableLogCache"), TRUE);
-	m_regEnableGravatar = CRegDWORD(_T("Software\\TortoiseGit\\EnableGravatar"), FALSE);
-	m_regGravatarUrl = CRegString(_T("Software\\TortoiseGit\\GravatarUrl"), _T("http://www.gravatar.com/avatar/%HASH%?d=identicon"));
-	m_regDrawBranchesTagsOnRightSide = CRegDWORD(_T("Software\\TortoiseGit\\DrawTagsBranchesOnRightSide"), FALSE);
-	m_regShowDescribe = CRegDWORD(_T("Software\\TortoiseGit\\ShowDescribe"), FALSE);
-	m_regShowBranchRevNo = CRegDWORD(_T("Software\\TortoiseGit\\ShowBranchRevisionNumber"), FALSE);
-	m_regDescribeStrategy = CRegDWORD(_T("Software\\TortoiseGit\\DescribeStrategy"), GIT_DESCRIBE_DEFAULT);
-	m_regDescribeAbbreviatedSize = CRegDWORD(_T("Software\\TortoiseGit\\DescribeAbbreviatedSize"), GIT_DESCRIBE_DEFAULT_ABBREVIATED_SIZE);
-	m_regDescribeAlwaysLong = CRegDWORD(_T("Software\\TortoiseGit\\DescribeAlwaysLong"), FALSE);
-	m_regFullCommitMessageOnLogLine = CRegDWORD(_T("Software\\TortoiseGit\\FullCommitMessageOnLogLine"), FALSE);
+	m_regDefaultLogs = CRegDWORD(L"Software\\TortoiseGit\\LogDialog\\NumberOfLogs", 1);
+	m_regDefaultLogsScale = CRegDWORD(L"Software\\TortoiseGit\\LogDialog\\NumberOfLogsScale", CFilterData::SHOW_NO_LIMIT);
+	m_regShortDateFormat = CRegDWORD(L"Software\\TortoiseGit\\LogDateFormat", TRUE);
+	m_regRelativeTimes = CRegDWORD(L"Software\\TortoiseGit\\RelativeTimes", FALSE);
+	m_regAsteriskLogPrefix = CRegDWORD(L"Software\\TortoiseGit\\AsteriskLogPrefix", TRUE);
+	m_regUseSystemLocaleForDates = CRegDWORD(L"Software\\TortoiseGit\\UseSystemLocaleForDates", TRUE);
+	m_regFontName = CRegString(L"Software\\TortoiseGit\\LogFontName", L"Consolas");
+	m_regFontSize = CRegDWORD(L"Software\\TortoiseGit\\LogFontSize", 9);
+	m_regDiffByDoubleClick = CRegDWORD(L"Software\\TortoiseGit\\DiffByDoubleClickInLog", FALSE);
+	m_regAbbreviateRenamings = CRegDWORD(L"Software\\TortoiseGit\\AbbreviateRenamings", FALSE);
+	m_regSymbolizeRefNames = CRegDWORD(L"Software\\TortoiseGit\\SymbolizeRefNames", FALSE);
+	m_regEnableLogCache = CRegDWORD(L"Software\\TortoiseGit\\EnableLogCache", TRUE);
+	m_regEnableGravatar = CRegDWORD(L"Software\\TortoiseGit\\EnableGravatar", FALSE);
+	m_regGravatarUrl = CRegString(L"Software\\TortoiseGit\\GravatarUrl", L"http://www.gravatar.com/avatar/%HASH%?d=identicon");
+	m_regDrawBranchesTagsOnRightSide = CRegDWORD(L"Software\\TortoiseGit\\DrawTagsBranchesOnRightSide", FALSE);
+	m_regShowDescribe = CRegDWORD(L"Software\\TortoiseGit\\ShowDescribe", FALSE);
+	m_regShowBranchRevNo = CRegDWORD(L"Software\\TortoiseGit\\ShowBranchRevisionNumber", FALSE);
+	m_regDescribeStrategy = CRegDWORD(L"Software\\TortoiseGit\\DescribeStrategy", GIT_DESCRIBE_DEFAULT);
+	m_regDescribeAbbreviatedSize = CRegDWORD(L"Software\\TortoiseGit\\DescribeAbbreviatedSize", GIT_DESCRIBE_DEFAULT_ABBREVIATED_SIZE);
+	m_regDescribeAlwaysLong = CRegDWORD(L"Software\\TortoiseGit\\DescribeAlwaysLong", FALSE);
+	m_regDescribeOnlyFollowFirstParent = CRegDWORD(L"Software\\TortoiseGit\\DescribeOnlyFollowFirstParent", FALSE);
+	m_regFullCommitMessageOnLogLine = CRegDWORD(L"Software\\TortoiseGit\\FullCommitMessageOnLogLine", FALSE);
+	m_regMailmapOnLog = CRegDWORD(L"Software\\TortoiseGit\\LogDialog\\UseMailmap", FALSE);
 }
 
 CSetDialogs::~CSetDialogs()
@@ -81,7 +84,7 @@ void CSetDialogs::DoDataExchange(CDataExchange* pDX)
 	{
 		CString t;
 		m_cFontSizes.GetWindowText(t);
-		m_dwFontSize = _ttoi(t);
+		m_dwFontSize = _wtoi(t);
 	}
 	DDX_Control(pDX, IDC_FONTNAMES, m_cFontNames);
 	DDX_Text(pDX, IDC_DEFAULT_NUMBER_OF, m_sDefaultLogs);
@@ -104,8 +107,10 @@ void CSetDialogs::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_DESCRIBESTRATEGY, m_cDescribeStrategy);
 	DDX_Text(pDX, IDC_DESCRIBEABBREVIATEDSIZE, m_DescribeAbbreviatedSize);
 	DDX_Check(pDX, IDC_DESCRIBEALWAYSLONG, m_bDescribeAlwaysLong);
+	DDX_Check(pDX, IDC_DESCRIBEONLYFIRSTPARENT, m_bDescribeOnlyFollowFirstParent);
 	DDX_Check(pDX, IDC_FULLCOMMITMESSAGEONLOGLINE, m_bFullCommitMessageOnLogLine);
 	DDX_Control(pDX, IDC_DEFAULT_NUMBER_OF, m_DefaultNumberOfCtl);
+	DDX_Check(pDX, IDC_USEMAILMAP, m_bMailmapOnLog);
 }
 
 BEGIN_MESSAGE_MAP(CSetDialogs, ISettingsPropPage)
@@ -129,7 +134,10 @@ BEGIN_MESSAGE_MAP(CSetDialogs, ISettingsPropPage)
 	ON_CBN_SELCHANGE(IDC_DESCRIBESTRATEGY, OnChange)
 	ON_EN_CHANGE(IDC_DESCRIBEABBREVIATEDSIZE, OnChange)
 	ON_BN_CLICKED(IDC_DESCRIBEALWAYSLONG, OnChange)
+	ON_BN_CLICKED(IDC_DESCRIBEONLYFIRSTPARENT, OnChange)
 	ON_BN_CLICKED(IDC_FULLCOMMITMESSAGEONLOGLINE, OnChange)
+	ON_BN_CLICKED(IDC_USEMAILMAP, OnChange)
+	ON_WM_MEASUREITEM()
 END_MESSAGE_MAP()
 
 // CSetDialogs message handlers
@@ -152,7 +160,9 @@ BOOL CSetDialogs::OnInitDialog()
 	AdjustControlSize(IDC_SHOWDESCRIBE);
 	AdjustControlSize(IDC_SHOWREVCOUNTER);
 	AdjustControlSize(IDC_DESCRIBEALWAYSLONG);
+	AdjustControlSize(IDC_DESCRIBEONLYFIRSTPARENT);
 	AdjustControlSize(IDC_FULLCOMMITMESSAGEONLOGLINE);
+	AdjustControlSize(IDC_USEMAILMAP);
 
 	EnableToolTips();
 
@@ -174,7 +184,9 @@ BOOL CSetDialogs::OnInitDialog()
 	m_DescribeStrategy = m_regDescribeStrategy;
 	m_DescribeAbbreviatedSize = m_regDescribeAbbreviatedSize;
 	m_bDescribeAlwaysLong = m_regDescribeAlwaysLong;
+	m_bDescribeOnlyFollowFirstParent = m_regDescribeOnlyFollowFirstParent;
 	m_bFullCommitMessageOnLogLine = m_regFullCommitMessageOnLogLine;
+	m_bMailmapOnLog = m_regMailmapOnLog;
 
 	CString temp;
 
@@ -198,13 +210,13 @@ BOOL CSetDialogs::OnInitDialog()
 
 	m_cDefaultLogsScale.AddString(CString(MAKEINTRESOURCE(IDS_NO_LIMIT)));
 	m_cDefaultLogsScale.AddString(CString(MAKEINTRESOURCE(IDS_LAST_SEL_DATE)));
-	temp.Format(IDS_LAST_N_COMMITS, _T("N"));
+	temp.Format(IDS_LAST_N_COMMITS, L"N");
 	m_cDefaultLogsScale.AddString(temp);
-	temp.Format(IDS_LAST_N_YEARS, _T("N"));
+	temp.Format(IDS_LAST_N_YEARS, L"N");
 	m_cDefaultLogsScale.AddString(temp);
-	temp.Format(IDS_LAST_N_MONTHS, _T("N"));
+	temp.Format(IDS_LAST_N_MONTHS, L"N");
 	m_cDefaultLogsScale.AddString(temp);
-	temp.Format(IDS_LAST_N_WEEKS, _T("N"));
+	temp.Format(IDS_LAST_N_WEEKS, L"N");
 	m_cDefaultLogsScale.AddString(temp);
 	m_cDefaultLogsScale.SetCurSel((DWORD)m_regDefaultLogsScale);
 
@@ -219,14 +231,14 @@ BOOL CSetDialogs::OnInitDialog()
 	case CFilterData::SHOW_LAST_N_YEARS:
 	case CFilterData::SHOW_LAST_N_MONTHS:
 	case CFilterData::SHOW_LAST_N_WEEKS:
-		m_sDefaultLogs.Format(_T("%ld"), (DWORD)m_regDefaultLogs);
+		m_sDefaultLogs.Format(L"%ld", (DWORD)m_regDefaultLogs);
 		break;
 	}
 
 	int count = 0;
 	for (int i=6; i<32; i=i+2)
 	{
-		temp.Format(_T("%d"), i);
+		temp.Format(L"%d", i);
 		m_cFontSizes.AddString(temp);
 		m_cFontSizes.SetItemData(count++, i);
 	}
@@ -241,20 +253,21 @@ BOOL CSetDialogs::OnInitDialog()
 	}
 	if (!foundfont)
 	{
-		temp.Format(_T("%lu"), m_dwFontSize);
+		temp.Format(L"%lu", m_dwFontSize);
 		m_cFontSizes.SetWindowText(temp);
 	}
 
 	m_cFontNames.Setup(DEVICE_FONTTYPE|RASTER_FONTTYPE|TRUETYPE_FONTTYPE, 1, FIXED_PITCH);
 	m_cFontNames.SelectFont(m_sFontName);
+	m_cFontNames.SendMessage(CB_SETITEMHEIGHT, (WPARAM)-1, m_cFontSizes.GetItemHeight(-1));
 
-	m_cGravatarUrl.AddString(_T("http://www.gravatar.com/avatar/%HASH%"));
-	m_cGravatarUrl.AddString(_T("http://www.gravatar.com/avatar/%HASH%?d=mm"));
-	m_cGravatarUrl.AddString(_T("http://www.gravatar.com/avatar/%HASH%?d=identicon"));
-	m_cGravatarUrl.AddString(_T("http://www.gravatar.com/avatar/%HASH%?d=monsterid"));
-	m_cGravatarUrl.AddString(_T("http://www.gravatar.com/avatar/%HASH%?d=wavatar"));
-	m_cGravatarUrl.AddString(_T("http://www.gravatar.com/avatar/%HASH%?d=retro"));
-	m_cGravatarUrl.AddString(_T("http://www.gravatar.com/avatar/%HASH%?d=blank"));;
+	m_cGravatarUrl.AddString(L"http://www.gravatar.com/avatar/%HASH%");
+	m_cGravatarUrl.AddString(L"http://www.gravatar.com/avatar/%HASH%?d=mm");
+	m_cGravatarUrl.AddString(L"http://www.gravatar.com/avatar/%HASH%?d=identicon");
+	m_cGravatarUrl.AddString(L"http://www.gravatar.com/avatar/%HASH%?d=monsterid");
+	m_cGravatarUrl.AddString(L"http://www.gravatar.com/avatar/%HASH%?d=wavatar");
+	m_cGravatarUrl.AddString(L"http://www.gravatar.com/avatar/%HASH%?d=retro");
+	m_cGravatarUrl.AddString(L"http://www.gravatar.com/avatar/%HASH%?d=blank");;
 
 	m_cDescribeStrategy.AddString(CString(MAKEINTRESOURCE(IDS_ANNOTATEDTAGS)));
 	m_cDescribeStrategy.AddString(CString(MAKEINTRESOURCE(IDS_ALLTAGS)));
@@ -273,8 +286,8 @@ void CSetDialogs::OnCbnSelchangeDefaultlogscale()
 {
 	UpdateData();
 	int sel = m_cDefaultLogsScale.GetCurSel();
-	if (sel > 1 && (m_sDefaultLogs.IsEmpty() || _ttol((LPCTSTR)m_sDefaultLogs) == 0))
-		m_sDefaultLogs.Format(_T("%ld"), (DWORD)m_regDefaultLogs);
+	if (sel > 1 && (m_sDefaultLogs.IsEmpty() || _wtol((LPCTSTR)m_sDefaultLogs) == 0))
+		m_sDefaultLogs.Format(L"%ld", (DWORD)m_regDefaultLogs);
 	else if (sel <= 1)
 		m_sDefaultLogs.Empty();
 	m_DefaultNumberOfCtl.EnableWindow(sel > 1);
@@ -298,7 +311,7 @@ BOOL CSetDialogs::OnApply()
 	int sel = m_cDefaultLogsScale.GetCurSel();
 	Store(sel > 0 ? sel : 0, m_regDefaultLogsScale);
 
-	int val = _ttol((LPCTSTR)m_sDefaultLogs);
+	int val = _wtol((LPCTSTR)m_sDefaultLogs);
 	if (sel > 1 && val > 0)
 		Store(val, m_regDefaultLogs);
 
@@ -316,8 +329,26 @@ BOOL CSetDialogs::OnApply()
 	Store(m_DescribeStrategy, m_regDescribeStrategy);
 	Store(m_DescribeAbbreviatedSize, m_regDescribeAbbreviatedSize);
 	Store(m_bDescribeAlwaysLong, m_regDescribeAlwaysLong);
+	Store(m_bDescribeOnlyFollowFirstParent, m_regDescribeOnlyFollowFirstParent);
 	Store(m_bFullCommitMessageOnLogLine, m_regFullCommitMessageOnLogLine);
+	Store(m_bMailmapOnLog, m_regMailmapOnLog);
 
 	SetModified(FALSE);
 	return ISettingsPropPage::OnApply();
+}
+
+void CSetDialogs::OnMeasureItem(int nIDCtl, LPMEASUREITEMSTRUCT lpMeasureItemStruct)
+{
+	CFont* pFont = GetFont();
+	if (pFont)
+	{
+		CDC* pDC = GetDC();
+		CFont* pFontPrev = pDC->SelectObject(pFont);
+		int iborder = ::GetSystemMetrics(SM_CYBORDER);
+		CSize sz = pDC->GetTextExtent(L"0");
+		lpMeasureItemStruct->itemHeight = sz.cy + 2 * iborder;
+		pDC->SelectObject(pFontPrev);
+		ReleaseDC(pDC);
+	}
+	ISettingsPropPage::OnMeasureItem(nIDCtl, lpMeasureItemStruct);
 }

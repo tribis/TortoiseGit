@@ -29,15 +29,15 @@ class CToolAssocDlg : public CDialog
 	DECLARE_DYNAMIC(CToolAssocDlg)
 
 public:
-	CToolAssocDlg(const CString& type, bool add, CWnd* pParent = NULL);
+	CToolAssocDlg(const CString& type, bool add, CWnd* pParent = nullptr);
 	virtual ~CToolAssocDlg();
 
 	enum { IDD = IDD_TOOLASSOC };
 
 protected:
-	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
-	virtual BOOL OnInitDialog();
-	virtual BOOL PreTranslateMessage(MSG* pMsg);
+	virtual void DoDataExchange(CDataExchange* pDX) override;    // DDX/DDV support
+	virtual BOOL OnInitDialog() override;
+	virtual BOOL PreTranslateMessage(MSG* pMsg) override;
 	afx_msg void OnBnClickedToolbrowse();
 
 	DECLARE_MESSAGE_MAP()

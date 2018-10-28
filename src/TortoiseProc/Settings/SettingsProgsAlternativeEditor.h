@@ -1,7 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
 // Copyright (C) 2003-2008 - TortoiseSVN
-// Copyright (C) 2011 - Sven Strickroth <email@cs-ware.de>
+// Copyright (C) 2011, 2018 - Sven Strickroth <email@cs-ware.de>
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -34,14 +34,14 @@ public:
 	CSettingsProgsAlternativeEditor();
 	virtual ~CSettingsProgsAlternativeEditor();
 
-	UINT GetIconID() {return IDI_DIFF;}
+	UINT GetIconID() override { return IDI_NOTEPAD; }
 
 	enum { IDD = IDD_SETTINGSPROGSALTERNATIVEEDITOR };
 
 protected:
-	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
-	virtual BOOL OnInitDialog();
-	virtual BOOL OnApply();
+	virtual void DoDataExchange(CDataExchange* pDX) override;    // DDX/DDV support
+	virtual BOOL OnInitDialog() override;
+	virtual BOOL OnApply() override;
 	afx_msg void OnBnClickedAlternativeEditorOff();
 	afx_msg void OnBnClickedAlternativeEditorOn();
 	afx_msg void OnBnClickedAlternativeEditorBrowse();
@@ -50,7 +50,7 @@ protected:
 	DECLARE_MESSAGE_MAP()
 
 private:
-	bool IsExternal(const CString& path) const { return !path.IsEmpty() && path.Left(1) != _T("#"); }
+	bool IsExternal(const CString& path) const { return !path.IsEmpty() && path.Left(1) != L"#"; }
 	void CheckProgComment();
 
 	CString			m_sAlternativeEditorPath;

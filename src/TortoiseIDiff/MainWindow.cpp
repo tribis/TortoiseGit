@@ -1,7 +1,7 @@
-// TortoiseIDiff - an image diff viewer in TortoiseSVN
+﻿// TortoiseGitIDiff - an image diff viewer in TortoiseSVN
 
-// Copyright (C) 2015 - TortoiseGit
-// Copyright (C) 2006-2013, 2015 - TortoiseSVN
+// Copyright (C) 2015-2018 - TortoiseGit
+// Copyright (C) 2006-2013, 2015, 2018 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -25,6 +25,8 @@
 #include "AboutDlg.h"
 #include "TaskbarUUID.h"
 #include "PathUtils.h"
+#include "DPIAware.h"
+#include "LoadIconEx.h"
 
 #pragma comment(lib, "comctl32.lib")
 
@@ -47,19 +49,19 @@ bool CMainWindow::RegisterAndCreateWindow()
     wcx.cbClsExtra = 0;
     wcx.cbWndExtra = 0;
     wcx.hInstance = hResource;
-    wcx.hCursor = LoadCursor(NULL, IDC_SIZEWE);
+    wcx.hCursor = LoadCursor(nullptr, IDC_SIZEWE);
     ResString clsname(hResource, IDS_APP_TITLE);
     wcx.lpszClassName = clsname;
-    wcx.hIcon = LoadIcon(hResource, MAKEINTRESOURCE(IDI_TORTOISEIDIFF));
+    wcx.hIcon = LoadIconEx(hResource, MAKEINTRESOURCE(IDI_TORTOISEIDIFF), GetSystemMetrics(SM_CXICON), GetSystemMetrics(SM_CYICON));
     wcx.hbrBackground = (HBRUSH)(COLOR_3DFACE+1);
     if (selectionPaths.empty())
         wcx.lpszMenuName = MAKEINTRESOURCE(IDC_TORTOISEIDIFF);
     else
         wcx.lpszMenuName = MAKEINTRESOURCE(IDC_TORTOISEIDIFF2);
-    wcx.hIconSm = LoadIcon(wcx.hInstance, MAKEINTRESOURCE(IDI_TORTOISEIDIFF));
+    wcx.hIconSm = LoadIconEx(wcx.hInstance, MAKEINTRESOURCE(IDI_TORTOISEIDIFF));
     if (RegisterWindow(&wcx))
     {
-        if (Create(WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN | WS_VISIBLE, NULL))
+        if (Create(WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN | WS_VISIBLE, nullptr))
         {
             UpdateWindow(m_hwnd);
             return true;
@@ -68,18 +70,19 @@ bool CMainWindow::RegisterAndCreateWindow()
     return false;
 }
 
-void CMainWindow::PositionChildren(RECT * clientrect /* = NULL */)
+void CMainWindow::PositionChildren(RECT * clientrect /* = nullptr */)
 {
     RECT tbRect;
-    if (clientrect == NULL)
+    if (!clientrect)
         return;
+    const auto splitter_border = CDPIAware::Instance().ScaleX(SPLITTER_BORDER);
     SendMessage(hwndTB, TB_AUTOSIZE, 0, 0);
     GetWindowRect(hwndTB, &tbRect);
     LONG tbHeight = tbRect.bottom-tbRect.top-1;
     HDWP hdwp = BeginDeferWindowPos(3);
     if (bOverlap && selectionPaths.empty())
     {
-        SetWindowPos(picWindow1, NULL, clientrect->left, clientrect->top+tbHeight, clientrect->right-clientrect->left, clientrect->bottom-clientrect->top-tbHeight, SWP_SHOWWINDOW);
+        SetWindowPos(picWindow1, nullptr, clientrect->left, clientrect->top + tbHeight, clientrect->right - clientrect->left, clientrect->bottom - clientrect->top - tbHeight, SWP_SHOWWINDOW);
     }
     else
     {
@@ -92,11 +95,11 @@ void CMainWindow::PositionChildren(RECT * clientrect /* = NULL */)
                 child.left = clientrect->left;
                 child.top = clientrect->top+tbHeight;
                 child.right = clientrect->right;
-                child.bottom = nSplitterPos-(SPLITTER_BORDER/2);
-                if (hdwp) hdwp = DeferWindowPos(hdwp, picWindow1, NULL, child.left, child.top, child.right-child.left, child.bottom-child.top, SWP_FRAMECHANGED|SWP_SHOWWINDOW);
-                child.top = nSplitterPos+(SPLITTER_BORDER/2);
+                child.bottom = nSplitterPos - (splitter_border / 2);
+                if (hdwp) hdwp = DeferWindowPos(hdwp, picWindow1, nullptr, child.left, child.top, child.right - child.left, child.bottom - child.top, SWP_FRAMECHANGED | SWP_SHOWWINDOW);
+                child.top = nSplitterPos + (splitter_border / 2);
                 child.bottom = clientrect->bottom;
-                if (hdwp) hdwp = DeferWindowPos(hdwp, picWindow2, NULL, child.left, child.top, child.right-child.left, child.bottom-child.top, SWP_FRAMECHANGED|SWP_SHOWWINDOW);
+                if (hdwp) hdwp = DeferWindowPos(hdwp, picWindow2, nullptr, child.left, child.top, child.right - child.left, child.bottom - child.top, SWP_FRAMECHANGED | SWP_SHOWWINDOW);
             }
             else
             {
@@ -105,14 +108,14 @@ void CMainWindow::PositionChildren(RECT * clientrect /* = NULL */)
                 child.left = clientrect->left;
                 child.top = clientrect->top+tbHeight;
                 child.right = clientrect->right;
-                child.bottom = nSplitterPos-(SPLITTER_BORDER/2);
-                if (hdwp) hdwp = DeferWindowPos(hdwp, picWindow1, NULL, child.left, child.top, child.right-child.left, child.bottom-child.top, SWP_FRAMECHANGED|SWP_SHOWWINDOW);
-                child.top = nSplitterPos+(SPLITTER_BORDER/2);
-                child.bottom = nSplitterPos2-(SPLITTER_BORDER/2);
-                if (hdwp) hdwp = DeferWindowPos(hdwp, picWindow2, NULL, child.left, child.top, child.right-child.left, child.bottom-child.top, SWP_FRAMECHANGED|SWP_SHOWWINDOW);
-                child.top = nSplitterPos2+(SPLITTER_BORDER/2);
+                child.bottom = nSplitterPos - (splitter_border / 2);
+                if (hdwp) hdwp = DeferWindowPos(hdwp, picWindow1, nullptr, child.left, child.top, child.right - child.left, child.bottom - child.top, SWP_FRAMECHANGED | SWP_SHOWWINDOW);
+                child.top = nSplitterPos + (splitter_border / 2);
+                child.bottom = nSplitterPos2 - (splitter_border / 2);
+                if (hdwp) hdwp = DeferWindowPos(hdwp, picWindow2, nullptr, child.left, child.top, child.right - child.left, child.bottom - child.top, SWP_FRAMECHANGED | SWP_SHOWWINDOW);
+                child.top = nSplitterPos2 + (splitter_border / 2);
                 child.bottom = clientrect->bottom;
-                if (hdwp) hdwp = DeferWindowPos(hdwp, picWindow3, NULL, child.left, child.top, child.right-child.left, child.bottom-child.top, SWP_FRAMECHANGED|SWP_SHOWWINDOW);
+                if (hdwp) hdwp = DeferWindowPos(hdwp, picWindow3, nullptr, child.left, child.top, child.right - child.left, child.bottom - child.top, SWP_FRAMECHANGED | SWP_SHOWWINDOW);
             }
         }
         else
@@ -123,12 +126,12 @@ void CMainWindow::PositionChildren(RECT * clientrect /* = NULL */)
                 RECT child;
                 child.left = clientrect->left;
                 child.top = clientrect->top+tbHeight;
-                child.right = nSplitterPos-(SPLITTER_BORDER/2);
+                child.right = nSplitterPos - (splitter_border / 2);
                 child.bottom = clientrect->bottom;
-                if (hdwp) hdwp = DeferWindowPos(hdwp, picWindow1, NULL, child.left, child.top, child.right-child.left, child.bottom-child.top, SWP_FRAMECHANGED|SWP_SHOWWINDOW);
-                child.left = nSplitterPos+(SPLITTER_BORDER/2);
+                if (hdwp) hdwp = DeferWindowPos(hdwp, picWindow1, nullptr, child.left, child.top, child.right - child.left, child.bottom - child.top, SWP_FRAMECHANGED | SWP_SHOWWINDOW);
+                child.left = nSplitterPos + (splitter_border / 2);
                 child.right = clientrect->right;
-                if (hdwp) hdwp = DeferWindowPos(hdwp, picWindow2, NULL, child.left, child.top, child.right-child.left, child.bottom-child.top, SWP_FRAMECHANGED|SWP_SHOWWINDOW);
+                if (hdwp) hdwp = DeferWindowPos(hdwp, picWindow2, nullptr, child.left, child.top, child.right - child.left, child.bottom - child.top, SWP_FRAMECHANGED | SWP_SHOWWINDOW);
             }
             else
             {
@@ -136,15 +139,15 @@ void CMainWindow::PositionChildren(RECT * clientrect /* = NULL */)
                 RECT child;
                 child.left = clientrect->left;
                 child.top = clientrect->top+tbHeight;
-                child.right = nSplitterPos-(SPLITTER_BORDER/2);
+                child.right = nSplitterPos - (splitter_border / 2);
                 child.bottom = clientrect->bottom;
-                if (hdwp) hdwp = DeferWindowPos(hdwp, picWindow1, NULL, child.left, child.top, child.right-child.left, child.bottom-child.top, SWP_FRAMECHANGED|SWP_SHOWWINDOW);
-                child.left = nSplitterPos+(SPLITTER_BORDER/2);
-                child.right = nSplitterPos2-(SPLITTER_BORDER/2);
-                if (hdwp) hdwp = DeferWindowPos(hdwp, picWindow2, NULL, child.left, child.top, child.right-child.left, child.bottom-child.top, SWP_FRAMECHANGED|SWP_SHOWWINDOW);
-                child.left = nSplitterPos2+(SPLITTER_BORDER/2);
+                if (hdwp) hdwp = DeferWindowPos(hdwp, picWindow1, nullptr, child.left, child.top, child.right - child.left, child.bottom - child.top, SWP_FRAMECHANGED | SWP_SHOWWINDOW);
+                child.left = nSplitterPos + (splitter_border / 2);
+                child.right = nSplitterPos2 - (splitter_border / 2);
+                if (hdwp) hdwp = DeferWindowPos(hdwp, picWindow2, nullptr, child.left, child.top, child.right - child.left, child.bottom - child.top, SWP_FRAMECHANGED | SWP_SHOWWINDOW);
+                child.left = nSplitterPos2 + (splitter_border / 2);
                 child.right = clientrect->right;
-                if (hdwp) hdwp = DeferWindowPos(hdwp, picWindow3, NULL, child.left, child.top, child.right-child.left, child.bottom-child.top, SWP_FRAMECHANGED|SWP_SHOWWINDOW);
+                if (hdwp) hdwp = DeferWindowPos(hdwp, picWindow3, nullptr, child.left, child.top, child.right - child.left, child.bottom - child.top, SWP_FRAMECHANGED | SWP_SHOWWINDOW);
             }
         }
     }
@@ -152,7 +155,7 @@ void CMainWindow::PositionChildren(RECT * clientrect /* = NULL */)
     picWindow1.SetTransparentColor(transparentColor);
     picWindow2.SetTransparentColor(transparentColor);
     picWindow3.SetTransparentColor(transparentColor);
-    InvalidateRect(*this, NULL, FALSE);
+    InvalidateRect(*this, nullptr, FALSE);
 }
 
 LRESULT CALLBACK CMainWindow::WinMsgHandler(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -224,7 +227,7 @@ LRESULT CALLBACK CMainWindow::WinMsgHandler(HWND hwnd, UINT uMsg, WPARAM wParam,
             ::GetClientRect(*this, &rect);
             hdc = BeginPaint(hwnd, &ps);
             SetBkColor(hdc, GetSysColor(COLOR_3DFACE));
-            ::ExtTextOut(hdc, 0, 0, ETO_OPAQUE, &rect, NULL, 0, NULL);
+            ::ExtTextOut(hdc, 0, 0, ETO_OPAQUE, &rect, nullptr, 0, nullptr);
             EndPaint(hwnd, &ps);
         }
         break;
@@ -285,12 +288,12 @@ LRESULT CALLBACK CMainWindow::WinMsgHandler(HWND hwnd, UINT uMsg, WPARAM wParam,
                 {
                     if (bVertical)
                     {
-                        HCURSOR hCur = LoadCursor(NULL, IDC_SIZENS);
+                        HCURSOR hCur = LoadCursor(nullptr, IDC_SIZENS);
                         SetCursor(hCur);
                     }
                     else
                     {
-                        HCURSOR hCur = LoadCursor(NULL, IDC_SIZEWE);
+                        HCURSOR hCur = LoadCursor(nullptr, IDC_SIZEWE);
                         SetCursor(hCur);
                     }
                     return TRUE;
@@ -394,7 +397,7 @@ LRESULT CALLBACK CMainWindow::WinMsgHandler(HWND hwnd, UINT uMsg, WPARAM wParam,
                 mii.dwTypeData = stringbuf;
                 mii.cch = _countof(stringbuf);
                 GetMenuItemInfo(GetMenu(*this), (UINT)lpttt->hdr.idFrom, FALSE, &mii);
-                _tcscpy_s(lpttt->lpszText, 80, stringbuf);
+                wcscpy_s(lpttt->lpszText, 80, stringbuf);
             }
         }
         break;
@@ -421,8 +424,8 @@ LRESULT CMainWindow::DoCommand(int id, LPARAM lParam)
         {
             if (OpenDialog())
             {
-                picWindow1.SetPic(leftpicpath, _T(""), true);
-                picWindow2.SetPic(rightpicpath, _T(""), false);
+                picWindow1.SetPic(leftpicpath, L"", true);
+                picWindow2.SetPic(rightpicpath, L"", false);
                 if (bOverlap)
                 {
                     picWindow1.SetSecondPic(picWindow2.GetPic(), rightpictitle, rightpicpath);
@@ -556,8 +559,7 @@ LRESULT CMainWindow::DoCommand(int id, LPARAM lParam)
     case ID_VIEW_TRANSPARENTCOLOR:
         {
             static COLORREF customColors[16] = {0};
-            CHOOSECOLOR ccDlg;
-            SecureZeroMemory(&ccDlg, sizeof(ccDlg));
+            CHOOSECOLOR ccDlg = { 0 };
             ccDlg.lStructSize = sizeof(ccDlg);
             ccDlg.hwndOwner = m_hwnd;
             ccDlg.rgbResult = transparentColor;
@@ -772,10 +774,10 @@ LRESULT CMainWindow::DoCommand(int id, LPARAM lParam)
                 break;
             }
 
-            CStringA subpath = CUnicodeUtils::GetUTF8(selectionResult.c_str()).Mid((int)strlen(projectRoot->ptr) - 5); /* 5 = len(".git/") */
+            CStringA subpath = CUnicodeUtils::GetUTF8(selectionResult.c_str()).Mid((int)strlen(git_repository_workdir(repository)));
 
             CAutoIndex index;
-            if (git_repository_index(index.GetPointer(), repository) || git_index_get_bypath(index, CUnicodeUtils::GetUTF8(subpath), 1) == nullptr)
+            if (git_repository_index(index.GetPointer(), repository) || (git_index_get_bypath(index, subpath, 1) == nullptr && git_index_get_bypath(index, subpath, 2) == nullptr))
             {
                 PostQuitMessage(resolveWith);
                 break;
@@ -783,23 +785,19 @@ LRESULT CMainWindow::DoCommand(int id, LPARAM lParam)
 
             CString sTemp;
             sTemp.Format(ResString(hResource, IDS_MARKASRESOLVED), (LPCTSTR)CPathUtils::GetFileNameFromPath(selectionResult.c_str()));
-            if (MessageBox(m_hwnd, sTemp, _T("TortoiseGitMerge"), MB_YESNO | MB_ICONQUESTION) != IDYES)
+            if (MessageBox(m_hwnd, sTemp, L"TortoiseGitMerge", MB_YESNO | MB_ICONQUESTION) != IDYES)
                 break;
 
             CString cmd;
-            cmd.Format(_T("\"%sTortoiseGitProc.exe\" /command:resolve /path:\"%s\" /closeonend:1 /noquestion /skipcheck /silent"), (LPCTSTR)CPathUtils::GetAppDirectory(), selectionResult.c_str());
+            cmd.Format(L"\"%sTortoiseGitProc.exe\" /command:resolve /path:\"%s\" /closeonend:1 /noquestion /skipcheck /silent", (LPCTSTR)CPathUtils::GetAppDirectory(), selectionResult.c_str());
             if (resolveMsgWnd)
-            {
-                CString s;
-                s.Format(L" /resolvemsghwnd:%I64d /resolvemsgwparam:%I64d /resolvemsglparam:%I64d", (__int64)resolveMsgWnd, (__int64)resolveMsgWParam, (__int64)resolveMsgLParam);
-                cmd += s;
-            }
+                cmd.AppendFormat(L" /resolvemsghwnd:%I64d /resolvemsgwparam:%I64d /resolvemsglparam:%I64d", (__int64)resolveMsgWnd, (__int64)resolveMsgWParam, (__int64)resolveMsgLParam);
 
             STARTUPINFO startup = { 0 };
             PROCESS_INFORMATION process = { 0 };
             startup.cb = sizeof(startup);
 
-            if (!CreateProcess(nullptr, cmd.GetBuffer(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &startup, &process))
+            if (!CreateProcess(nullptr, cmd.GetBuffer(), nullptr, nullptr, FALSE, CREATE_UNICODE_ENVIRONMENT, nullptr, nullptr, &startup, &process))
             {
                 cmd.ReleaseBuffer();
                 PostQuitMessage(resolveWith);
@@ -938,6 +936,9 @@ LRESULT CMainWindow::Splitter_OnLButtonUp(HWND hwnd, UINT /*iMsg*/, WPARAM /*wPa
     if (bDragMode == FALSE)
         return 0;
 
+    const auto bordersm = CDPIAware::Instance().ScaleX(2);
+    const auto borderl = CDPIAware::Instance().ScaleY(4);
+
     GetClientRect(hwnd, &clientrect);
     GetWindowRect(hwnd, &rect);
     POINT zero = {0,0};
@@ -952,18 +953,18 @@ LRESULT CMainWindow::Splitter_OnLButtonUp(HWND hwnd, UINT /*iMsg*/, WPARAM /*wPa
 
     if (pt.x < 0)
         pt.x = 0;
-    if (pt.x > rect.right-4)
-        pt.x = rect.right-4;
+    if (pt.x > rect.right - borderl)
+        pt.x = rect.right - borderl;
     if (pt.y < 0)
         pt.y = 0;
-    if (pt.y > rect.bottom-4)
-        pt.y = rect.bottom-4;
+    if (pt.y > rect.bottom - borderl)
+        pt.y = rect.bottom - borderl;
 
     hdc = GetWindowDC(hwnd);
     if (bVertical)
-        DrawXorBar(hdc, clientrect.left, oldy+2, clientrect.right-clientrect.left-2, 4);
+        DrawXorBar(hdc, clientrect.left, oldy + bordersm, clientrect.right - clientrect.left - bordersm, borderl);
     else
-        DrawXorBar(hdc, oldx+2, clientrect.top, 4, clientrect.bottom-clientrect.top-2);
+        DrawXorBar(hdc, oldx + bordersm, clientrect.top, borderl, clientrect.bottom - clientrect.top - bordersm);
     ReleaseDC(hwnd, hdc);
 
     oldx = pt.x;
@@ -982,32 +983,46 @@ LRESULT CMainWindow::Splitter_OnLButtonUp(HWND hwnd, UINT /*iMsg*/, WPARAM /*wPa
 #define MINWINSIZE 10
     if (bVertical)
     {
-        if (bDrag2)
+        if (selectionPaths.size() != 3)
         {
-            if (pt.y < (nSplitterPos+MINWINSIZE))
-                pt.y = nSplitterPos+MINWINSIZE;
-            nSplitterPos2 = pt.y;
+            nSplitterPos = pt.y;
         }
         else
         {
-            if (pt.y > (nSplitterPos2-MINWINSIZE))
-                pt.y = nSplitterPos2-MINWINSIZE;
-            nSplitterPos = pt.y;
+            if (bDrag2)
+            {
+                if (pt.y < (nSplitterPos+MINWINSIZE))
+                    pt.y = nSplitterPos+MINWINSIZE;
+                nSplitterPos2 = pt.y;
+            }
+            else
+            {
+                if (pt.y > (nSplitterPos2-MINWINSIZE))
+                    pt.y = nSplitterPos2-MINWINSIZE;
+                nSplitterPos = pt.y;
+            }
         }
     }
     else
     {
-        if (bDrag2)
+        if (selectionPaths.size() != 3)
         {
-            if (pt.x < (nSplitterPos+MINWINSIZE))
-                pt.x = nSplitterPos+MINWINSIZE;
-            nSplitterPos2 = pt.x;
+            nSplitterPos = pt.x;
         }
         else
         {
-            if (pt.x > (nSplitterPos2-MINWINSIZE))
-                pt.x = nSplitterPos2-MINWINSIZE;
-            nSplitterPos = pt.x;
+            if (bDrag2)
+            {
+                if (pt.x < (nSplitterPos+MINWINSIZE))
+                    pt.x = nSplitterPos+MINWINSIZE;
+                nSplitterPos2 = pt.x;
+            }
+            else
+            {
+                if (pt.x > (nSplitterPos2-MINWINSIZE))
+                    pt.x = nSplitterPos2-MINWINSIZE;
+                nSplitterPos = pt.x;
+            }
         }
     }
 
@@ -1027,6 +1042,9 @@ LRESULT CMainWindow::Splitter_OnMouseMove(HWND hwnd, UINT /*iMsg*/, WPARAM wPara
 
     if (bDragMode == FALSE)
         return 0;
+
+    const auto bordersm = CDPIAware::Instance().ScaleX(2);
+    const auto borderl = CDPIAware::Instance().ScaleY(4);
 
     pt.x = (short)LOWORD(lParam);  // horizontal position of cursor
     pt.y = (short)HIWORD(lParam);
@@ -1048,12 +1066,12 @@ LRESULT CMainWindow::Splitter_OnMouseMove(HWND hwnd, UINT /*iMsg*/, WPARAM wPara
 
     if (pt.x < 0)
         pt.x = 0;
-    if (pt.x > rect.right-4)
-        pt.x = rect.right-4;
+    if (pt.x > rect.right - borderl)
+        pt.x = rect.right - borderl;
     if (pt.y < 0)
         pt.y = 0;
-    if (pt.y > rect.bottom-4)
-        pt.y = rect.bottom-4;
+    if (pt.y > rect.bottom - borderl)
+        pt.y = rect.bottom - borderl;
 
     if ((wParam & MK_LBUTTON) && ((bVertical && (pt.y != oldy)) || (!bVertical && (pt.x != oldx))))
     {
@@ -1061,13 +1079,13 @@ LRESULT CMainWindow::Splitter_OnMouseMove(HWND hwnd, UINT /*iMsg*/, WPARAM wPara
 
         if (bVertical)
         {
-            DrawXorBar(hdc, clientrect.left, oldy+2, clientrect.right-clientrect.left-2, 4);
-            DrawXorBar(hdc, clientrect.left, pt.y+2, clientrect.right-clientrect.left-2, 4);
+            DrawXorBar(hdc, clientrect.left, oldy + bordersm, clientrect.right - clientrect.left - bordersm, borderl);
+            DrawXorBar(hdc, clientrect.left, pt.y + bordersm, clientrect.right - clientrect.left - bordersm, borderl);
         }
         else
         {
-            DrawXorBar(hdc, oldx+2, clientrect.top, 4, clientrect.bottom-clientrect.top-2);
-            DrawXorBar(hdc, pt.x+2, clientrect.top, 4, clientrect.bottom-clientrect.top-2);
+            DrawXorBar(hdc, oldx + bordersm, clientrect.top, borderl, clientrect.bottom - clientrect.top - bordersm);
+            DrawXorBar(hdc, pt.x + bordersm, clientrect.top, borderl, clientrect.bottom - clientrect.top - bordersm);
         }
 
         ReleaseDC(hwnd, hdc);
@@ -1099,7 +1117,7 @@ BOOL CALLBACK CMainWindow::OpenDlgProc(HWND hwndDlg, UINT message, WPARAM wParam
             centeredrect.right = centeredrect.left + (childrect.right-childrect.left);
             centeredrect.top = parentrect.top + ((parentrect.bottom-parentrect.top-childrect.bottom+childrect.top)/2);
             centeredrect.bottom = centeredrect.top + (childrect.bottom-childrect.top);
-            SetWindowPos(hwndDlg, NULL, centeredrect.left, centeredrect.top, centeredrect.right-centeredrect.left, centeredrect.bottom-centeredrect.top, SWP_SHOWWINDOW);
+            SetWindowPos(hwndDlg, nullptr, centeredrect.left, centeredrect.top, centeredrect.right - centeredrect.left, centeredrect.bottom - centeredrect.top, SWP_SHOWWINDOW);
 
             if (!leftpicpath.empty())
                 SetDlgItemText(hwndDlg, IDC_LEFTIMAGE, leftpicpath.c_str());
@@ -1158,7 +1176,7 @@ bool CMainWindow::AskForFile(HWND owner, TCHAR * path)
     ofn.lpstrTitle = sTitle;
     ofn.Flags = OFN_DONTADDTORECENT | OFN_FILEMUSTEXIST | OFN_EXPLORER;
     ofn.hInstance = ::hResource;
-    TCHAR filters[] = _T("Images\0*.wmf;*.jpg;*jpeg;*.bmp;*.gif;*.png;*.ico;*.dib;*.emf\0All (*.*)\0*.*\0\0");
+    TCHAR filters[] = L"Images\0*.wmf;*.jpg;*jpeg;*.bmp;*.gif;*.png;*.ico;*.dib;*.emf;*.webp\0All (*.*)\0*.*\0\0";
     ofn.lpstrFilter = filters;
     ofn.nFilterIndex = 1;
     // Display the Open dialog box.
@@ -1177,30 +1195,32 @@ bool CMainWindow::CreateToolbar()
     icex.dwICC  = ICC_BAR_CLASSES | ICC_WIN95_CLASSES;
     InitCommonControlsEx(&icex);
 
-    hwndTB = CreateWindowEx(0,
+    hwndTB = CreateWindowEx(TBSTYLE_EX_DOUBLEBUFFER,
                             TOOLBARCLASSNAME,
-                            (LPCTSTR)NULL,
+                            (LPCTSTR)nullptr,
                             WS_CHILD | WS_BORDER | WS_VISIBLE | TBSTYLE_FLAT | TBSTYLE_TOOLTIPS,
                             0, 0, 0, 0,
                             *this,
                             (HMENU)IDC_TORTOISEIDIFF,
                             hResource,
-                            NULL);
+                            nullptr);
     if (hwndTB == INVALID_HANDLE_VALUE)
         return false;
 
     SendMessage(hwndTB, TB_BUTTONSTRUCTSIZE, (WPARAM) sizeof(TBBUTTON), 0);
 
-    TBBUTTON tbb[13];
+    TBBUTTON tbb[14];
     // create an imagelist containing the icons for the toolbar
-    hToolbarImgList = ImageList_Create(24, 24, ILC_COLOR32 | ILC_MASK, 12, 4);
-    if (hToolbarImgList == NULL)
+    auto imgSizeX = CDPIAware::Instance().ScaleX(24);
+    auto imgSizeY = CDPIAware::Instance().ScaleY(24);
+    hToolbarImgList = ImageList_Create(imgSizeX, imgSizeY, ILC_COLOR32 | ILC_MASK, 12, 4);
+    if (!hToolbarImgList)
         return false;
     int index = 0;
-    HICON hIcon = NULL;
+    HICON hIcon = nullptr;
     if (selectionPaths.empty())
     {
-        hIcon = LoadIcon(hResource, MAKEINTRESOURCE(IDI_OVERLAP));
+        hIcon = LoadIconEx(hResource, MAKEINTRESOURCE(IDI_OVERLAP), imgSizeX, imgSizeY);
         tbb[index].iBitmap = ImageList_AddIcon(hToolbarImgList, hIcon);
         tbb[index].idCommand = ID_VIEW_OVERLAPIMAGES;
         tbb[index].fsState = TBSTATE_ENABLED;
@@ -1208,7 +1228,7 @@ bool CMainWindow::CreateToolbar()
         tbb[index].dwData = 0;
         tbb[index++].iString = 0;
 
-        hIcon = LoadIcon(hResource, MAKEINTRESOURCE(IDI_BLEND));
+        hIcon = LoadIconEx(hResource, MAKEINTRESOURCE(IDI_BLEND), imgSizeX, imgSizeY);
         tbb[index].iBitmap = ImageList_AddIcon(hToolbarImgList, hIcon);
         tbb[index].idCommand = ID_VIEW_BLENDALPHA;
         tbb[index].fsState = 0;
@@ -1216,7 +1236,14 @@ bool CMainWindow::CreateToolbar()
         tbb[index].dwData = 0;
         tbb[index++].iString = 0;
 
-        hIcon = LoadIcon(hResource, MAKEINTRESOURCE(IDI_LINK));
+        tbb[index].iBitmap = 0;
+        tbb[index].idCommand = 0;
+        tbb[index].fsState = TBSTATE_ENABLED;
+        tbb[index].fsStyle = BTNS_SEP;
+        tbb[index].dwData = 0;
+        tbb[index++].iString = 0;
+
+        hIcon = LoadIconEx(hResource, MAKEINTRESOURCE(IDI_LINK), imgSizeX, imgSizeY);
         tbb[index].iBitmap = ImageList_AddIcon(hToolbarImgList, hIcon);
         tbb[index].idCommand = ID_VIEW_LINKIMAGESTOGETHER;
         tbb[index].fsState = TBSTATE_ENABLED | TBSTATE_CHECKED;
@@ -1224,7 +1251,7 @@ bool CMainWindow::CreateToolbar()
         tbb[index].dwData = 0;
         tbb[index++].iString = 0;
 
-        hIcon = LoadIcon(hResource, MAKEINTRESOURCE(IDI_FITWIDTHS));
+        hIcon = LoadIconEx(hResource, MAKEINTRESOURCE(IDI_FITWIDTHS), imgSizeX, imgSizeY);
         tbb[index].iBitmap = ImageList_AddIcon(hToolbarImgList, hIcon);
         tbb[index].idCommand = ID_VIEW_FITIMAGEWIDTHS;
         tbb[index].fsState = TBSTATE_ENABLED;
@@ -1232,7 +1259,7 @@ bool CMainWindow::CreateToolbar()
         tbb[index].dwData = 0;
         tbb[index++].iString = 0;
 
-        hIcon = LoadIcon(hResource, MAKEINTRESOURCE(IDI_FITHEIGHTS));
+        hIcon = LoadIconEx(hResource, MAKEINTRESOURCE(IDI_FITHEIGHTS), imgSizeX, imgSizeY);
         tbb[index].iBitmap = ImageList_AddIcon(hToolbarImgList, hIcon);
         tbb[index].idCommand = ID_VIEW_FITIMAGEHEIGHTS;
         tbb[index].fsState = TBSTATE_ENABLED;
@@ -1247,15 +1274,8 @@ bool CMainWindow::CreateToolbar()
         tbb[index].dwData = 0;
         tbb[index++].iString = 0;
     }
-    hIcon = LoadIcon(hResource, MAKEINTRESOURCE(IDI_VERTICAL));
-    tbb[index].iBitmap = ImageList_AddIcon(hToolbarImgList, hIcon);
-    tbb[index].idCommand = ID_VIEW_ARRANGEVERTICAL;
-    tbb[index].fsState = TBSTATE_ENABLED;
-    tbb[index].fsStyle = BTNS_BUTTON;
-    tbb[index].dwData = 0;
-    tbb[index++].iString = 0;
 
-    hIcon = LoadIcon(hResource, MAKEINTRESOURCE(IDI_FITINWINDOW));
+    hIcon = LoadIconEx(hResource, MAKEINTRESOURCE(IDI_FITINWINDOW), imgSizeX, imgSizeY);
     tbb[index].iBitmap = ImageList_AddIcon(hToolbarImgList, hIcon);
     tbb[index].idCommand = ID_VIEW_FITIMAGESINWINDOW;
     tbb[index].fsState = TBSTATE_ENABLED;
@@ -1263,7 +1283,7 @@ bool CMainWindow::CreateToolbar()
     tbb[index].dwData = 0;
     tbb[index++].iString = 0;
 
-    hIcon = LoadIcon(hResource, MAKEINTRESOURCE(IDI_ORIGSIZE));
+    hIcon = LoadIconEx(hResource, MAKEINTRESOURCE(IDI_ORIGSIZE), imgSizeX, imgSizeY);
     tbb[index].iBitmap = ImageList_AddIcon(hToolbarImgList, hIcon);
     tbb[index].idCommand = ID_VIEW_ORININALSIZE;
     tbb[index].fsState = TBSTATE_ENABLED;
@@ -1271,7 +1291,7 @@ bool CMainWindow::CreateToolbar()
     tbb[index].dwData = 0;
     tbb[index++].iString = 0;
 
-    hIcon = LoadIcon(hResource, MAKEINTRESOURCE(IDI_ZOOMIN));
+    hIcon = LoadIconEx(hResource, MAKEINTRESOURCE(IDI_ZOOMIN), imgSizeX, imgSizeY);
     tbb[index].iBitmap = ImageList_AddIcon(hToolbarImgList, hIcon);
     tbb[index].idCommand = ID_VIEW_ZOOMIN;
     tbb[index].fsState = TBSTATE_ENABLED;
@@ -1279,7 +1299,7 @@ bool CMainWindow::CreateToolbar()
     tbb[index].dwData = 0;
     tbb[index++].iString = 0;
 
-    hIcon = LoadIcon(hResource, MAKEINTRESOURCE(IDI_ZOOMOUT));
+    hIcon = LoadIconEx(hResource, MAKEINTRESOURCE(IDI_ZOOMOUT), imgSizeX, imgSizeY);
     tbb[index].iBitmap = ImageList_AddIcon(hToolbarImgList, hIcon);
     tbb[index].idCommand = ID_VIEW_ZOOMOUT;
     tbb[index].fsState = TBSTATE_ENABLED;
@@ -1294,9 +1314,17 @@ bool CMainWindow::CreateToolbar()
     tbb[index].dwData = 0;
     tbb[index++].iString = 0;
 
-    hIcon = LoadIcon(hResource, MAKEINTRESOURCE(IDI_IMGINFO));
+    hIcon = LoadIconEx(hResource, MAKEINTRESOURCE(IDI_IMGINFO), imgSizeX, imgSizeY);
     tbb[index].iBitmap = ImageList_AddIcon(hToolbarImgList, hIcon);
     tbb[index].idCommand = ID_VIEW_IMAGEINFO;
+    tbb[index].fsState = TBSTATE_ENABLED;
+    tbb[index].fsStyle = BTNS_BUTTON;
+    tbb[index].dwData = 0;
+    tbb[index++].iString = 0;
+
+    hIcon = LoadIconEx(hResource, MAKEINTRESOURCE(IDI_VERTICAL), imgSizeX, imgSizeY);
+    tbb[index].iBitmap = ImageList_AddIcon(hToolbarImgList, hIcon);
+    tbb[index].idCommand = ID_VIEW_ARRANGEVERTICAL;
     tbb[index].fsState = TBSTATE_ENABLED;
     tbb[index].fsStyle = BTNS_BUTTON;
     tbb[index].dwData = 0;

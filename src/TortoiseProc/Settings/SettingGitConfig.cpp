@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2016 - TortoiseGit
+// Copyright (C) 2008-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -82,10 +82,10 @@ BOOL CSettingGitConfig::OnInitDialog()
 {
 	ISettingsPropPage::OnInitDialog();
 
-	m_cSafeCrLf.AddString(_T(""));
-	m_cSafeCrLf.AddString(_T("false"));
-	m_cSafeCrLf.AddString(_T("true"));
-	m_cSafeCrLf.AddString(_T("warn"));
+	m_cSafeCrLf.AddString(L"");
+	m_cSafeCrLf.AddString(L"false");
+	m_cSafeCrLf.AddString(L"true");
+	m_cSafeCrLf.AddString(L"warn");
 
 	AdjustControlSize(IDC_CHECK_AUTOCRLF);
 	AdjustControlSize(IDC_CHECK_QUOTEPATH);
@@ -94,12 +94,19 @@ BOOL CSettingGitConfig::OnInitDialog()
 	AdjustControlSize(IDC_CHECK_INHERIT_KEYID);
 	GITSETTINGS_ADJUSTCONTROLSIZE
 
+	m_tooltips.AddTool(IDC_CHECK_INHERIT_NAME, IDS_SETTINGS_GITCONFIG_INHERIT_TT);
+	m_tooltips.AddTool(IDC_CHECK_INHERIT_EMAIL, IDS_SETTINGS_GITCONFIG_INHERIT_TT);
+	m_tooltips.AddTool(IDC_CHECK_INHERIT_KEYID, IDS_SETTINGS_GITCONFIG_INHERIT_TT);
+
 	InitGitSettings(this, false, &m_tooltips);
 
 	if (!m_bGlobal || m_bIsBareRepo)
 		this->GetDlgItem(IDC_EDITLOCALGITCONFIG)->EnableWindow(TRUE);
 	else
 		this->GetDlgItem(IDC_EDITLOCALGITCONFIG)->EnableWindow(FALSE);
+
+	if (m_bGlobal)
+		this->GetDlgItem(IDC_EDITTGITCONFIG)->EnableWindow(FALSE);
 
 	if (m_bIsBareRepo)
 	{
@@ -135,7 +142,7 @@ BOOL CSettingGitConfig::OnInitDialog()
 
 void CSettingGitConfig::LoadDataImpl(CAutoConfig& config)
 {
-	m_bInheritSigningKey = (config.GetString(_T("user.signingkey"), m_UserSigningKey) == GIT_ENOTFOUND);
+	m_bInheritSigningKey = (config.GetString(L"user.signingkey", m_UserSigningKey) == GIT_ENOTFOUND);
 
 	// special handling for UserName and UserEmail, because these can also be defined as environment variables for effective settings
 	if (m_iConfigSource == CFG_SRC_EFFECTIVE)
@@ -148,8 +155,8 @@ void CSettingGitConfig::LoadDataImpl(CAutoConfig& config)
 	}
 	else
 	{
-		m_bInheritUserName = (config.GetString(_T("user.name"), m_UserName) == GIT_ENOTFOUND);
-		m_bInheritEmail = (config.GetString(_T("user.email"), m_UserEmail) == GIT_ENOTFOUND);
+		m_bInheritUserName = (config.GetString(L"user.name", m_UserName) == GIT_ENOTFOUND);
+		m_bInheritEmail = (config.GetString(L"user.email", m_UserEmail) == GIT_ENOTFOUND);
 	}
 
 	if (git_config_get_bool(&m_bAutoCrlf, config, "core.autocrlf") == GIT_ENOTFOUND)
@@ -171,9 +178,9 @@ void CSettingGitConfig::LoadDataImpl(CAutoConfig& config)
 	else
 	{
 		CString sSafeCrLf;
-		config.GetString(_T("core.safecrlf"), sSafeCrLf);
+		config.GetString(L"core.safecrlf", sSafeCrLf);
 		sSafeCrLf = sSafeCrLf.MakeLower().Trim();
-		if (sSafeCrLf == _T("warn"))
+		if (sSafeCrLf == L"warn")
 			m_cSafeCrLf.SetCurSel(3);
 		else
 			m_cSafeCrLf.SetCurSel(1);
@@ -213,25 +220,25 @@ void CSettingGitConfig::OnChange()
 
 BOOL CSettingGitConfig::SafeDataImpl(CAutoConfig& config)
 {
-	if (!Save(config, _T("user.name"), m_UserName, m_bInheritUserName == TRUE))
+	if (!Save(config, L"user.name", m_UserName, m_bInheritUserName == TRUE))
 		return FALSE;
 
-	if (!Save(config, _T("user.email"), m_UserEmail, m_bInheritEmail == TRUE))
+	if (!Save(config, L"user.email", m_UserEmail, m_bInheritEmail == TRUE))
 		return FALSE;
 
-	if (!Save(config, _T("user.signingkey"), this->m_UserSigningKey, m_bInheritSigningKey == TRUE))
+	if (!Save(config, L"user.signingkey", this->m_UserSigningKey, m_bInheritSigningKey == TRUE))
 		return FALSE;
 
-	if (!Save(config, _T("core.quotepath"), m_bQuotePath ? _T("true") : _T("false"), m_bQuotePath == BST_INDETERMINATE))
+	if (!Save(config, L"core.quotepath", m_bQuotePath ? L"true" : L"false", m_bQuotePath == BST_INDETERMINATE))
 		return FALSE;
 
-	if (!Save(config, _T("core.autocrlf"), m_bAutoCrlf ? _T("true") : _T("false"), m_bAutoCrlf == BST_INDETERMINATE))
+	if (!Save(config, L"core.autocrlf", m_bAutoCrlf ? L"true" : L"false", m_bAutoCrlf == BST_INDETERMINATE))
 		return FALSE;
 
 	{
 		CString safecrlf;
 		this->m_cSafeCrLf.GetWindowText(safecrlf);
-		if (!Save(config, _T("core.safecrlf"), safecrlf, safecrlf.IsEmpty()))
+		if (!Save(config, L"core.safecrlf", safecrlf, safecrlf.IsEmpty()))
 			return FALSE;
 	}
 
@@ -274,15 +281,16 @@ void CSettingGitConfig::OnBnClickedEdittgitconfig()
 	if (GitAdminDir::IsBareRepo(g_Git.m_CurrentDir))
 	{
 		CString tmpFile = GetTempFile();
-		CTGitPath path(_T(".tgitconfig"));
-		if (g_Git.GetOneFile(_T("HEAD"), path, tmpFile) == 0)
+		CTGitPath path(L".tgitconfig");
+		if (g_Git.GetOneFile(L"HEAD", path, tmpFile) == 0)
 		{
+			::SetFileAttributes(tmpFile, FILE_ATTRIBUTE_READONLY);
 			CAppUtils::LaunchAlternativeEditor(tmpFile);
 		}
 	}
 	else
 	{
-		CAppUtils::LaunchAlternativeEditor(g_Git.m_CurrentDir + _T("\\.tgitconfig"));
+		CAppUtils::LaunchAlternativeEditor(g_Git.m_CurrentDir + L"\\.tgitconfig");
 	}
 }
 
@@ -291,11 +299,13 @@ void CSettingGitConfig::OnBnClickedEditsystemgitconfig()
 	CString filename = g_Git.GetGitSystemConfig();
 	if (filename.IsEmpty())
 	{
-		CMessageBox::Show(NULL, IDS_PROC_GITCONFIG_NOMSYSGIT, IDS_APPNAME, MB_ICONERROR);
+		CMessageBox::Show(GetSafeHwnd(), IDS_PROC_GITCONFIG_NOMSYSGIT, IDS_APPNAME, MB_ICONERROR);
 		return;
 	}
 	// use alternative editor because of LineEndings
 	CAppUtils::LaunchAlternativeEditor(filename, true);
+	if (!g_Git.ms_bCygwinGit && !g_Git.ms_bMsys2Git && PathFileExists(g_Git.GetGitProgramDataConfig()))
+		CAppUtils::LaunchAlternativeEditor(g_Git.GetGitProgramDataConfig(), true);
 }
 
 void CSettingGitConfig::OnBnClickedViewsystemgitconfig()
@@ -303,9 +313,11 @@ void CSettingGitConfig::OnBnClickedViewsystemgitconfig()
 	CString filename = g_Git.GetGitSystemConfig();
 	if (filename.IsEmpty())
 	{
-		CMessageBox::Show(NULL, IDS_PROC_GITCONFIG_NOMSYSGIT, IDS_APPNAME, MB_ICONERROR);
+		CMessageBox::Show(GetSafeHwnd(), IDS_PROC_GITCONFIG_NOMSYSGIT, IDS_APPNAME, MB_ICONERROR);
 		return;
 	}
 	// use alternative editor because of LineEndings
 	CAppUtils::LaunchAlternativeEditor(filename);
+	if (!g_Git.ms_bCygwinGit && !g_Git.ms_bMsys2Git && PathFileExists(g_Git.GetGitProgramDataConfig()))
+		CAppUtils::LaunchAlternativeEditor(g_Git.GetGitProgramDataConfig());
 }

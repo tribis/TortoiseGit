@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2009,2011-2016 - TortoiseGit
+// Copyright (C) 2009, 2011-2018 - TortoiseGit
 // Copyright (C) 2007-2008 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -28,50 +28,53 @@
 
 bool DropMoveCommand::Execute()
 {
-	CString droppath = parser.GetVal(_T("droptarget"));
+	CString droppath = parser.GetVal(L"droptarget");
 	CString ProjectTop;
 	if (!CTGitPath(droppath).HasAdminDir(&ProjectTop))
 		return FALSE;
 
-	if (ProjectTop != g_Git.m_CurrentDir )
+	if (g_Git.m_CurrentDir.CompareNoCase(ProjectTop) != 0)
 	{
-		MessageBox(hwndExplorer, _T("Target and source must be the same git repository"), _T("TortoiseGit"), MB_OK | MB_ICONEXCLAMATION);
+		CMessageBox::Show(GetExplorerHWND(), IDS_ERR_MUSTBESAMEWT, IDS_APPNAME, MB_OK | MB_ICONEXCLAMATION);
 		return FALSE;
 	}
 
-	if (ProjectTop.GetLength() == 3 && ProjectTop.Mid(1, 2) == _T(":\\")) // working tree root is directly on a drive
+	if (ProjectTop.GetLength() == 3 && ProjectTop.Mid(1, 2) == L":\\") // working tree root is directly on a drive
 		droppath = droppath.Right(droppath.GetLength() - ProjectTop.GetLength());
 	else
 		droppath = droppath.Right(droppath.GetLength() - ProjectTop.GetLength() - 1);
 	if (!droppath.IsEmpty())
-		droppath += L"\\";
+		droppath += L'\\';
 
 	unsigned long count = 0;
 	pathList.RemoveAdminPaths();
 	CString sNewName;
 
-	if ((parser.HasKey(_T("rename")))&&(pathList.GetCount()==1))
+	if (parser.HasKey(L"rename") && pathList.GetCount() == 1)
 	{
 		// ask for a new name of the source item
-		do
+		CRenameDlg renDlg;
+		renDlg.SetRenameRequired(pathList[0].GetContainingDirectory().IsEquivalentToWithoutCase(droppath));
+		renDlg.SetInputValidator([&](const int /*nID*/, const CString& input) -> CString
 		{
-			CRenameDlg renDlg;
-			renDlg.m_windowtitle.LoadString(IDS_PROC_MOVERENAME);
-			renDlg.m_name = pathList[0].GetFileOrDirectoryName();
-			if (renDlg.DoModal() != IDOK)
-			{
-				return FALSE;
-			}
-			sNewName = renDlg.m_name;
-		} while(sNewName.IsEmpty() || PathFileExists(droppath + sNewName));
+			if (PathFileExists(g_Git.CombinePath(droppath + L'\\' + input)))
+				return CString(CFormatMessageWrapper(ERROR_FILE_EXISTS));
+
+			return{};
+		});
+		renDlg.m_sBaseDir = g_Git.CombinePath(droppath);
+		renDlg.m_windowtitle.LoadString(IDS_PROC_MOVERENAME);
+		renDlg.m_name = pathList[0].GetFileOrDirectoryName();
+		if (renDlg.DoModal() != IDOK)
+			return FALSE;
+		sNewName = renDlg.m_name;
 	}
 	CSysProgressDlg progress;
 	if (progress.IsValid())
 	{
 		progress.SetTitle(IDS_PROC_MOVING);
-		progress.SetAnimation(IDR_MOVEANI);
 		progress.SetTime(true);
-		progress.ShowModeless(CWnd::FromHandle(hwndExplorer));
+		progress.ShowModeless(CWnd::FromHandle(GetExplorerHWND()));
 	}
 	for (int nPath = 0; nPath < pathList.GetCount(); ++nPath)
 	{
@@ -82,30 +85,46 @@ bool DropMoveCommand::Execute()
 			destPath = CTGitPath(droppath + sNewName);
 		if (destPath.Exists())
 		{
-			CString name = pathList[nPath].GetFileOrDirectoryName();
-			if (!sNewName.IsEmpty())
-				name = sNewName;
+			progress.Stop();
+
+			CString name = destPath.GetFileOrDirectoryName();
 			progress.Stop();
 			CRenameDlg dlg;
+			dlg.SetInputValidator([&](const int /*nID*/, const CString& input) -> CString
+			{
+				if (PathFileExists(g_Git.CombinePath(droppath + L'\\' + input)))
+					return CString(CFormatMessageWrapper(ERROR_FILE_EXISTS));
+
+				return{};
+			});
+			dlg.m_sBaseDir = g_Git.CombinePath(destPath);
 			dlg.m_name = name;
 			dlg.m_windowtitle.Format(IDS_PROC_NEWNAMEMOVE, (LPCTSTR)name);
 			if (dlg.DoModal() != IDOK)
-			{
 				return FALSE;
-			}
-			destPath.SetFromWin(droppath + dlg.m_name);
+
+			// rebuild the progress dialog
+			progress.EnsureValid();
+			progress.SetTitle(IDS_PROC_MOVING);
+			progress.SetTime(true);
+			progress.SetProgress(count, pathList.GetCount());
+			progress.ShowModeless(CWnd::FromHandle(GetExplorerHWND()));
+
+			// Rebuild the destination path, with the new name
+			destPath.SetFromUnknown(droppath);
+			destPath.AppendPathString(dlg.m_name);
 		}
 		CString cmd,out;
 
-		cmd.Format(_T("git.exe mv -- \"%s\" \"%s\""), (LPCTSTR)pathList[nPath].GetGitPathString(), (LPCTSTR)destPath.GetGitPathString());
+		cmd.Format(L"git.exe mv -- \"%s\" \"%s\"", (LPCTSTR)pathList[nPath].GetGitPathString(), (LPCTSTR)destPath.GetGitPathString());
 		if (g_Git.Run(cmd, &out, CP_UTF8))
 		{
-			if (CMessageBox::Show(hwndExplorer, out, _T("TortoiseGit"), 2, IDI_EXCLAMATION, CString(MAKEINTRESOURCE(IDS_IGNOREBUTTON)), CString(MAKEINTRESOURCE(IDS_ABORTBUTTON))) == 1)
+			if (CMessageBox::Show(GetExplorerHWND(), out, L"TortoiseGit", 2, IDI_EXCLAMATION, CString(MAKEINTRESOURCE(IDS_IGNOREBUTTON)), CString(MAKEINTRESOURCE(IDS_ABORTBUTTON))) == 1)
 			{
 #if 0
 					if (!svn.Move(CTSVNPathList(pathList[nPath]), destPath, TRUE))
 					{
-						CMessageBox::Show(hwndExplorer, svn.GetLastErrorMessage(), _T("TortoiseGit"), MB_ICONERROR);
+						CMessageBox::Show(GetExplorerHWND(), svn.GetLastErrorMessage(), L"TortoiseGit", MB_ICONERROR);
 						return FALSE;		//get out of here
 					}
 					CShellUpdater::Instance().AddPathForUpdate(destPath);
@@ -113,7 +132,7 @@ bool DropMoveCommand::Execute()
 			}
 			else
 			{
-				CMessageBox::Show(hwndExplorer, IDS_USERCANCELLED, IDS_APPNAME, MB_ICONERROR);
+				CMessageBox::Show(GetExplorerHWND(), IDS_USERCANCELLED, IDS_APPNAME, MB_ICONERROR);
 				return FALSE;		//get out of here
 			}
 		}
@@ -128,7 +147,7 @@ bool DropMoveCommand::Execute()
 		}
 		if ((progress.IsValid())&&(progress.HasUserCancelled()))
 		{
-			CMessageBox::Show(hwndExplorer, IDS_USERCANCELLED, IDS_APPNAME, MB_ICONINFORMATION);
+			CMessageBox::Show(GetExplorerHWND(), IDS_USERCANCELLED, IDS_APPNAME, MB_ICONINFORMATION);
 			return FALSE;
 		}
 	}

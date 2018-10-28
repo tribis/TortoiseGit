@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2009-2015 - TortoiseGit
+// Copyright (C) 2009-2016, 2018 - TortoiseGit
 // Copyright (C) 2007-2008,2012 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -20,7 +20,6 @@
 #include "stdafx.h"
 #include "ResolveCommand.h"
 #include "AppUtils.h"
-#include "MessageBox.h"
 #include "ResolveDlg.h"
 #include "GitProgressDlg.h"
 #include "ProgressCommands/ResolveProgressCommand.h"
@@ -30,7 +29,7 @@ bool ResolveCommand::Execute()
 	CResolveDlg dlg;
 	dlg.m_pathList = pathList;
 	INT_PTR ret = IDOK;
-	if (!parser.HasKey(_T("noquestion")))
+	if (!parser.HasKey(L"noquestion"))
 		ret = dlg.DoModal();
 	if (ret == IDOK)
 	{
@@ -41,10 +40,10 @@ bool ResolveCommand::Execute()
 				for (int i = 0; i < dlg.m_pathList.GetCount(); ++i)
 				{
 					CString cmd, out;
-					cmd.Format(_T("git.exe add -f -- \"%s\""), (LPCTSTR)dlg.m_pathList[i].GetGitPathString());
+					cmd.Format(L"git.exe add -f -- \"%s\"", (LPCTSTR)dlg.m_pathList[i].GetGitPathString());
 					if (g_Git.Run(cmd, &out, CP_UTF8))
 					{
-						CMessageBox::Show(NULL, out, _T("TortoiseGit"), MB_OK | MB_ICONERROR);
+						MessageBox(GetExplorerHWND(), out, L"TortoiseGit", MB_OK | MB_ICONERROR);
 						return false;
 					}
 
@@ -52,16 +51,16 @@ bool ResolveCommand::Execute()
 				}
 
 				HWND resolveMsgWnd = parser.HasVal(L"resolvemsghwnd") ? (HWND)parser.GetLongLongVal(L"resolvemsghwnd") : 0;
-				if (resolveMsgWnd && CRegDWORD(_T("Software\\TortoiseGit\\RefreshFileListAfterResolvingConflict"), TRUE) == TRUE)
+				if (resolveMsgWnd && CRegDWORD(L"Software\\TortoiseGit\\RefreshFileListAfterResolvingConflict", TRUE) == TRUE)
 				{
-					static UINT WM_REVERTMSG = RegisterWindowMessage(_T("GITSLNM_NEEDSREFRESH"));
+					static UINT WM_REVERTMSG = RegisterWindowMessage(L"GITSLNM_NEEDSREFRESH");
 					::PostMessage(resolveMsgWnd, WM_REVERTMSG, NULL, NULL);
 				}
 				return true;
 			}
 			else
 			{
-				CGitProgressDlg progDlg(CWnd::FromHandle(hWndExplorer));
+				CGitProgressDlg progDlg(CWnd::FromHandle(GetExplorerHWND()));
 				theApp.m_pMainWnd = &progDlg;
 				ResolveProgressCommand resolveProgressCommand;
 				progDlg.SetCommand(&resolveProgressCommand);

@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2010-2013 - TortoiseGit
+// Copyright (C) 2009-2013, 2016-2017 - TortoiseGit
 // Copyright (C) 2003-2006,2008-2011,2015 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -21,11 +21,11 @@
 #include "SysProgressDlg.h"
 
 CSysProgressDlg::CSysProgressDlg()
-	: m_pIDlg(NULL)
+	: m_pIDlg(nullptr)
 	, m_isVisible(false)
 	, m_dwDlgFlags(PROGDLG_NORMAL)
-	, m_hWndProgDlg(NULL)
-	, m_hWndParent(NULL)
+	, m_hWndProgDlg(nullptr)
+	, m_hWndParent(nullptr)
 	, m_hWndFocus(nullptr)
 {
 	EnsureValid();
@@ -39,7 +39,7 @@ CSysProgressDlg::~CSysProgressDlg()
 			m_pIDlg->StopProgressDialog();
 
 		m_pIDlg.Release();
-		m_hWndProgDlg = NULL;
+		m_hWndProgDlg = nullptr;
 	}
 }
 
@@ -48,7 +48,7 @@ bool CSysProgressDlg::EnsureValid()
 	if(IsValid())
 		return true;
 
-	HRESULT hr = m_pIDlg.CoCreateInstance (CLSID_ProgressDialog, NULL, CLSCTX_INPROC_SERVER);
+	HRESULT hr = m_pIDlg.CoCreateInstance(CLSID_ProgressDialog, nullptr, CLSCTX_INPROC_SERVER);
 	return (SUCCEEDED(hr));
 }
 
@@ -56,9 +56,7 @@ void CSysProgressDlg::SetTitle(LPCTSTR szTitle)
 {
 	USES_CONVERSION;
 	if (IsValid())
-	{
 		m_pIDlg->SetTitle(T2COLE(szTitle));
-	}
 }
 void CSysProgressDlg::SetTitle ( UINT idTitle)
 {
@@ -69,9 +67,7 @@ void CSysProgressDlg::SetLine(DWORD dwLine, LPCTSTR szText, bool bCompactPath /*
 {
 	USES_CONVERSION;
 	if (IsValid())
-	{
-		m_pIDlg->SetLine(dwLine, T2COLE(szText), bCompactPath, NULL);
-	}
+		m_pIDlg->SetLine(dwLine, T2COLE(szText), bCompactPath, nullptr);
 }
 
 #ifdef _MFC_VER
@@ -85,27 +81,9 @@ void CSysProgressDlg::SetCancelMsg(LPCTSTR szMessage)
 {
 	USES_CONVERSION;
 	if (IsValid())
-	{
-		m_pIDlg->SetCancelMsg(T2COLE(szMessage), NULL);
-	}
+		m_pIDlg->SetCancelMsg(T2COLE(szMessage), nullptr);
 }
 
-void CSysProgressDlg::SetAnimation(HINSTANCE hinst, UINT uRsrcID)
-{
-	if (IsValid())
-	{
-		m_pIDlg->SetAnimation(hinst, uRsrcID);
-	}
-}
-#ifdef _MFC_VER
-void CSysProgressDlg::SetAnimation(UINT uRsrcID)
-{
-	if (IsValid())
-	{
-		m_pIDlg->SetAnimation(AfxGetResourceHandle(), uRsrcID);
-	}
-}
-#endif
 void CSysProgressDlg::SetTime(bool bTime /* = true */)
 {
 	m_dwDlgFlags &= ~(PROGDLG_NOTIME | PROGDLG_AUTOTIME);
@@ -148,7 +126,7 @@ void CSysProgressDlg::FormatPathLine ( DWORD dwLine, UINT idFormatText, ...)
 	va_end(args);
 }
 
-void CSysProgressDlg::FormatPathLine ( DWORD dwLine, CString FormatText, ...)
+void CSysProgressDlg::FormatPathLine(DWORD dwLine, LPCTSTR FormatText, ...)
 {
 	va_list args;
 	va_start(args, FormatText);
@@ -172,7 +150,7 @@ void CSysProgressDlg::FormatNonPathLine(DWORD dwLine, UINT idFormatText, ...)
 	va_end(args);
 }
 
-void CSysProgressDlg::FormatNonPathLine(DWORD dwLine, CString FormatText, ...)
+void CSysProgressDlg::FormatNonPathLine(DWORD dwLine, LPCTSTR FormatText, ...)
 {
 	va_list args;
 	va_start(args, FormatText);
@@ -188,18 +166,18 @@ void CSysProgressDlg::FormatNonPathLine(DWORD dwLine, CString FormatText, ...)
 HRESULT CSysProgressDlg::ShowModal(HWND hWndParent, BOOL immediately /* = true */)
 {
 	EnsureValid();
-	m_hWndProgDlg = NULL;
+	m_hWndProgDlg = nullptr;
 	if (!IsValid())
 		return E_FAIL;
 	m_hWndParent = hWndParent;
-	auto winId = GetWindowThreadProcessId(m_hWndParent, 0);
+	auto winId = GetWindowThreadProcessId(m_hWndParent, nullptr);
 	auto threadId = GetCurrentThreadId();
 	if (winId != threadId)
 		AttachThreadInput(winId, threadId, TRUE);
 	m_hWndFocus = GetFocus();
 	if (winId != threadId)
 		AttachThreadInput(winId, threadId, FALSE);
-	HRESULT hr = m_pIDlg->StartProgressDialog(hWndParent, NULL, m_dwDlgFlags | PROGDLG_MODAL, NULL);
+	HRESULT hr = m_pIDlg->StartProgressDialog(hWndParent, nullptr, m_dwDlgFlags | PROGDLG_MODAL, nullptr);
 	if(FAILED(hr))
 		return hr;
 
@@ -222,18 +200,18 @@ HRESULT CSysProgressDlg::ShowModal(HWND hWndParent, BOOL immediately /* = true *
 HRESULT CSysProgressDlg::ShowModeless(HWND hWndParent, BOOL immediately)
 {
 	EnsureValid();
-	m_hWndProgDlg = NULL;
+	m_hWndProgDlg = nullptr;
 	if (!IsValid())
 		return E_FAIL;
 	m_hWndParent = hWndParent;
-	auto winId = GetWindowThreadProcessId(m_hWndParent, 0);
+	auto winId = GetWindowThreadProcessId(m_hWndParent, nullptr);
 	auto threadId = GetCurrentThreadId();
 	if (winId != threadId)
 		AttachThreadInput(winId, threadId, TRUE);
 	m_hWndFocus = GetFocus();
 	if (winId != threadId)
 		AttachThreadInput(winId, threadId, FALSE);
-	HRESULT hr = m_pIDlg->StartProgressDialog(hWndParent, NULL, m_dwDlgFlags, NULL);
+	HRESULT hr = m_pIDlg->StartProgressDialog(hWndParent, nullptr, m_dwDlgFlags, nullptr);
 	if(FAILED(hr))
 		return hr;
 
@@ -255,17 +233,13 @@ HRESULT CSysProgressDlg::ShowModeless(HWND hWndParent, BOOL immediately)
 void CSysProgressDlg::SetProgress(DWORD dwProgress, DWORD dwMax)
 {
 	if (IsValid())
-	{
 		m_pIDlg->SetProgress(dwProgress, dwMax);
-	}
 }
 
 void CSysProgressDlg::SetProgress64(ULONGLONG u64Progress, ULONGLONG u64ProgressMax)
 {
 	if (IsValid())
-	{
 		m_pIDlg->SetProgress64(u64Progress, u64ProgressMax);
-	}
 }
 
 bool CSysProgressDlg::HasUserCancelled()
@@ -333,14 +307,12 @@ void CSysProgressDlg::Stop()
 		m_isVisible = false;
 		m_pIDlg.Release();
 
-		m_hWndProgDlg = NULL;
+		m_hWndProgDlg = nullptr;
 	}
 }
 
 void CSysProgressDlg::ResetTimer()
 {
 	if (IsValid())
-	{
-		m_pIDlg->Timer(PDTIMER_RESET, NULL);
-	}
+		m_pIDlg->Timer(PDTIMER_RESET, nullptr);
 }

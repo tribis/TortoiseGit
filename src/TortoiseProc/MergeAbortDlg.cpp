@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2013 - TortoiseGit
+// Copyright (C) 2008-2013, 2016-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -29,11 +29,10 @@
 
 IMPLEMENT_DYNAMIC(CMergeAbortDlg, CStateStandAloneDialog)
 
-CMergeAbortDlg::CMergeAbortDlg(CWnd* pParent /*=NULL*/)
+CMergeAbortDlg::CMergeAbortDlg(CWnd* pParent /*=nullptr*/)
 	: CStateStandAloneDialog(CMergeAbortDlg::IDD, pParent)
-	, m_ResetType(1)
+	, m_ResetType(0)
 {
-
 }
 
 CMergeAbortDlg::~CMergeAbortDlg()
@@ -61,12 +60,13 @@ BOOL CMergeAbortDlg::OnInitDialog()
 	GetWindowText(sWindowTitle);
 	CAppUtils::SetWindowTitle(m_hWnd, g_Git.m_CurrentDir, sWindowTitle);
 
+	AdjustControlSize(IDC_RADIO_RESET_MERGE);
 	AdjustControlSize(IDC_RADIO_RESET_MIXED);
 	AdjustControlSize(IDC_RADIO_RESET_HARD);
 
-	EnableSaveRestore(_T("MergeAbortDlg"));
+	EnableSaveRestore(L"MergeAbortDlg");
 
-	this->CheckRadioButton(IDC_RADIO_RESET_MIXED, IDC_RADIO_RESET_HARD, IDC_RADIO_RESET_MIXED + m_ResetType);
+	this->CheckRadioButton(IDC_RADIO_RESET_MERGE, IDC_RADIO_RESET_HARD, IDC_RADIO_RESET_MERGE + m_ResetType);
 
 	return FALSE;
 }
@@ -74,7 +74,7 @@ BOOL CMergeAbortDlg::OnInitDialog()
 void CMergeAbortDlg::OnOK()
 {
 	this->UpdateData(TRUE);
-	m_ResetType = this->GetCheckedRadioButton(IDC_RADIO_RESET_MIXED, IDC_RADIO_RESET_HARD) - IDC_RADIO_RESET_MIXED;
+	m_ResetType = this->GetCheckedRadioButton(IDC_RADIO_RESET_MERGE, IDC_RADIO_RESET_HARD) - IDC_RADIO_RESET_MERGE;
 	return CStateStandAloneDialog::OnOK();
 }
 
@@ -82,8 +82,8 @@ void CMergeAbortDlg::OnBnClickedShowModifiedFiles()
 {
 		CFileDiffDlg dlg;
 
-		dlg.m_strRev1 = _T("0000000000000000000000000000000000000000");
-		dlg.m_strRev2 = _T("HEAD");
+		dlg.m_strRev1 = L"HEAD";
+		dlg.m_strRev2 = GIT_REV_ZERO;
 
 		dlg.DoModal();
 }

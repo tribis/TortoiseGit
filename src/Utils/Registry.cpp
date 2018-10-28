@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2013 - TortoiseGit
+// Copyright (C) 2013, 2016 - TortoiseGit
 // Copyright (C) 2003-2006,2008-2010, 2014 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -30,12 +30,12 @@ CRegBase::CRegBase()
 CRegBase::CRegBase (const CString& key, bool force, HKEY base, REGSAM sam)
     : CRegBaseCommon<CString> (key, force, base, sam)
 {
-    m_key.TrimLeft(_T("\\"));
+    m_key.TrimLeft(L'\\');
     int backslashpos = m_key.ReverseFind('\\');
     m_path = m_key.Left(backslashpos);
-    m_path.TrimRight(_T("\\"));
+    m_path.TrimRight(L'\\');
     m_key = m_key.Mid(backslashpos);
-    m_key.Trim(_T("\\"));
+    m_key.Trim(L'\\');
 }
 #endif
 
@@ -48,7 +48,7 @@ CRegStdBase::CRegStdBase()
 CRegStdBase::CRegStdBase (const tstring& key, bool force, HKEY base, REGSAM sam)
     : CRegBaseCommon<tstring> (key, force, base, sam)
 {
-    tstring::size_type pos = key.find_last_of(_T('\\'));
+    tstring::size_type pos = key.find_last_of(L'\\');
     m_path = key.substr(0, pos);
     m_key = key.substr(pos + 1);
 }
@@ -71,12 +71,12 @@ void CRegRect::InternalRead (HKEY hKey, CRect& value)
 {
     DWORD size = 0;
     DWORD type = 0;
-    LastError = RegQueryValueEx(hKey, m_key, NULL, &type, NULL, (LPDWORD) &size);
+    LastError = RegQueryValueEx(hKey, m_key, nullptr, &type, nullptr, (LPDWORD)&size);
 
     if (LastError == ERROR_SUCCESS)
     {
         auto buffer = std::make_unique<char[]>(size);
-        if ((LastError = RegQueryValueEx(hKey, m_key, NULL, &type, (BYTE*) buffer.get(), &size))==ERROR_SUCCESS)
+        if ((LastError = RegQueryValueEx(hKey, m_key, nullptr, &type, (BYTE*)buffer.get(), &size)) == ERROR_SUCCESS)
         {
             ASSERT(type==REG_BINARY);
             value = CRect((LPRECT)buffer.get());
@@ -109,12 +109,12 @@ void CRegPoint::InternalRead (HKEY hKey, CPoint& value)
 {
     DWORD size = 0;
     DWORD type = 0;
-    LastError = RegQueryValueEx(hKey, m_key, NULL, &type, NULL, (LPDWORD) &size);
+    LastError = RegQueryValueEx(hKey, m_key, nullptr, &type, nullptr, (LPDWORD)&size);
 
     if (LastError == ERROR_SUCCESS)
     {
         auto buffer = std::make_unique<char[]>(size);
-        if ((LastError = RegQueryValueEx(hKey, m_key, NULL, &type, (BYTE*) buffer.get(), &size))==ERROR_SUCCESS)
+        if ((LastError = RegQueryValueEx(hKey, m_key, nullptr, &type, (BYTE*)buffer.get(), &size)) == ERROR_SUCCESS)
         {
             ASSERT(type==REG_BINARY);
             value = CPoint(*(POINT*)buffer.get());
@@ -134,10 +134,10 @@ void CRegPoint::InternalWrite (HKEY hKey, const CPoint& value)
 CRegistryKey::CRegistryKey(const CString& key, HKEY base, REGSAM sam)
 {
     m_base = base;
-    m_hKey = NULL;
+    m_hKey = nullptr;
     m_sam = sam;
     m_path = key;
-    m_path.TrimLeft(_T("\\"));
+    m_path.TrimLeft(L'\\');
 }
 
 CRegistryKey::~CRegistryKey()
@@ -149,11 +149,9 @@ CRegistryKey::~CRegistryKey()
 DWORD CRegistryKey::createKey()
 {
     DWORD disp;
-    DWORD rc = RegCreateKeyEx(m_base, m_path, 0, _T(""), REG_OPTION_NON_VOLATILE, KEY_WRITE|m_sam, NULL, &m_hKey, &disp);
+    DWORD rc = RegCreateKeyEx(m_base, m_path, 0, L"", REG_OPTION_NON_VOLATILE, KEY_WRITE | m_sam, nullptr, &m_hKey, &disp);
     if (rc != ERROR_SUCCESS)
-    {
         return rc;
-    }
     return RegCloseKey(m_hKey);
 }
 
@@ -173,11 +171,9 @@ bool CRegistryKey::getValues(CStringList& values)
         {
             TCHAR value[255] = { 0 };
             DWORD size = _countof(value);
-            rc = RegEnumValue(m_hKey, i, value, &size, NULL, NULL, NULL, NULL);
+            rc = RegEnumValue(m_hKey, i, value, &size, nullptr, nullptr, nullptr, nullptr);
             if (rc == ERROR_SUCCESS)
-            {
                 values.AddTail(value);
-            }
         }
     }
 
@@ -195,11 +191,9 @@ bool CRegistryKey::getSubKeys(CStringList& subkeys)
             TCHAR value[1024] = { 0 };
             DWORD size = _countof(value);
             FILETIME last_write_time;
-            rc = RegEnumKeyEx(m_hKey, i, value, &size, NULL, NULL, NULL, &last_write_time);
+            rc = RegEnumKeyEx(m_hKey, i, value, &size, nullptr, nullptr, nullptr, &last_write_time);
             if (rc == ERROR_SUCCESS)
-            {
                 subkeys.AddTail(value);
-            }
         }
     }
 

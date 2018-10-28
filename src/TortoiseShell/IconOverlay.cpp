@@ -1,7 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2009-2013, 2015 - TortoiseGit
-// Copyright (C) 2003-2008 - TortoiseSVN
+// Copyright (C) 2009-2013, 2015-2018 - TortoiseGit
+// Copyright (C) 2003-2008, 2017 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -23,7 +23,9 @@
 #include "PreserveChdir.h"
 #include "UnicodeUtils.h"
 #include "GitStatus.h"
-#include "..\TGitCache\CacheInterface.h"
+#include "../TGitCache/CacheInterface.h"
+#include "GitAdminDir.h"
+#include "StringUtils.h"
 
 // "The Shell calls IShellIconOverlayIdentifier::GetOverlayInfo to request the
 //  location of the handler's icon overlay. The icon overlay handler returns
@@ -32,23 +34,11 @@
 
 STDMETHODIMP CShellExt::GetOverlayInfo(LPWSTR pwszIconFile, int cchMax, int* pIndex, DWORD* pdwFlags)
 {
-	__try
-	{
-		return GetOverlayInfo_Wrap(pwszIconFile, cchMax, pIndex, pdwFlags);
-	}
-	__except(CCrashReport::Instance().SendReport(GetExceptionInformation()))
-	{
-	}
-	return E_FAIL;
-}
-
-STDMETHODIMP CShellExt::GetOverlayInfo_Wrap(LPWSTR pwszIconFile, int cchMax, int* pIndex, DWORD* pdwFlags)
-{
-	if(pwszIconFile == 0)
+	if (!pwszIconFile)
 		return E_POINTER;
-	if(pIndex == 0)
+	if (!pIndex)
 		return E_POINTER;
-	if(pdwFlags == 0)
+	if (!pdwFlags)
 		return E_POINTER;
 	if(cchMax < 1)
 		return E_INVALIDARG;
@@ -82,19 +72,7 @@ STDMETHODIMP CShellExt::GetOverlayInfo_Wrap(LPWSTR pwszIconFile, int cchMax, int
 
 STDMETHODIMP CShellExt::GetPriority(int *pPriority)
 {
-	__try
-	{
-		return GetPriority_Wrap(pPriority);
-	}
-	__except(CCrashReport::Instance().SendReport(GetExceptionInformation()))
-	{
-	}
-	return E_FAIL;
-}
-
-STDMETHODIMP CShellExt::GetPriority_Wrap(int *pPriority)
-{
-	if (pPriority == 0)
+	if (!pPriority)
 		return E_POINTER;
 
 	switch (m_State)
@@ -134,26 +112,14 @@ STDMETHODIMP CShellExt::GetPriority_Wrap(int *pPriority)
 //  IShellIconOverlayIdentifier::GetOverlayInfo method to determine which icon
 //  to display."
 
-STDMETHODIMP CShellExt::IsMemberOf(LPCWSTR pwszPath, DWORD dwAttrib)
+STDMETHODIMP CShellExt::IsMemberOf(LPCWSTR pwszPath, DWORD /*dwAttrib*/)
 {
-	__try
-	{
-		return IsMemberOf_Wrap(pwszPath, dwAttrib);
-	}
-	__except(CCrashReport::Instance().SendReport(GetExceptionInformation()))
-	{
-	}
-	return E_FAIL;
-}
-
-STDMETHODIMP CShellExt::IsMemberOf_Wrap(LPCWSTR pwszPath, DWORD /*dwAttrib*/)
-{
-	if (pwszPath == NULL)
+	if (!pwszPath)
 		return E_INVALIDARG;
 	const TCHAR* pPath = pwszPath;
 	// the shell sometimes asks overlays for invalid paths, e.g. for network
 	// printers (in that case the path is "0", at least for me here).
-	if (_tcslen(pPath)<2)
+	if (wcslen(pPath) < 2)
 		return S_FALSE;
 	PreserveChdir preserveChdir;
 	git_wc_status_kind status = git_wc_status_none;
@@ -165,7 +131,7 @@ STDMETHODIMP CShellExt::IsMemberOf_Wrap(LPCWSTR pwszPath, DWORD /*dwAttrib*/)
 	// To make sure that cache expires, clear it as soon as one handler is used.
 
 	AutoLocker lock(g_csGlobalCOMGuard);
-	if (_tcscmp(pPath, g_filepath.c_str())==0)
+	if (wcscmp(pPath, g_filepath.c_str()) == 0)
 	{
 		status = g_filestatus;
 		readonlyoverlay = g_readonlyoverlay;
@@ -184,7 +150,13 @@ STDMETHODIMP CShellExt::IsMemberOf_Wrap(LPCWSTR pwszPath, DWORD /*dwAttrib*/)
 			return S_FALSE;
 		}
 
-		switch (g_ShellCache.GetCacheType())
+		auto cacheType = g_ShellCache.GetCacheType();
+		if (g_ShellCache.IsOnlyNonElevated() && g_ShellCache.IsProcessElevated())
+		{
+			cacheType = ShellCache::none;
+			CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) L": elevated overlays blocked\n");
+		}
+		switch (cacheType)
 		{
 		case ShellCache::exe:
 			{
@@ -207,7 +179,7 @@ STDMETHODIMP CShellExt::IsMemberOf_Wrap(LPCWSTR pwszPath, DWORD /*dwAttrib*/)
 						readonlyoverlay = true;
 					if (itemStatus.m_bSkipWorktree)
 						lockedoverlay = true;
-					status = GitStatus::GetMoreImportant(itemStatus.m_status.text_status, itemStatus.m_status.prop_status);
+					status = (git_wc_status_kind)itemStatus.m_status;
 				}
 			}
 			break;
@@ -236,9 +208,7 @@ STDMETHODIMP CShellExt::IsMemberOf_Wrap(LPCWSTR pwszPath, DWORD /*dwAttrib*/)
 						if (g_ShellCache.HasGITAdminDir(pPath, TRUE))
 						{
 							if ((!g_ShellCache.IsRecursive()) && (!g_ShellCache.IsFolderOverlay()))
-							{
 								status = git_wc_status_normal;
-							}
 							else
 							{
 								s = m_CachedStatus.GetFullStatus(CTGitPath(pPath), TRUE);
@@ -246,10 +216,10 @@ STDMETHODIMP CShellExt::IsMemberOf_Wrap(LPCWSTR pwszPath, DWORD /*dwAttrib*/)
 							}
 						}
 						else
-						{
 							status = git_wc_status_none;
-						}
 					}
+					else if (CStringUtils::EndsWith(pPath, GitAdminDir::GetAdminDirName()))
+						status = git_wc_status_none;
 					else
 					{
 						s = m_CachedStatus.GetFullStatus(CTGitPath(pPath), FALSE);
@@ -271,22 +241,16 @@ STDMETHODIMP CShellExt::IsMemberOf_Wrap(LPCWSTR pwszPath, DWORD /*dwAttrib*/)
 				if (PathIsDirectory(pPath))
 				{
 					if (g_ShellCache.HasGITAdminDir(pPath, TRUE))
-					{
 						status = git_wc_status_normal;
-					}
 					else
-					{
 						status = git_wc_status_none;
-					}
 				}
 				else
-				{
 					status = git_wc_status_none;
-				}
 			}
 			break;
 		}
-		CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": Status %d for file %s\n"), status, pwszPath);
+		CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) L": Status %d for file %s\n", status, pwszPath);
 	}
 	g_filepath.clear();
 	g_filepath = pPath;
@@ -323,8 +287,6 @@ STDMETHODIMP CShellExt::IsMemberOf_Wrap(LPCWSTR pwszPath, DWORD /*dwAttrib*/)
 			}
 			return S_FALSE;
 		case git_wc_status_normal:
-		case git_wc_status_external:
-		case git_wc_status_incomplete:
 			// skip-worktree aka locked has higher priority than assume-valid
 			if ((lockedoverlay)&&(g_lockedovlloaded))
 			{
@@ -353,7 +315,6 @@ STDMETHODIMP CShellExt::IsMemberOf_Wrap(LPCWSTR pwszPath, DWORD /*dwAttrib*/)
 			}
 			else
 				return S_FALSE;
-		case git_wc_status_missing:
 		case git_wc_status_deleted:
 			if (g_deletedovlloaded)
 			{
@@ -377,7 +338,6 @@ STDMETHODIMP CShellExt::IsMemberOf_Wrap(LPCWSTR pwszPath, DWORD /*dwAttrib*/)
 				else
 					return S_FALSE;
 			}
-		case git_wc_status_replaced:
 		case git_wc_status_modified:
 			if (g_modifiedovlloaded)
 			{
@@ -399,14 +359,6 @@ STDMETHODIMP CShellExt::IsMemberOf_Wrap(LPCWSTR pwszPath, DWORD /*dwAttrib*/)
 				else
 					return S_FALSE;
 			}
-		case git_wc_status_merged:
-			if (m_State == FileStateReadOnly)
-			{
-				g_filepath.clear();
-				return S_OK;
-			}
-			else
-				return S_FALSE;
 		case git_wc_status_added:
 			if (g_addedovlloaded)
 			{
@@ -431,7 +383,6 @@ STDMETHODIMP CShellExt::IsMemberOf_Wrap(LPCWSTR pwszPath, DWORD /*dwAttrib*/)
 					return S_FALSE;
 			}
 		case git_wc_status_conflicted:
-		case git_wc_status_obstructed:
 			if (g_conflictedovlloaded)
 			{
 				if (m_State == FileStateConflict)

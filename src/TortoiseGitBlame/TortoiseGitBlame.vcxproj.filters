@@ -90,9 +90,6 @@
     <ClCompile Include="..\Utils\MiscUI\IconMenu.cpp">
       <Filter>Utils\MiscUI</Filter>
     </ClCompile>
-    <ClCompile Include="..\Utils\MiscUI\HintListCtrl.cpp">
-      <Filter>Utils\MiscUI</Filter>
-    </ClCompile>
     <ClCompile Include="..\Utils\MiscUI\FilterEdit.cpp">
       <Filter>Utils\MiscUI</Filter>
     </ClCompile>
@@ -100,9 +97,6 @@
       <Filter>Utils</Filter>
     </ClCompile>
     <ClCompile Include="..\Utils\MiscUI\IconBitmapUtils.cpp">
-      <Filter>Utils\MiscUI</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Utils\MiscUI\HTMLFormatter.cpp">
       <Filter>Utils\MiscUI</Filter>
     </ClCompile>
     <ClCompile Include="..\Utils\PersonalDictionary.cpp">
@@ -133,9 +127,6 @@
       <Filter>TortoiseGitProc</Filter>
     </ClCompile>
     <ClCompile Include="..\TortoiseProc\GitLogListBase.cpp">
-      <Filter>TortoiseGitProc</Filter>
-    </ClCompile>
-    <ClCompile Include="..\TortoiseProc\GitStatusListCtrlHelpers.cpp">
       <Filter>TortoiseGitProc</Filter>
     </ClCompile>
     <ClCompile Include="..\TortoiseProc\lanes.cpp">
@@ -176,6 +167,12 @@
     </ClCompile>
     <ClCompile Include="..\Git\GitRevLoglist.cpp">
       <Filter>Git</Filter>
+    </ClCompile>
+    <ClCompile Include="..\TortoiseProc\ColumnManager.cpp">
+      <Filter>TortoiseGitProc</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Utils\LoadIconEx.cpp">
+      <Filter>Utils</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -248,9 +245,6 @@
     <ClInclude Include="..\Utils\MiscUI\IconMenu.h">
       <Filter>Utils\MiscUI</Filter>
     </ClInclude>
-    <ClInclude Include="..\Utils\MiscUI\HintListCtrl.h">
-      <Filter>Utils\MiscUI</Filter>
-    </ClInclude>
     <ClInclude Include="..\Utils\MiscUI\FilterEdit.h">
       <Filter>Utils\MiscUI</Filter>
     </ClInclude>
@@ -258,9 +252,6 @@
       <Filter>Utils</Filter>
     </ClInclude>
     <ClInclude Include="..\Utils\MiscUI\IconBitmapUtils.h">
-      <Filter>Utils\MiscUI</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Utils\MiscUI\HTMLFormatter.h">
       <Filter>Utils\MiscUI</Filter>
     </ClInclude>
     <ClInclude Include="..\Utils\PersonalDictionary.h">
@@ -332,6 +323,27 @@
     <ClInclude Include="GitBlameLogList.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\Utils\LruCache.h">
+      <Filter>Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Utils\MiscUI\HintCtrl.h">
+      <Filter>Utils\MiscUI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\TortoiseProc\ColumnManager.h">
+      <Filter>TortoiseGitProc</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Utils\MiscUI\CommonDialogFunctions.h">
+      <Filter>Utils\MiscUI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Utils\MiscUI\GestureEnabledControl.h">
+      <Filter>Utils\MiscUI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Utils\DPIAware.h">
+      <Filter>Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Utils\LoadIconEx.h">
+      <Filter>Utils</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Image Include="..\Resources\blameres\output_wnd.ico">
@@ -352,16 +364,10 @@
     <Image Include="..\Resources\blameres\Toolbar256.bmp">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="..\Resources\blameres\TortoiseGitBlame.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="..\Resources\blameres\TortoiseGitBlameDoc.ico">
+    <Image Include="..\Resources\TortoiseGitBlame.ico">
       <Filter>Resource Files</Filter>
     </Image>
     <Image Include="..\Resources\copy.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="..\Resources\menublame.ico">
       <Filter>Resource Files</Filter>
     </Image>
     <Image Include="..\Resources\menucompare.ico">

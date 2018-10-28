@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2009-2013, 2015 - TortoiseGit
+// Copyright (C) 2009-2013, 2015-2016, 2018 - TortoiseGit
 // Copyright (C) 2007-2008 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -28,43 +28,35 @@ bool IgnoreCommand::Execute()
 {
 	bool bmask=false;
 
-	if(parser.HasKey(_T("onlymask")))
-	{
+	if (parser.HasKey(L"onlymask"))
 		bmask=true;
-	}
 
-	bool ret = CAppUtils::IgnoreFile(pathList,bmask);
+	bool ret = CAppUtils::IgnoreFile(GetExplorerHWND(), pathList, bmask);
 	if (!ret)
 		return false;
 
-	if (parser.HasKey(_T("delete")))
+	if (parser.HasKey(L"delete"))
 	{
 		int key;
 
 		CString format;
 
-		if(CMessageBox::Show(hwndExplorer, IDS_PROC_KEEPFILELOCAL, IDS_APPNAME, MB_ICONERROR|MB_YESNO) == IDYES)
-		{
-			format = _T("git.exe rm --cache -r -f -- \"%s\"");
-		}
+		if(CMessageBox::Show(GetExplorerHWND(), IDS_PROC_KEEPFILELOCAL, IDS_APPNAME, MB_ICONERROR|MB_YESNO) == IDYES)
+			format = L"git.exe rm --cache -r -f -- \"%s\"";
 		else
-		{
-			format=_T("git.exe rm -r -f -- \"%s\"");
-		}
+			format = L"git.exe rm -r -f -- \"%s\"";
 
 		CString output;
 		CString cmd;
 		int nPath;
 		for (nPath = 0; nPath < pathList.GetCount(); ++nPath)
 		{
-
 			cmd.Format(format, (LPCTSTR)pathList[nPath].GetGitPathString());
 			if (g_Git.Run(cmd, &output, CP_UTF8))
 			{
-				key = MessageBox(hwndExplorer, output, _T("TortoiseGit"), MB_ICONERROR | MB_OKCANCEL);
+				key = MessageBox(GetExplorerHWND(), output, L"TortoiseGit", MB_ICONERROR | MB_OKCANCEL);
 				if(key == IDCANCEL)
 					return FALSE;
-
 			}
 		}
 
@@ -72,7 +64,7 @@ bool IgnoreCommand::Execute()
 
 		CShellUpdater::Instance().AddPathsForUpdate(pathList);
 
-		MessageBox(hwndExplorer, output, _T("TortoiseGit"), MB_ICONINFORMATION | MB_OK);
+		MessageBox(GetExplorerHWND(), output, L"TortoiseGit", MB_ICONINFORMATION | MB_OK);
 	}
 
 	CShellUpdater::Instance().AddPathsForUpdate(orgPathList);

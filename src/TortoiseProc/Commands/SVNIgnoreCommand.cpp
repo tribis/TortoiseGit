@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2007-2008,2012,2014-2015 - TortoiseGit
+// Copyright (C) 2007-2008, 2012, 2014-2016, 2018 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -20,7 +20,6 @@
 #include "SVNIgnoreCommand.h"
 
 #include "ProgressDlg.h"
-#include "MessageBox.h"
 #include "Git.h"
 #include "SVNIgnoreTypeDlg.h"
 
@@ -35,22 +34,23 @@ bool SVNIgnoreCommand::Execute()
 		{
 		case 0:
 			{
-				progress.m_GitCmd = _T("git.exe svn show-ignore");
+				progress.m_GitCmd = L"git.exe svn show-ignore";
 				CString dotGitPath;
 				GitAdminDir::GetAdminDirPath(g_Git.m_CurrentDir, dotGitPath);
-				progress.m_LogFile = dotGitPath + _T("info\\exclude");
+				progress.m_LogFile = dotGitPath + L"info\\exclude";
 				progress.m_bShowCommand = false;
-				progress.m_PreText = _T("git.exe svn show-ignore > ") + progress.m_LogFile;
+				progress.m_PreText = L"git.exe svn show-ignore > " + progress.m_LogFile;
 			}
 			break;
 		case 1:
-			progress.m_GitCmd=_T("git.exe svn create-ignore");
+			progress.m_GitCmd = L"git.exe svn create-ignore";
 			break;
 		default:
-			CMessageBox::Show(NULL,_T("Unkown SVN Ignore Type"),_T("TortoiseGit"),MB_OK|MB_ICONERROR);
+			MessageBox(GetExplorerHWND(), L"Unknown SVN Ignore Type", L"TortoiseGit", MB_OK | MB_ICONERROR);
 			return FALSE;
 		}
 
+		theApp.m_pMainWnd = &progress;
 		if (progress.DoModal() == IDOK)
 			return progress.m_GitStatus == 0;
 	}

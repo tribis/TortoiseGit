@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2013-2016 - TortoiseGit
+// Copyright (C) 2013-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -21,6 +21,7 @@
 #include "SetMainPage.h"
 #include "ProjectProperties.h"
 #include "SetDialogs3.h"
+#include "AppUtils.h"
 
 static std::vector<DWORD> g_langs;
 
@@ -75,13 +76,17 @@ BOOL CSetDialogs3::OnInitDialog()
 	AdjustControlSize(IDC_CHECK_INHERIT_KEYID);
 	GITSETTINGS_ADJUSTCONTROLSIZE
 
+	m_tooltips.AddTool(IDC_CHECK_INHERIT_LIMIT, IDS_SETTINGS_GITCONFIG_INHERIT_TT);
+	m_tooltips.AddTool(IDC_CHECK_INHERIT_BORDER, IDS_SETTINGS_GITCONFIG_INHERIT_TT);
+	m_tooltips.AddTool(IDC_CHECK_INHERIT_KEYID, IDS_SETTINGS_GITCONFIG_INHERIT_TT);
+
 	AddTrueFalseToComboBox(m_cWarnNoSignedOffBy);
 
-	m_langCombo.AddString(_T(""));
+	m_langCombo.AddString(L"");
 	m_langCombo.SetItemData(0, (DWORD_PTR)-2);
-	m_langCombo.AddString(_T("(auto)")); // do not translate, the order matters!
+	m_langCombo.AddString(L"(auto)"); // do not translate, the order matters!
 	m_langCombo.SetItemData(1, 0);
-	m_langCombo.AddString(_T("(disable)")); // do not translate, the order matters!
+	m_langCombo.AddString(L"(disable)"); // do not translate, the order matters!
 	m_langCombo.SetItemData(2, (DWORD_PTR)-1);
 	// fill the combo box with all available languages
 	g_langs.clear();
@@ -113,16 +118,16 @@ void CSetDialogs3::LoadDataImpl(CAutoConfig& config)
 		CString value;
 		if (config.GetString(PROJECTPROPNAME_PROJECTLANGUAGE, value) == GIT_ENOTFOUND && m_iConfigSource != 0)
 			m_langCombo.SetCurSel(0);
-		else if (value == _T("-1"))
+		else if (value == L"-1")
 			m_langCombo.SetCurSel(2);
 		else if (!value.IsEmpty())
 		{
 			LPTSTR strEnd;
-			long longValue = _tcstol(value, &strEnd, 0);
+			long longValue = wcstol(value, &strEnd, 0);
 			if (longValue == 0)
 			{
 				if (m_iConfigSource == CFG_SRC_EFFECTIVE)
-					SelectLanguage(m_langCombo, CRegDWORD(_T("Software\\TortoiseGit\\LanguageID"), 1033));
+					SelectLanguage(m_langCombo, CRegDWORD(L"Software\\TortoiseGit\\LanguageID", 1033));
 				else
 					m_langCombo.SetCurSel(1);
 			}
@@ -130,7 +135,7 @@ void CSetDialogs3::LoadDataImpl(CAutoConfig& config)
 				SelectLanguage(m_langCombo, longValue);
 		}
 		else if (m_iConfigSource == CFG_SRC_EFFECTIVE)
-			SelectLanguage(m_langCombo, CRegDWORD(_T("Software\\TortoiseGit\\LanguageID"), 1033));
+			SelectLanguage(m_langCombo, CRegDWORD(L"Software\\TortoiseGit\\LanguageID", 1033));
 		else
 			m_langCombo.SetCurSel(1);
 	}
@@ -141,7 +146,7 @@ void CSetDialogs3::LoadDataImpl(CAutoConfig& config)
 		m_bInheritLogMinSize = (config.GetString(PROJECTPROPNAME_LOGMINSIZE, value) == GIT_ENOTFOUND);
 		if (!value.IsEmpty() || m_iConfigSource == CFG_SRC_EFFECTIVE)
 		{
-			int nMinLogSize = _ttoi(value);
+			int nMinLogSize = _wtoi(value);
 			m_LogMinSize.Format(L"%d", nMinLogSize);
 			m_bInheritLogMinSize = FALSE;
 		}
@@ -153,7 +158,7 @@ void CSetDialogs3::LoadDataImpl(CAutoConfig& config)
 		m_bInheritBorder = (config.GetString(PROJECTPROPNAME_LOGWIDTHLINE, value) == GIT_ENOTFOUND);
 		if (!value.IsEmpty() || m_iConfigSource == CFG_SRC_EFFECTIVE)
 		{
-			int nLogWidthMarker = _ttoi(value);
+			int nLogWidthMarker = _wtoi(value);
 			m_Border.Format(L"%d", nLogWidthMarker);
 			m_bInheritBorder = FALSE;
 		}
@@ -238,29 +243,24 @@ void CSetDialogs3::OnChange()
 void CSetDialogs3::OnBnClickedIconfileBrowse()
 {
 	UpdateData(TRUE);
-	CString currentDir = g_Git.m_CurrentDir + (g_Git.m_CurrentDir.Right(1) == _T("\\") ? _T("") : _T("\\"));
+	CString currentDir = g_Git.m_CurrentDir + (CStringUtils::EndsWith(g_Git.m_CurrentDir, L'\\') ? L"" : L"\\");
 	CString iconFile = m_iconFile;
-	if (!(iconFile.Mid(1, 1) == _T(":") || iconFile.Left(1) == _T("\\")))
+	if (!(iconFile.Mid(1, 1) == L":" || CStringUtils::StartsWith(iconFile, L"\\")))
 		iconFile = currentDir + iconFile;
 	iconFile.Replace('/', '\\');
-	CFileDialog dlg(FALSE, _T(""), iconFile, OFN_FILEMUSTEXIST, CString(MAKEINTRESOURCE(IDS_ICONFILEFILTER)));
+	if (!CAppUtils::FileOpenSave(iconFile, nullptr, 0, IDS_ICONFILEFILTER, true, GetSafeHwnd()))
+		return;
 
-	INT_PTR ret = dlg.DoModal();
-	SetCurrentDirectory(g_Git.m_CurrentDir);
-	if (ret == IDOK)
+	if (CStringUtils::StartsWith(iconFile, currentDir))
+		iconFile = iconFile.Mid(currentDir.GetLength());
+	iconFile.Replace('\\', '/');
+	if (m_iconFile != iconFile)
 	{
-		iconFile = dlg.GetPathName();
-		if (iconFile.Left(currentDir.GetLength()) == currentDir)
-			iconFile = iconFile.Mid(currentDir.GetLength());
-		iconFile.Replace('\\', '/');
-		if (m_iconFile != iconFile)
-		{
-			m_iconFile = iconFile;
-			m_bNeedSave = true;
-			SetModified();
-		}
-		UpdateData(FALSE);
+		m_iconFile = iconFile;
+		m_bNeedSave = true;
+		SetModified();
 	}
+	UpdateData(FALSE);
 }
 
 BOOL CSetDialogs3::OnApply()
@@ -277,7 +277,7 @@ BOOL CSetDialogs3::OnApply()
 
 BOOL CSetDialogs3::EnumLocalesProc(LPTSTR lpLocaleString)
 {
-	DWORD langID = _tcstol(lpLocaleString, NULL, 16);
+	DWORD langID = wcstol(lpLocaleString, nullptr, 16);
 	g_langs.push_back(langID);
 	return TRUE;
 }
@@ -290,9 +290,9 @@ void CSetDialogs3::AddLangToCombo(DWORD langID)
 	GetLocaleInfo(langID, LOCALE_SNATIVECTRYNAME, buf, _countof(buf));
 	if (buf[0])
 	{
-		sLang += _T(" (");
+		sLang += L" (";
 		sLang += buf;
-		sLang += _T(")");
+		sLang += L')';
 	}
 
 	int index = m_langCombo.AddString(sLang);

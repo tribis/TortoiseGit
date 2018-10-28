@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2007-2011, 2013-2015 - TortoiseGit
+// Copyright (C) 2007-2011, 2013-2016 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -30,7 +30,7 @@ class CMergeDlg : public CResizableStandAloneDialog,public CChooseVersion , publ
 	DECLARE_DYNAMIC(CMergeDlg)
 
 public:
-	CMergeDlg(CWnd* pParent = NULL);   // standard constructor
+	CMergeDlg(CWnd* pParent = nullptr);   // standard constructor
 	virtual ~CMergeDlg();
 
 // Dialog Data
@@ -48,8 +48,8 @@ public:
 	//CString m_Base;
 
 protected:
-	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
-	virtual BOOL OnInitDialog();
+	virtual void DoDataExchange(CDataExchange* pDX) override;    // DDX/DDV support
+	virtual BOOL OnInitDialog() override;
 
 	CSciEdit			m_cLogMessage;
 	ProjectProperties	m_ProjectProperties;
@@ -59,8 +59,8 @@ protected:
 	CHOOSE_EVENT_RADIO() ;
 
 	// CSciEditContextMenuInterface
-	virtual void		InsertMenuItems(CMenu& mPopup, int& nCmd);
-	virtual bool		HandleMenuItemClick(int cmd, CSciEdit * pSciEdit);
+	virtual void		InsertMenuItems(CMenu& mPopup, int& nCmd) override;
+	virtual bool		HandleMenuItemClick(int cmd, CSciEdit* pSciEdit) override;
 
 public:
 	CString m_strLogMesage;
@@ -72,11 +72,12 @@ private:
 
 	void ReloadHistoryEntries();
 	afx_msg void OnBnClickedOk();
-	virtual void OnCancel();
+	virtual void OnCancel() override;
 	afx_msg void OnDestroy();
 	afx_msg void OnBnClickedCheckSquash();
 	afx_msg void OnBnClickedCheckMergeLog();
 	afx_msg void OnCbnSelchangeComboMergestrategy();
 	afx_msg void OnCbnSelchangeComboStrategyoption();
 	afx_msg void OnBnClickedCheckFFonlyOrNoFF();
+	afx_msg void OnSysColorChange();
 };

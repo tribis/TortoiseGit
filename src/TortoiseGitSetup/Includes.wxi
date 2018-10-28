@@ -8,8 +8,7 @@
 	<?define ProductName="TortoiseGit" ?>
 
 	<?define PackageKeywords="Sourcecontrol;Git;TortoiseGit;Shell" ?>
-	<?define PackageDescription="Git Client" ?>
-	<?define PackageComments="Windows Shell Integration For Git Source Control, v$(var.VersionNumberUserVisible)" ?>
+	<?define PackageDescription="Windows Shell Integration For Git Source Control, v$(var.VersionNumberUserVisible)" ?>
 	<?define PackageManufacturer="TortoiseGit team" ?>
 	<?define TortoiseGitOrg="https://tortoisegit.org/"?>
 
@@ -54,6 +53,11 @@
 	<?define GuidIgnored="1B94B098-57C6-4C39-9DC5-8EB00E423D3E"?>
 	<?define GuidUnversioned="18BF1135-6EA2-405F-A71E-16EEE7F71F8B"?>
 
+	<?define GuidGitWCRev="9642A3D3-7425-49F6-8F75-6A001F716AED"?>
+	<?define GuidGitWCRevTypeLib="F2E334DC-2799-4961-9FCC-C324CB5FD205"?>
+	<?define GuidGitWCRevInterface="41886E22-73C4-49E8-8831-37F79CED16FE"?>
+	<?define GuidPermanentProtocols="ca93ed24-fab4-4da7-8958-88ba04092f98"?>
+
 	<!-- Target specific component GUIDs ............................................. -->
 
 	<?if $(var.Platform) = "x64" ?>
@@ -67,12 +71,14 @@
 	<?define GuidApproveShellComponents="E7E43AE0-DB46-4AF9-95EA-2EF7AD3F2119"?>
 	<?define GuidApproveShellComponents32="56A11ACF-3DE2-40F8-A6A8-4CC334E19571"?>
 
-	<?define GuidLibSSL="CB2A61D8-AE23-4B9B-AC7D-473E2610367E"?>
 	<?define GuidAPR="72EB77A1-E5CD-4CDB-BFC2-77FDCFD04ACF"?>
 	<?define GuidTGit="CA01E04E-4D42-4C1E-B615-0D09D12380D4"?>
 	<?define GuidGitLibs="61EC5A0E-0B76-4E47-90A9-E0CF2E893444"?>
 	<?define GuidGitLibs32="69FBADA2-E356-45E6-BF22-D544057EB07E"?>
 	<?define GuidCrashRpt="69B216BC-60D2-4675-A4E5-1ECFB26A4AED"?>
+
+	<?define GuidUCRT="832ECBD6-EF93-42F2-ACCF-A40FEA2FB1FB"?>
+	<?define GuidCRTMFC="343ED373-E84F-4844-BB88-9709D81F2E45"?>
 
 	<?define GuidHelpEN="7AB0A6AA-1283-4A2A-B989-D8117ACB9FC4"?>
 
@@ -93,9 +99,12 @@
 	<?define GuidProtocolTGit="59646B9D-5524-4236-83E4-2A2D88175ED4"?>
 	<?define GuidProtocolGit="0AD2B787-A9B3-4AD7-99A5-EC6DFF0EB2B7"?>
 	<?define GuidProtocolGithub="78544CC9-8E07-4968-BD03-2D3260301784"?>
+	<?define GuidProtocolXGithubClient="91b67a41-96ad-410c-a64b-ca15d4abcbf2"?>
 	<?define GuidProtocolSmartgit="294096FE-7AD3-445C-8F7C-77B048315FB9"?>
 	<?define GuidPlainSettingsShortcuts="D78CE764-1770-4D38-9229-F5068D8738FD"?>
 	<?define GuidPlatformSettingsShortcuts="256F134F-87F1-418F-BA9A-AFA92270D42D"?>
+	<?define GuidTortoiseGitGitWCRev="FBB5B46E-3F8D-4128-B851-C8C781C2DD03"?>
+	<?define GuidTortoiseGitGitWCRev32="9549BE69-E931-4001-AF29-C815B2030584"?>
 
 	<?define GuidDictionaryENGB="03B4BF1F-7CBB-4F14-BE09-5DAA6F38B976"?>
 	<?define GuidDictionaryENUS="5E7DDA35-1078-40C1-8428-14808AF7DB96"?>
@@ -151,11 +160,13 @@
 	<?define GuidMachineRegistry="27FA9458-F68B-4A26-A36B-D452FD9EABBA"?>
 	<?define GuidApproveShellComponents="E3B982F9-7B17-457F-A72F-2F47E9DB1719"?>
 
-	<?define GuidLibSSL="BD9DD138-AEA4-4CF3-982D-8B5EB2A510D9"?>
 	<?define GuidAPR="DFBE3185-5272-4880-9ED3-F50F21EA9BE7"?>
 	<?define GuidTGit="F62E9AD5-EAC7-4EB9-825E-A8EF5CBA6730"?>
 	<?define GuidGitLibs="45615857-0FA0-43C1-9595-4C72A03AD1AC"?>
 	<?define GuidCrashRpt="2B7AD90B-41D9-4A10-834F-1CDD6E366AC7"?>
+
+	<?define GuidUCRT="710A4A9A-7C0A-4EC0-9000-4FE880BC92E2"?>
+	<?define GuidCRTMFC="4DDDB464-3077-4D19-A302-4A67B62143FE"?>
 
 	<?define GuidHelpEN="2355B04E-2D12-48C9-8034-372EEB6910D5"?>
 
@@ -175,9 +186,11 @@
 	<?define GuidProtocolTGit="83AEB17F-36A5-4FE1-90DA-57904A085A98"?>
 	<?define GuidProtocolGit="508DD925-273C-4170-9D81-55222E2E36AB"?>
 	<?define GuidProtocolGithub="02D10663-4B9B-4164-B6DA-6EC8BC222A92"?>
+	<?define GuidProtocolXGithubClient="4d1fa7d4-a012-4317-8a0e-685bab6a474b"?>
 	<?define GuidProtocolSmartgit="C114A9E4-2427-4435-B3BE-11EDC9C39B8C"?>
 	<?define GuidPlainSettingsShortcuts="49263747-C09E-4FFE-A0A4-8E8966CBD807"?>
 	<?define GuidPlatformSettingsShortcuts="F1B92E39-6F75-4ED4-9099-CB5DC7A91831"?>
+	<?define GuidTortoiseGitGitWCRev="FBB5B46E-3F8D-4128-B851-C8C781C2DD03"?>
 
 	<?define GuidDictionaryENGB="7218599E-4140-429F-855A-D82B59ED34F9"?>
 	<?define GuidDictionaryENUS="B3FD2F77-B14C-448F-8D82-4B21F16711D6"?>

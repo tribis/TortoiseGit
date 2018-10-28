@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2012,2014 - TortoiseGit
+// Copyright (C) 2008-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -18,21 +18,11 @@
 //
 
 #pragma once
-
 #include "TGitPath.h"
+#include "PathUtils.h"
 
 class CGitFileName;
 
-#pragma warning (push,1)
-typedef std::basic_string<wchar_t> wide_string;
-#ifdef UNICODE
-#	define stdstring wide_string
-#else
-#	define stdstring std::string
-#endif
-#pragma warning (pop)
-
-#include "TGitPath.h"
 #include "GitHash.h"
 
 typedef enum type_git_wc_status_kind
@@ -41,40 +31,16 @@ typedef enum type_git_wc_status_kind
 	git_wc_status_unversioned,
 	git_wc_status_ignored,
 	git_wc_status_normal,
-	git_wc_status_external,
-	git_wc_status_incomplete,
-	git_wc_status_missing,
 	git_wc_status_deleted,
-	git_wc_status_replaced,
 	git_wc_status_modified,
-	git_wc_status_merged,
 	git_wc_status_added,
 	git_wc_status_conflicted,
-	git_wc_status_obstructed,
-	git_wc_status_unknown,
-
+	git_wc_status_unknown, // should be last, see TGitCache/CacheInterface.h
 }git_wc_status_kind;
-
-typedef enum
-{
-	git_depth_empty,
-	git_depth_infinity,
-	git_depth_unknown,
-	git_depth_files,
-	git_depth_immediates,
-}git_depth_t;
-
-#define GIT_REV_ZERO _T("0000000000000000000000000000000000000000")
-#define GIT_INVALID_REVNUM _T("")
-typedef CString git_revnum_t;
 
 typedef struct git_wc_status2_t
 {
-	/** The status of the entries text. */
-	git_wc_status_kind text_status;
-
-	/** The status of the entries properties. */
-	git_wc_status_kind prop_status;
+	git_wc_status_kind status;
 
 	bool assumeValid;
 	bool skipWorktree;
@@ -82,13 +48,23 @@ typedef struct git_wc_status2_t
 
 #define MAX_STATUS_STRING_LENGTH		256
 
-typedef BOOL (*FILL_STATUS_CALLBACK)(const CString &path, git_wc_status_kind status, bool isDir, void *pdata, bool assumeValid, bool skipWorktree);
+typedef BOOL (*FILL_STATUS_CALLBACK)(const CString& path, const git_wc_status2_t* status, bool isDir, __int64 lastwritetime, void* baton);
 
 static CString CombinePath(const CString& part1, const CString& part2)
 {
 	CString path(part1);
-	path += _T('\\');
+	path += L'\\';
 	path += part2;
+	return path;
+}
+
+static CString CombinePath(const CString& part1, const CString& part2, const CString& part3)
+{
+	CString path(part1);
+	path += L'\\';
+	path += part2;
+	CPathUtils::EnsureTrailingPathDelimiter(path);
+	path += part3;
 	return path;
 }
 
@@ -100,22 +76,18 @@ class GitStatus
 {
 public:
 
-	static int GetFileStatus(const CString& gitdir, CString path, git_wc_status_kind* status, BOOL IsFull = FALSE, BOOL IsRecursive = FALSE, BOOL isIgnore = TRUE, FILL_STATUS_CALLBACK callback = nullptr, void* pData = nullptr, bool* assumeValid = nullptr, bool* skipWorktree = nullptr);
+	static int GetFileStatus(const CString& gitdir, CString path, git_wc_status2_t& status, BOOL IsFull = FALSE, BOOL isIgnore = TRUE, bool update = true);
 	static int GetDirStatus(const CString& gitdir, const CString& path, git_wc_status_kind* status, BOOL IsFull = false, BOOL IsRecursive = false, BOOL isIgnore = true);
-	static int EnumDirStatus(const CString &gitdir, const CString &path, git_wc_status_kind * status, BOOL IsFull = false, BOOL IsRecursive = false, BOOL isIgnore = true, FILL_STATUS_CALLBACK callback = nullptr, void *pData = nullptr);
-	static int GetFileList(CString path, std::vector<CGitFileName> &list);
-	static bool HasIgnoreFilesChanged(const CString &gitdir, const CString &subpaths, bool isDir);
-	static int LoadIgnoreFile(const CString &gitdir, const CString &subpaths, bool isDir);
-	static int IsUnderVersionControl(const CString &gitdir, const CString &path, bool isDir,bool *isVersion);
-	static int IsIgnore(const CString &gitdir, const CString &path, bool *isIgnore, bool isDir);
+	static int EnumDirStatus(const CString& gitdir, const CString& path, git_wc_status_kind* dirstatus, FILL_STATUS_CALLBACK callback, void* pData);
+	static int GetFileList(const CString& path, std::vector<CGitFileName>& list, bool& isRepoRoot, bool ignoreCase);
+	static bool CheckAndUpdateIgnoreFiles(const CString& gitdir, const CString& subpaths, bool isDir);
+	/** Checks whether a file/directory is ignored - does not reload .ignore files */
+	static bool IsIgnored(const CString &gitdir, const CString &path, bool isDir);
 	static bool IsExistIndexLockFile(CString gitdir);
 	static bool ReleasePath(const CString &gitdir);
 	static bool ReleasePathsRecursively(const CString &rootpath);
 
-public:
 	GitStatus();
-	~GitStatus(void);
-
 
 	/**
 	 * Reads the git status of the working copy entry. No
@@ -123,7 +95,7 @@ public:
 	 * If the status of the text and property part are different
 	 * then the more important status is returned.
 	 */
-	static git_wc_status_kind GetAllStatus(const CTGitPath& path, git_depth_t depth = git_depth_empty, bool * assumeValid = NULL, bool * skipWorktree = NULL);
+	static int GetAllStatus(const CTGitPath& path, bool bIsRecursive, git_wc_status2_t& status);
 
 	/**
 	 * Returns the status which is more "important" of the two statuses specified.
@@ -133,12 +105,7 @@ public:
 	 */
 	static git_wc_status_kind GetMoreImportant(git_wc_status_kind status1, git_wc_status_kind status2);
 
-	/**
-	 * Checks if a status is "important", i.e. if the status indicates that the user should know about it.
-	 * E.g. a "normal" status is not important, but "modified" is.
-	 * \param status the status to check
-	 */
-	static BOOL IsImportant(git_wc_status_kind status) {return (GetMoreImportant(git_wc_status_added, status)==status);}
+	static void AdjustFolderStatus(git_wc_status_kind& status);
 
 	/**
 	 * Reads the git text status of the working copy entry. No

@@ -80,8 +80,6 @@ public:
     void ReleaseReaderLock() throw();
     bool AcquireWriterLock(DWORD dwTimeout = INFINITE) throw();
     void ReleaseWriterLock() throw();
-    bool TryAcquireReaderLock() throw();
-    bool TryAcquireWriterLock() throw();
     void DowngradeFromWriterLock() throw();
 
     // When a thread calls UpgradeToWriterLock, the reader lock is released,
@@ -168,6 +166,9 @@ public:
     {
         m_lock.ReleaseReaderLock();
     }
+	CAutoReadLockT(CAutoReadLockT&) = delete;
+	CAutoReadLockT(CAutoReadLockT&& that) = default;
+	CAutoReadLockT& operator=(const CAutoReadLockT&) = delete;
 protected:
     T& m_lock;
 };
@@ -184,6 +185,9 @@ public :
     {
         m_lock.ReleaseWriterLock();
     }
+	CAutoWriteLockT(CAutoWriteLockT&) = delete;
+	CAutoWriteLockT(CAutoWriteLockT&&) = default;
+	CAutoWriteLockT& operator=(const CAutoWriteLockT&) = delete;
 protected:
     T& m_lock;
 };
@@ -205,6 +209,9 @@ public:
     {
         return isAcquired;
     }
+	CAutoReadWeakLockT(CAutoReadWeakLockT&) = delete;
+	CAutoReadWeakLockT(CAutoReadWeakLockT&&) = default;
+	CAutoReadWeakLockT& operator=(const CAutoReadWeakLockT&) = delete;
 protected:
     T& m_lock;
     bool isAcquired;
@@ -230,6 +237,9 @@ public :
     {
         return isAcquired;
     }
+	CAutoWriteWeakLockT(CAutoWriteWeakLockT&) = delete;
+	CAutoWriteWeakLockT(CAutoWriteWeakLockT&&) = default;
+	CAutoWriteWeakLockT& operator=(const CAutoWriteWeakLockT&) = delete;
 protected:
     T& m_lock;
     bool isAcquired;

@@ -31,15 +31,15 @@ class CSendMailDlg : public CResizableStandAloneDialog
 	DECLARE_DYNAMIC(CSendMailDlg)
 
 public:
-	CSendMailDlg(CWnd* pParent = NULL);   // standard constructor
+	CSendMailDlg(CWnd* pParent = nullptr);   // standard constructor
 	virtual ~CSendMailDlg();
 
 // Dialog Data
 	enum { IDD = IDD_SENDMAIL };
 
 protected:
-	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
-	virtual BOOL OnInitDialog();
+	virtual void DoDataExchange(CDataExchange* pDX) override;    // DDX/DDV support
+	virtual BOOL OnInitDialog() override;
 	DECLARE_MESSAGE_MAP()
 
 	void UpdateSubject();

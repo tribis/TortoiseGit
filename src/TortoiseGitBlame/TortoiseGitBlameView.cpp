@@ -1,6 +1,6 @@
 // TortoiseGitBlame - a Viewer for Git Blames
 
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2018 - TortoiseGit
 // Copyright (C) 2003-2008, 2014 - TortoiseSVN
 
 // Copyright (C)2003 Don HO <donho@altern.org>
@@ -39,6 +39,7 @@
 #include "BlameDetectMovedOrCopiedLines.h"
 #include "TGitPath.h"
 #include "IconMenu.h"
+#include "DPIAware.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -86,12 +87,16 @@ BEGIN_MESSAGE_MAP(CTortoiseGitBlameView, CView)
 	ON_UPDATE_COMMAND_UI(ID_VIEW_IGNORE_WHITESPACE, OnUpdateViewToggleIgnoreWhitespace)
 	ON_COMMAND(ID_VIEW_SHOWCOMPLETELOG, OnViewToggleShowCompleteLog)
 	ON_UPDATE_COMMAND_UI(ID_VIEW_SHOWCOMPLETELOG, OnUpdateViewToggleShowCompleteLog)
+	ON_COMMAND(ID_VIEW_ONLYCONSIDERFIRSTPARENTS, OnViewToggleOnlyFirstParent)
+	ON_UPDATE_COMMAND_UI(ID_VIEW_ONLYCONSIDERFIRSTPARENTS, OnUpdateViewToggleOnlyFirstParent)
 	ON_COMMAND(ID_VIEW_FOLLOWRENAMES, OnViewToggleFollowRenames)
 	ON_UPDATE_COMMAND_UI(ID_VIEW_FOLLOWRENAMES, OnUpdateViewToggleFollowRenames)
 	ON_COMMAND(ID_VIEW_COLORBYAGE, OnViewToggleColorByAge)
 	ON_UPDATE_COMMAND_UI(ID_VIEW_COLORBYAGE, OnUpdateViewToggleColorByAge)
 	ON_COMMAND(ID_VIEW_ENABLELEXER, OnViewToggleLexer)
 	ON_UPDATE_COMMAND_UI(ID_VIEW_ENABLELEXER, OnUpdateViewToggleLexer)
+	ON_COMMAND(ID_VIEW_WRAPLONGLINES, OnViewWrapLongLines)
+	ON_UPDATE_COMMAND_UI(ID_VIEW_WRAPLONGLINES, OnUpdateViewWrapLongLines)
 	ON_COMMAND_RANGE(IDM_FORMAT_ENCODE, IDM_FORMAT_ENCODE_END, OnChangeEncode)
 	ON_WM_CREATE()
 	ON_WM_SIZE()
@@ -101,6 +106,8 @@ BEGIN_MESSAGE_MAP(CTortoiseGitBlameView, CView)
 	ON_WM_LBUTTONDOWN()
 	ON_WM_RBUTTONDOWN()
 	ON_WM_RBUTTONUP()
+	ON_WM_SYSCOLORCHANGE()
+	ON_WM_ERASEBKGND()
 	ON_NOTIFY(SCN_PAINTED, IDC_SCINTILLA, OnSciPainted)
 	ON_NOTIFY(SCN_GETBKCOLOR, IDC_SCINTILLA, OnSciGetBkColor)
 	ON_REGISTERED_MESSAGE(m_FindDialogMessage, OnFindDialogMessage)
@@ -118,21 +125,25 @@ CTortoiseGitBlameView::CTortoiseGitBlameView()
 	, bIgnoreAllSpaces(false)
 	, m_MouseLine(-1)
 	, m_bMatchCase(false)
+	, hInstance(nullptr)
+	, hResource(nullptr)
+	, currentDialog(nullptr)
+	, wMain(nullptr)
+	, wLocator(nullptr)
+	, m_blamewidth(0)
+	, m_revwidth(0)
+	, m_datewidth(0)
+	, m_authorwidth(0)
+	, m_filenameWidth(0)
+	, m_originalLineNumberWidth(0)
+	, m_linewidth(0)
+	, m_SelectedLine(-1)
+	, m_bShowLine(true)
+	, m_pFindDialog(nullptr)
+#ifdef USE_TEMPFILENAME
+	, m_Buffer(nullptr)
+#endif
 {
-	hInstance = 0;
-	hResource = 0;
-	currentDialog = 0;
-	wMain = 0;
-	wLocator = 0;
-
-	m_blamewidth = 0;
-	m_revwidth = 0;
-	m_datewidth = 0;
-	m_authorwidth = 0;
-	m_filenameWidth = 0;
-	m_originalLineNumberWidth = 0;
-	m_linewidth = 0;
-
 	m_windowcolor = ::GetSysColor(COLOR_WINDOW);
 	m_textcolor = ::GetSysColor(COLOR_WINDOWTEXT);
 	m_texthighlightcolor = ::GetSysColor(COLOR_HIGHLIGHTTEXT);
@@ -141,30 +152,28 @@ CTortoiseGitBlameView::CTortoiseGitBlameView()
 	m_selectedrevcolor = ::GetSysColor(COLOR_HIGHLIGHT);
 	m_selectedauthorcolor = InterColor(m_selectedrevcolor, m_texthighlightcolor, 35);
 
-	m_SelectedLine = -1;
-
 	HIGHCONTRAST highContrast = { 0 };
 	highContrast.cbSize = sizeof(HIGHCONTRAST);
 	BOOL highContrastModeEnabled = SystemParametersInfo(SPI_GETHIGHCONTRAST, 0, &highContrast, 0) == TRUE && (highContrast.dwFlags & HCF_HIGHCONTRASTON);
-	m_colorage = !!theApp.GetInt(_T("ColorAge"), !highContrastModeEnabled);
-	m_bLexer = !!theApp.GetInt(_T("EnableLexer"), !highContrastModeEnabled);
+	m_colorage = !!theApp.GetInt(L"ColorAge", !highContrastModeEnabled);
+	m_bLexer = !!theApp.GetInt(L"EnableLexer", !highContrastModeEnabled);
 
-	m_bShowLine=true;
-
-	m_bShowAuthor = (theApp.GetInt(_T("ShowAuthor"), 1) == 1);
-	m_bShowDate = (theApp.GetInt(_T("ShowDate"), 0) == 1);
-	m_bShowFilename = (theApp.GetInt(_T("ShowFilename"), 0) == 1);
-	m_bShowOriginalLineNumber = (theApp.GetInt(_T("ShowOriginalLineNumber"), 0) == 1);
-	m_dwDetectMovedOrCopiedLines = theApp.GetInt(_T("DetectMovedOrCopiedLines"), 0);
-	m_bIgnoreWhitespace = (theApp.GetInt(_T("IgnoreWhitespace"), 0) == 1);
-	m_bShowCompleteLog = (theApp.GetInt(_T("ShowCompleteLog"), 1) == 1);
-	m_bFollowRenames = (theApp.GetInt(_T("FollowRenames"), 0) == 1);
-	m_bBlameOuputContainsOtherFilenames = FALSE;
+	m_bShowAuthor = (theApp.GetInt(L"ShowAuthor", 1) == 1);
+	m_bShowDate = (theApp.GetInt(L"ShowDate", 0) == 1);
+	m_bShowFilename = (theApp.GetInt(L"ShowFilename", 0) == 1);
+	m_bShowOriginalLineNumber = (theApp.GetInt(L"ShowOriginalLineNumber", 0) == 1);
+	m_dwDetectMovedOrCopiedLines = theApp.GetInt(L"DetectMovedOrCopiedLines", 0);
+	m_bIgnoreWhitespace = (theApp.GetInt(L"IgnoreWhitespace", 0) == 1);
+	m_bShowCompleteLog = (theApp.GetInt(L"ShowCompleteLog", 1) == 1);
+	m_bOnlyFirstParent = (theApp.GetInt(L"OnlyFirstParent", 0) == 1);
+	m_bFollowRenames = (theApp.GetInt(L"FollowRenames", 0) == 1);
+	m_bBlameOutputContainsOtherFilenames = FALSE;
+	m_bWrapLongLines = !!theApp.GetInt(L"WrapLongLines", 0);
+	m_sFindText = theApp.GetString(L"FindString");
 
 	m_FindDialogMessage = ::RegisterWindowMessage(FINDMSGSTRING);
-	m_pFindDialog = NULL;
 	// get short/long datetime setting from registry
-	DWORD RegUseShortDateFormat = CRegDWORD(_T("Software\\TortoiseGit\\LogDateFormat"), TRUE);
+	DWORD RegUseShortDateFormat = CRegDWORD(L"Software\\TortoiseGit\\LogDateFormat", TRUE);
 	if ( RegUseShortDateFormat )
 	{
 		m_DateFormat = DATE_SHORTDATE;
@@ -174,7 +183,7 @@ CTortoiseGitBlameView::CTortoiseGitBlameView()
 		m_DateFormat = DATE_LONGDATE;
 	}
 	// get relative time display setting from registry
-	DWORD regRelativeTimes = CRegDWORD(_T("Software\\TortoiseGit\\RelativeTimes"), FALSE);
+	DWORD regRelativeTimes = CRegDWORD(L"Software\\TortoiseGit\\RelativeTimes", FALSE);
 	m_bRelativeTimes = (regRelativeTimes != 0);
 
 	m_sRev.LoadString(IDS_LOG_REVISION);
@@ -182,10 +191,6 @@ CTortoiseGitBlameView::CTortoiseGitBlameView()
 	m_sAuthor.LoadString(IDS_LOG_AUTHOR);
 	m_sDate.LoadString(IDS_LOG_DATE);
 	m_sMessage.LoadString(IDS_LOG_MESSAGE);
-
-#ifdef USE_TEMPFILENAME
-	m_Buffer = NULL;
-#endif
 }
 
 CTortoiseGitBlameView::~CTortoiseGitBlameView()
@@ -262,14 +267,13 @@ void CTortoiseGitBlameView::OnChangeEncode(UINT nId)
 }
 int CTortoiseGitBlameView::OnCreate(LPCREATESTRUCT lpcs)
 {
-
 	CRect rect,rect1;
 	this->GetWindowRect(&rect1);
-	rect.left=m_blamewidth+LOCATOR_WIDTH;
+	rect.left = m_blamewidth + CDPIAware::Instance().ScaleX(LOCATOR_WIDTH);
 	rect.right=rect.Width();
 	rect.top=0;
 	rect.bottom=rect.Height();
-	if (!m_TextView.Create(_T("Scintilla"), _T("source"), 0, rect, this, IDC_SCINTILLA, 0))
+	if (!m_TextView.Create(L"Scintilla", L"source", 0, rect, this, IDC_SCINTILLA, 0))
 	{
 		TRACE0("Failed to create view\n");
 		return -1; // fail to create
@@ -282,12 +286,10 @@ int CTortoiseGitBlameView::OnCreate(LPCREATESTRUCT lpcs)
 
 	::AfxGetApp()->GetMainWnd();
 	return CView::OnCreate(lpcs);
-
 }
 
 void CTortoiseGitBlameView::OnSize(UINT /*nType*/, int cx, int cy)
 {
-
 	CRect rect;
 	rect.left=m_blamewidth;
 	rect.right=cx;
@@ -295,7 +297,6 @@ void CTortoiseGitBlameView::OnSize(UINT /*nType*/, int cx, int cy)
 	rect.bottom=cy;
 
 	m_TextView.MoveWindow(&rect);
-
 }
 BOOL CTortoiseGitBlameView::PreCreateWindow(CREATESTRUCT& cs)
 {
@@ -304,16 +305,24 @@ BOOL CTortoiseGitBlameView::PreCreateWindow(CREATESTRUCT& cs)
 
 // CTortoiseGitBlameView drawing
 
-void CTortoiseGitBlameView::OnDraw(CDC* /*pDC*/)
+BOOL CTortoiseGitBlameView::OnEraseBkgnd(CDC* /*pDC*/)
+{
+	return TRUE;
+}
+
+void CTortoiseGitBlameView::OnDraw(CDC* pDC)
 {
 	CTortoiseGitBlameDoc* pDoc = GetDocument();
 	ASSERT_VALID(pDoc);
 	if (!pDoc)
 		return;
 
-	DrawBlame(this->GetDC()->m_hDC);
-	DrawLocatorBar(this->GetDC()->m_hDC);
-	// TODO: add draw code for native data here
+	CMemDC myDC(*pDC, this);
+	RECT rc;
+	GetClientRect(&rc);
+	myDC.GetDC().FillSolidRect(&rc, m_windowcolor);
+	DrawBlame(myDC.GetDC());
+	DrawLocatorBar(myDC.GetDC());
 }
 
 
@@ -341,11 +350,31 @@ void CTortoiseGitBlameView::OnEndPrinting(CDC* /*pDC*/, CPrintInfo* /*pInfo*/)
 	// TODO: add cleanup after printing
 }
 
+int CTortoiseGitBlameView::GetLineUnderCursor(CPoint point)
+{
+	auto firstvisibleline = (int)SendEditor(SCI_GETFIRSTVISIBLELINE);
+	auto line = (int)SendEditor(SCI_DOCLINEFROMVISIBLE, firstvisibleline);
+	auto linesonscreen = (int)SendEditor(SCI_LINESONSCREEN) + 1;
+	auto height = (int)SendEditor(SCI_TEXTHEIGHT);
+
+	int i = 0, y = 0;
+	for (i = line; y <= point.y && i < (line + linesonscreen); ++i)
+	{
+		auto wrapcount = (int)SendEditor(SCI_WRAPCOUNT, i);
+		if (wrapcount > 1)
+		{
+			if (i == line)
+				wrapcount -= (int)SendEditor(SCI_DOCLINEFROMVISIBLE, firstvisibleline + wrapcount - 1) - (int)SendEditor(SCI_DOCLINEFROMVISIBLE, firstvisibleline);
+			linesonscreen -= wrapcount - 1;
+		}
+		y += height * wrapcount;
+	}
+	return i - 1;
+}
+
 void CTortoiseGitBlameView::OnRButtonUp(UINT /*nFlags*/, CPoint point)
 {
-	int line = (int)SendEditor(SCI_GETFIRSTVISIBLELINE);
-	int height = (int)SendEditor(SCI_TEXTHEIGHT);
-	line = line + (int)(point.y / height);
+	int line = GetLineUnderCursor(point);
 	if (m_data.IsValidLine(line))
 	{
 		m_MouseLine = line;
@@ -364,7 +393,7 @@ void CTortoiseGitBlameView::OnRButtonUp(UINT /*nFlags*/, CPoint point)
 			if (pRev && pRev->m_ParentHash.empty())
 			{
 				if (pRev->GetParentFromHash(pRev->m_CommitHash))
-					MessageBox(pRev->GetLastErr(), _T("TortoiseGit"), MB_ICONERROR);
+					MessageBox(pRev->GetLastErr(), L"TortoiseGit", MB_ICONERROR);
 			}
 		}
 
@@ -385,7 +414,7 @@ void CTortoiseGitBlameView::OnRButtonUp(UINT /*nFlags*/, CPoint point)
 		try
 		{
 			CTGitPath path(m_data.GetFilename(line));
-			const CTGitPathList & files = pRev->GetFiles(NULL);
+			const CTGitPathList& files = pRev->GetFiles(nullptr);
 			for (int j = 0, j_size = files.GetCount(); j < j_size; ++j)
 			{
 				const CTGitPath &file =  files[j];
@@ -411,7 +440,7 @@ void CTortoiseGitBlameView::OnRButtonUp(UINT /*nFlags*/, CPoint point)
 		}
 		catch (const char* msg)
 		{
-			MessageBox(_T("Could not get files of parents.\nlibgit reports:\n") + CString(msg), _T("TortoiseGit"), MB_ICONERROR);
+			MessageBox(L"Could not get files of parents.\nlibgit reports:\n" + CString(msg), L"TortoiseGit", MB_ICONERROR);
 		}
 
 		// blame previous
@@ -441,7 +470,7 @@ void CTortoiseGitBlameView::OnRButtonUp(UINT /*nFlags*/, CPoint point)
 			if (parentHashWithFile.size() == 1)
 			{
 				popup.AppendMenuIcon(ID_COMPAREWITHPREVIOUS, IDS_BLAME_POPUP_COMPARE, IDI_BLAME_POPUP_COMPARE);
-				if (CRegDWORD(_T("Software\\TortoiseGit\\DiffByDoubleClickInLog"), FALSE))
+				if (CRegDWORD(L"Software\\TortoiseGit\\DiffByDoubleClickInLog", FALSE))
 					popup.SetDefaultItem(ID_COMPAREWITHPREVIOUS, FALSE);
 			}
 			else
@@ -453,7 +482,7 @@ void CTortoiseGitBlameView::OnRButtonUp(UINT /*nFlags*/, CPoint point)
 					CString str;
 					str.Format(IDS_BLAME_POPUP_PARENT, i + 1);
 					diffmenu.AppendMenuIcon((UINT)(ID_COMPAREWITHPREVIOUS + ((i + 1) << 16)),str);
-					if (i == 0 && CRegDWORD(_T("Software\\TortoiseGit\\DiffByDoubleClickInLog"), FALSE))
+					if (i == 0 && CRegDWORD(L"Software\\TortoiseGit\\DiffByDoubleClickInLog", FALSE))
 					{
 						popup.SetDefaultItem(ID_COMPAREWITHPREVIOUS, FALSE);
 						diffmenu.SetDefaultItem((UINT)(ID_COMPAREWITHPREVIOUS + ((i + 1) << 16)), FALSE);
@@ -467,12 +496,14 @@ void CTortoiseGitBlameView::OnRButtonUp(UINT /*nFlags*/, CPoint point)
 		popup.AppendMenuIcon(ID_COPYHASHTOCLIPBOARD, IDS_BLAME_POPUP_COPYHASHTOCLIPBOARD, IDI_BLAME_POPUP_COPY);
 		popup.AppendMenuIcon(ID_COPYLOGTOCLIPBOARD, IDS_BLAME_POPUP_COPYLOGTOCLIPBOARD, IDI_BLAME_POPUP_COPY);
 
-		int cmd = popup.TrackPopupMenu(TPM_RETURNCMD | TPM_LEFTALIGN | TPM_NONOTIFY, point.x, point.y, this, 0);
-		this->ContextMenuAction(cmd, pRev, parentHashWithFile, parentFilename);
+		int cmd = popup.TrackPopupMenu(TPM_RETURNCMD | TPM_LEFTALIGN | TPM_NONOTIFY, point.x, point.y, this);
+		if (!cmd)
+			return;
+		this->ContextMenuAction(cmd, pRev, parentHashWithFile, parentFilename, line);
 	}
 }
 
-void CTortoiseGitBlameView::ContextMenuAction(int cmd, GitRev *pRev, GIT_REV_LIST& parentHashWithFile, const std::vector<CString>& parentFilename)
+void CTortoiseGitBlameView::ContextMenuAction(int cmd, GitRev *pRev, GIT_REV_LIST& parentHashWithFile, const std::vector<CString>& parentFilename, int selectedLine)
 {
 	switch (cmd & 0xFFFF)
 	{
@@ -484,14 +515,13 @@ void CTortoiseGitBlameView::ContextMenuAction(int cmd, GitRev *pRev, GIT_REV_LIS
 
 			CString path = ResolveCommitFile(parentFilename[index]);
 			CString endrev = parentHashWithFile[index].ToString();
-			int line = m_data.GetOriginalLineNumber(m_MouseLine);
-			CString lineNumber;
-			lineNumber.Format(_T("%d"), line);
+			int line = m_data.GetOriginalLineNumber(selectedLine);
 
-			CString procCmd = _T("/path:\"") + path + _T("\" ");
-			procCmd += _T(" /command:blame");
-			procCmd += _T(" /endrev:") + endrev;
-			procCmd += _T(" /line:") + lineNumber;
+			CString procCmd = L"/path:\"" + path + L"\" ";
+			procCmd += L" /command:blame";
+			procCmd += L" /endrev:" + endrev;
+			procCmd += L" /line:";
+			procCmd.AppendFormat(L"%d", line);
 
 			CCommonAppUtils::RunTortoiseGitProc(procCmd);
 		}
@@ -504,13 +534,15 @@ void CTortoiseGitBlameView::ContextMenuAction(int cmd, GitRev *pRev, GIT_REV_LIS
 				index -= 1;
 
 			CString path = ResolveCommitFile(parentFilename[index]);
-			CString startrev = pRev->m_CommitHash.ToString();
-			CString endrev = parentHashWithFile[index].ToString();
+			CString startrev = parentHashWithFile[index].ToString();
+			CString endrev = pRev->m_CommitHash.ToString();
 
-			CString procCmd = _T("/path:\"") + path + _T("\" ");
-			procCmd += _T(" /command:diff");
-			procCmd += _T(" /startrev:") + startrev;
-			procCmd += _T(" /endrev:") + endrev;
+			CString procCmd = L"/path:\"" + path + L"\" ";
+			procCmd += L" /command:diff";
+			procCmd += L" /startrev:" + startrev;
+			procCmd += L" /endrev:" + endrev;
+			if (!!(GetAsyncKeyState(VK_SHIFT) & 0x8000))
+				procCmd += L" /alternative";
 
 			CCommonAppUtils::RunTortoiseGitProc(procCmd);
 		}
@@ -518,24 +550,24 @@ void CTortoiseGitBlameView::ContextMenuAction(int cmd, GitRev *pRev, GIT_REV_LIS
 
 	case ID_SHOWLOG:
 		{
-			CString path = ResolveCommitFile(m_MouseLine);
-			CString rev = m_data.GetHash(m_MouseLine).ToString();
+			CString path = ResolveCommitFile(selectedLine);
+			CString rev = m_data.GetHash(selectedLine).ToString();
 
-			CString procCmd = _T("/path:\"") + path + _T("\" ");
-			procCmd += _T(" /command:log");
-			procCmd += _T(" /rev:") + rev;
-			procCmd += _T(" /endrev:") + rev;
+			CString procCmd = L"/path:\"" + path + L"\" ";
+			procCmd += L" /command:log";
+			procCmd += L" /rev:" + rev;
+			procCmd += L" /endrev:" + rev;
 
 			CCommonAppUtils::RunTortoiseGitProc(procCmd);
 		}
 		break;
 
 	case ID_COPYHASHTOCLIPBOARD:
-		this->GetLogList()->CopySelectionToClipBoard(CGitLogListBase::ID_COPY_HASH);
+		this->GetLogList()->CopySelectionToClipBoard(CGitLogListBase::ID_COPYCLIPBOARDHASH);
 		break;
 
 	case ID_COPYLOGTOCLIPBOARD:
-		this->GetLogList()->CopySelectionToClipBoard();
+		this->GetLogList()->CopySelectionToClipBoard(CGitLogListBase::ID_COPYCLIPBOARDFULL);
 		break;
 	}
 }
@@ -560,26 +592,6 @@ CTortoiseGitBlameDoc* CTortoiseGitBlameView::GetDocument() const // non-debug ve
 }
 #endif //_DEBUG
 
-
-// CTortoiseGitBlameView message handlers
-CString CTortoiseGitBlameView::GetAppDirectory()
-{
-	CString path;
-	DWORD len = 0;
-	DWORD bufferlen = MAX_PATH;		// MAX_PATH is not the limit here!
-	do
-	{
-		bufferlen += MAX_PATH;		// MAX_PATH is not the limit here!
-		auto pBuf = std::make_unique<TCHAR[]>(bufferlen);
-		len = GetModuleFileName(NULL, pBuf.get(), bufferlen);
-		path = CString(pBuf.get(), len);
-	} while(len == bufferlen);
-
-	path = path.Left(path.ReverseFind(_T('\\')));
-	//path = path.substr(0, path.rfind('\\') + 1);
-
-	return path;
-}
 
 // Return a color which is interpolated between c1 and c2.
 // Slider controls the relative proportions as a percentage:
@@ -620,18 +632,24 @@ void CTortoiseGitBlameView::InitialiseEditor()
 {
 	SendEditor(SCI_STYLERESETDEFAULT);
 	// Set up the global default style. These attributes are used wherever no explicit choices are made.
-	std::string fontName = CUnicodeUtils::StdGetUTF8((stdstring)CRegStdString(_T("Software\\TortoiseGit\\BlameFontName"), _T("Courier New")));
+	std::string fontName = CUnicodeUtils::StdGetUTF8((std::wstring)CRegStdString(L"Software\\TortoiseGit\\BlameFontName", L"Consolas"));
 	SetAStyle(STYLE_DEFAULT,
 			::GetSysColor(COLOR_WINDOWTEXT),
 			::GetSysColor(COLOR_WINDOW),
-			(DWORD)CRegStdDWORD(_T("Software\\TortoiseGit\\BlameFontSize"), 10),
+			(DWORD)CRegStdDWORD(L"Software\\TortoiseGit\\BlameFontSize", 10),
 			fontName.c_str()
 			);
-	SendEditor(SCI_SETTABWIDTH, (DWORD)CRegStdDWORD(_T("Software\\TortoiseGit\\BlameTabSize"), 4));
+	SendEditor(SCI_SETTABWIDTH, (DWORD)CRegStdDWORD(L"Software\\TortoiseGit\\BlameTabSize", 4));
 	SendEditor(SCI_SETREADONLY, TRUE);
-	LRESULT pix = SendEditor(SCI_TEXTWIDTH, STYLE_LINENUMBER, (LPARAM)this->m_TextView.StringForControl(_T("_99999")).GetBuffer());
+	auto numberOfLines = m_data.GetNumberOfLines();
+	int numDigits = 2;
+	while (numberOfLines)
+	{
+		numberOfLines /= 10;
+		++numDigits;
+	}
 	if (m_bShowLine)
-		SendEditor(SCI_SETMARGINWIDTHN, 0, pix);
+		SendEditor(SCI_SETMARGINWIDTHN, 0, numDigits * (int)SendEditor(SCI_TEXTWIDTH, STYLE_LINENUMBER, (LPARAM)"8"));
 	else
 		SendEditor(SCI_SETMARGINWIDTHN, 0);
 	SendEditor(SCI_SETMARGINWIDTHN, 1);
@@ -640,37 +658,38 @@ void CTortoiseGitBlameView::InitialiseEditor()
 	SendEditor(SCI_SETSELFORE, TRUE, ::GetSysColor(COLOR_HIGHLIGHTTEXT));
 	SendEditor(SCI_SETSELBACK, TRUE, ::GetSysColor(COLOR_HIGHLIGHT));
 	SendEditor(SCI_SETCARETFORE, ::GetSysColor(COLOR_WINDOWTEXT));
-	m_regOldLinesColor = CRegStdDWORD(_T("Software\\TortoiseGit\\BlameOldColor"), BLAMEOLDCOLOR);
-	m_regNewLinesColor = CRegStdDWORD(_T("Software\\TortoiseGit\\BlameNewColor"), BLAMENEWCOLOR);
+	m_regOldLinesColor = CRegStdDWORD(L"Software\\TortoiseGit\\BlameOldColor", BLAMEOLDCOLOR);
+	m_regNewLinesColor = CRegStdDWORD(L"Software\\TortoiseGit\\BlameNewColor", BLAMENEWCOLOR);
 	if (CRegStdDWORD(L"Software\\TortoiseGit\\ScintillaDirect2D", FALSE) != FALSE)
 	{
 		SendEditor(SCI_SETTECHNOLOGY, SC_TECHNOLOGY_DIRECTWRITERETAIN);
 		SendEditor(SCI_SETBUFFEREDDRAW, 0);
 	}
 
-	SendEditor(SCI_SETWRAPMODE, SC_WRAP_NONE);
+	if (m_bWrapLongLines)
+		SendEditor(SCI_SETWRAPMODE, SC_WRAP_WORD);
+	else
+		SendEditor(SCI_SETWRAPMODE, SC_WRAP_NONE);
 	SendEditor(SCI_STYLECLEARALL);
 }
 
 bool CTortoiseGitBlameView::DoSearch(CTortoiseGitBlameData::SearchDirection direction)
 {
-	int pos = (int)SendEditor(SCI_GETCURRENTPOS);
-	int line = (int)SendEditor(SCI_LINEFROMPOSITION, pos);
+	auto pos = (Sci_Position)SendEditor(SCI_GETCURRENTPOS);
+	auto line = (int)SendEditor(SCI_LINEFROMPOSITION, pos);
 
-	int i = m_data.FindFirstLineWrapAround(direction, m_sFindText, line, m_bMatchCase);
+	int i = m_data.FindFirstLineWrapAround(direction, m_sFindText, line, m_bMatchCase, [hWnd = m_pFindDialog->GetSafeHwnd()]{ FLASHWINFO flags = { sizeof(FLASHWINFO), hWnd, FLASHW_ALL, 2, 100 }; ::FlashWindowEx(&flags); });
 	if (i >= 0)
 	{
 		GotoLine(i + 1);
-		int selstart = (int)SendEditor(SCI_GETCURRENTPOS);
-		int selend = (int)SendEditor(SCI_POSITIONFROMLINE, i + 1);
+		auto selstart = (int)(Sci_Position)SendEditor(SCI_GETCURRENTPOS);
+		auto selend = (int)(Sci_Position)SendEditor(SCI_POSITIONFROMLINE, i + 1);
 		SendEditor(SCI_SETSELECTIONSTART, selstart);
 		SendEditor(SCI_SETSELECTIONEND, selend);
 		m_SelectedLine = i;
 	}
 	else
-	{
-		::MessageBox(m_pFindDialog && m_pFindDialog->GetSafeHwnd() ? m_pFindDialog->GetSafeHwnd() : wMain, _T("\"") + m_sFindText + _T("\" ") + CString(MAKEINTRESOURCE(IDS_NOTFOUND)), _T("TortoiseGitBlame"), MB_ICONINFORMATION);
-	}
+		::MessageBox(m_pFindDialog && m_pFindDialog->GetSafeHwnd() ? m_pFindDialog->GetSafeHwnd() : wMain, L"\"" + m_sFindText + L"\" " + CString(MAKEINTRESOURCE(IDS_NOTFOUND)), L"TortoiseGitBlame", MB_ICONINFORMATION);
 
 	return true;
 }
@@ -692,7 +711,7 @@ void CTortoiseGitBlameView::OnFindNext()
 bool CTortoiseGitBlameView::GotoLine(int line)
 {
 	--line;
-	int numberOfLines = m_data.GetNumberOfLines();
+	int numberOfLines = (int)m_data.GetNumberOfLines();
 	if (line < 0 || numberOfLines == 0)
 		return false;
 	if (line >= numberOfLines)
@@ -700,7 +719,7 @@ bool CTortoiseGitBlameView::GotoLine(int line)
 		line = numberOfLines - 1;
 	}
 
-	int nCurrentPos = (int)SendEditor(SCI_GETCURRENTPOS);
+	auto nCurrentPos = (Sci_Position)SendEditor(SCI_GETCURRENTPOS);
 	int nCurrentLine = (int)SendEditor(SCI_LINEFROMPOSITION,nCurrentPos);
 	int nFirstVisibleLine = (int)SendEditor(SCI_GETFIRSTVISIBLELINE);
 	int nLinesOnScreen = (int)SendEditor(SCI_LINESONSCREEN);
@@ -751,7 +770,7 @@ void CTortoiseGitBlameView::CopyToClipboard()
 		GetLogList()->CopySelectionToClipBoard();
 	else if (wnd)
 	{
-		if (CString(wnd->GetRuntimeClass()->m_lpszClassName) == _T("CMFCPropertyGridCtrl"))
+		if (CString(wnd->GetRuntimeClass()->m_lpszClassName) == L"CMFCPropertyGridCtrl")
 		{
 			CMFCPropertyGridCtrl *grid = (CMFCPropertyGridCtrl *)wnd;
 			if (grid->GetCurSel() && !grid->GetCurSel()->IsGroup())
@@ -772,65 +791,65 @@ LONG CTortoiseGitBlameView::GetBlameWidth()
 
 	CString shortHash('f', g_Git.GetShortHASHLength() + 1);
 	::GetTextExtentPoint32(hDC, shortHash, g_Git.GetShortHASHLength() + 1, &width);
-	m_revwidth = width.cx + BLAMESPACE;
+	m_revwidth = width.cx + CDPIAware::Instance().ScaleX(BLAMESPACE);
 	blamewidth += m_revwidth;
 
 	if (m_bShowDate)
 	{
 		SIZE maxwidth = {0};
 
-		int numberOfLines = m_data.GetNumberOfLines();
-		for (int i = 0; i < numberOfLines; ++i)
+		auto numberOfLines = m_data.GetNumberOfLines();
+		for (size_t i = 0; i < numberOfLines; ++i)
 		{
 			::GetTextExtentPoint32(hDC, m_data.GetDate(i), m_data.GetDate(i).GetLength(), &width);
 			if (width.cx > maxwidth.cx)
 				maxwidth = width;
 		}
-		m_datewidth = maxwidth.cx + BLAMESPACE;
+		m_datewidth = maxwidth.cx + CDPIAware::Instance().ScaleX(BLAMESPACE);
 		blamewidth += m_datewidth;
 	}
 	if ( m_bShowAuthor)
 	{
 		SIZE maxwidth = {0};
 
-		int numberOfLines = m_data.GetNumberOfLines();
-		for (int i = 0; i < numberOfLines; ++i)
+		size_t numberOfLines = m_data.GetNumberOfLines();
+		for (size_t i = 0; i < numberOfLines; ++i)
 		{
 			::GetTextExtentPoint32(hDC,m_data.GetAuthor(i) , m_data.GetAuthor(i).GetLength(), &width);
 			if (width.cx > maxwidth.cx)
 				maxwidth = width;
 		}
-		m_authorwidth = maxwidth.cx + BLAMESPACE;
+		m_authorwidth = maxwidth.cx + CDPIAware::Instance().ScaleX(BLAMESPACE);
 		blamewidth += m_authorwidth;
 	}
 	if (m_bShowFilename)
 	{
 		SIZE maxwidth = {0};
 
-		int numberOfLines = m_data.GetNumberOfLines();
-		for (int i = 0; i < numberOfLines; ++i)
+		size_t numberOfLines = m_data.GetNumberOfLines();
+		for (size_t i = 0; i < numberOfLines; ++i)
 		{
 			::GetTextExtentPoint32(hDC, m_data.GetFilename(i), m_data.GetFilename(i).GetLength(), &width);
 			if (width.cx > maxwidth.cx)
 				maxwidth = width;
 		}
-		m_filenameWidth = maxwidth.cx + BLAMESPACE;
+		m_filenameWidth = maxwidth.cx + CDPIAware::Instance().ScaleX(BLAMESPACE);
 		blamewidth += m_filenameWidth;
 	}
 	if (m_bShowOriginalLineNumber)
 	{
 		SIZE maxwidth = {0};
 
-		int numberOfLines = m_data.GetNumberOfLines();
+		size_t numberOfLines = m_data.GetNumberOfLines();
 		CString str;
-		for (int i = 0; i < numberOfLines; ++i)
+		for (size_t i = 0; i < numberOfLines; ++i)
 		{
-			str.Format(_T("%5d"), m_data.GetOriginalLineNumber(i));
+			str.Format(L"%5d", m_data.GetOriginalLineNumber(i));
 			::GetTextExtentPoint32(hDC, str, str.GetLength(), &width);
 			if (width.cx > maxwidth.cx)
 				maxwidth = width;
 		}
-		m_originalLineNumberWidth = maxwidth.cx + BLAMESPACE;
+		m_originalLineNumberWidth = maxwidth.cx + CDPIAware::Instance().ScaleX(BLAMESPACE);
 		blamewidth += m_originalLineNumberWidth;
 	}
 	::SelectObject(hDC, oldfont);
@@ -839,7 +858,6 @@ LONG CTortoiseGitBlameView::GetBlameWidth()
 	m_blamewidth = pt.x;
 	//::ReleaseDC(wBlame, hDC);
 	return blamewidth;
-
 }
 
 void CTortoiseGitBlameView::CreateFont()
@@ -848,143 +866,138 @@ void CTortoiseGitBlameView::CreateFont()
 		return;
 	LOGFONT lf = {0};
 	lf.lfWeight = 400;
-	HDC hDC = ::GetDC(wBlame);
-	lf.lfHeight = -MulDiv((DWORD)CRegStdDWORD(_T("Software\\TortoiseGit\\BlameFontSize"), 10), GetDeviceCaps(hDC, LOGPIXELSY), 72);
+	lf.lfHeight = -CDPIAware::Instance().PointsToPixelsY((DWORD)CRegStdDWORD(L"Software\\TortoiseGit\\BlameFontSize", 10));
 	lf.lfCharSet = DEFAULT_CHARSET;
-	CRegStdString fontname = CRegStdString(_T("Software\\TortoiseGit\\BlameFontName"), _T("Courier New"));
-	_tcscpy_s(lf.lfFaceName, 32, ((stdstring)fontname).c_str());
+	CRegStdString fontname = CRegStdString(L"Software\\TortoiseGit\\BlameFontName", L"Consolas");
+	wcscpy_s(lf.lfFaceName, 32, ((std::wstring)fontname).c_str());
 	m_font.CreateFontIndirect(&lf);
 
 	lf.lfItalic = TRUE;
 	m_italicfont.CreateFontIndirect(&lf);
-
-	::ReleaseDC(wBlame, hDC);
 }
 
 void CTortoiseGitBlameView::DrawBlame(HDC hDC)
 {
-	if (hDC == NULL)
+	if (!hDC || m_data.GetNumberOfLines() == 0)
 		return;
 	if (!m_font.GetSafeHandle())
 		return;
 
-	HFONT oldfont = NULL;
-	int line = (int)SendEditor(SCI_GETFIRSTVISIBLELINE);
-	int linesonscreen = (int)SendEditor(SCI_LINESONSCREEN);
+	HFONT oldfont = nullptr;
+	int firstvisibleline = (int)SendEditor(SCI_GETFIRSTVISIBLELINE);
+	int line = (int)SendEditor(SCI_DOCLINEFROMVISIBLE, firstvisibleline);
+	int linesonscreen = (int)SendEditor(SCI_LINESONSCREEN) + 1;
 	int height = (int)SendEditor(SCI_TEXTHEIGHT);
 	int Y = 0;
 	TCHAR buf[MAX_PATH] = {0};
+	std::fill_n(buf, _countof(buf) - 1, L' ');
 	RECT rc;
-	BOOL sel = FALSE;
-	//::GetClientRect(this->m_hWnd, &rc);
-	for (int i = line; i < (line + linesonscreen); ++i)
+	CGitHash oldHash;
+	CString oldFile;
+
+	for (int i = line; i < (line + linesonscreen) && (size_t)i < m_data.GetNumberOfLines(); ++i)
 	{
-		sel = FALSE;
-		if (i < m_data.GetNumberOfLines())
+		auto wrapcount = (int)SendEditor(SCI_WRAPCOUNT, i);
+		if (wrapcount > 1)
 		{
-			 CGitHash hash(m_data.GetHash(i));
-		//	if (mergelines[i])
-		//		oldfont = (HFONT)::SelectObject(hDC, m_italicfont.GetSafeHwnd());
-		//	else
-			 oldfont = (HFONT)::SelectObject(hDC, m_font.GetSafeHandle());
-			::SetBkColor(hDC, m_windowcolor);
-			::SetTextColor(hDC, m_textcolor);
-			if (!hash.IsEmpty())
-			{
-				//if (m_CommitHash[i].Compare(m_MouseHash)==0)
-				//	::SetBkColor(hDC, m_mouseauthorcolor);
-				if (hash == m_SelectedHash)
-				{
-					::SetBkColor(hDC, m_selectedauthorcolor);
-					::SetTextColor(hDC, m_texthighlightcolor);
-					sel = TRUE;
-				}
-			}
+			if (i == line)
+				wrapcount -= (int)SendEditor(SCI_DOCLINEFROMVISIBLE, firstvisibleline + wrapcount - 1) - (int)SendEditor(SCI_DOCLINEFROMVISIBLE, firstvisibleline);
+			linesonscreen -= wrapcount - 1;
+		}
+		CGitHash hash(m_data.GetHash(i));
+		oldfont = (HFONT)::SelectObject(hDC, m_font.GetSafeHandle());
+		::SetBkColor(hDC, m_windowcolor);
+		::SetTextColor(hDC, m_textcolor);
+		if (!hash.IsEmpty() && hash == m_SelectedHash)
+		{
+			::SetBkColor(hDC, m_selectedauthorcolor);
+			::SetTextColor(hDC, m_texthighlightcolor);
+		}
 
-			if(m_MouseLine == i)
-				::SetBkColor(hDC, m_mouserevcolor);
+		if (m_MouseLine == i)
+			::SetBkColor(hDC, m_mouserevcolor);
 
-			//if ((revs[i] == m_mouserev)&&(!sel))
-			//	::SetBkColor(hDC, m_mouserevcolor);
-			//if (revs[i] == m_selectedrev)
-			//{
-			//	::SetBkColor(hDC, m_selectedrevcolor);
-			//	::SetTextColor(hDC, m_texthighlightcolor);
-			//}
+		if ((!hash.IsEmpty() && hash == m_SelectedHash) || m_MouseLine == i)
+		{
+			auto old = ::GetTextColor(hDC);
+			::SetTextColor(hDC, ::GetBkColor(hDC));
+			RECT rc2 = { CDPIAware::Instance().ScaleX(LOCATOR_WIDTH), Y, m_blamewidth + CDPIAware::Instance().ScaleX(LOCATOR_WIDTH), Y + (wrapcount * height) };
+			for (int j = 0; j < wrapcount; ++j)
+				::ExtTextOut(hDC, 0, Y + (j * height), ETO_CLIPPED, &rc2, buf, _countof(buf) - 1, 0);
+			::SetTextColor(hDC, old);
+		}
 
-			CString shortHashStr;
-			shortHashStr = hash.ToString().Left(g_Git.GetShortHASHLength());
-
-			//_stprintf_s(buf, MAX_PATH, _T("%8ld       "), revs[i]);
+		CString file = m_data.GetFilename(i);
+		if (oldHash != hash || (m_bShowFilename && oldFile != file) || m_bShowOriginalLineNumber)
+		{
 			rc.top = (LONG)Y;
-			rc.left=LOCATOR_WIDTH;
+			rc.left = CDPIAware::Instance().ScaleX(LOCATOR_WIDTH);
 			rc.bottom = (LONG)(Y + height);
 			rc.right = rc.left + m_blamewidth;
-			::ExtTextOut(hDC, LOCATOR_WIDTH, Y, ETO_CLIPPED, &rc, shortHashStr, shortHashStr.GetLength(), 0);
+			if (oldHash != hash)
+			{
+				CString shortHashStr = hash.ToString().Left(g_Git.GetShortHASHLength());
+				::ExtTextOut(hDC, CDPIAware::Instance().ScaleX(LOCATOR_WIDTH), Y, ETO_CLIPPED, &rc, shortHashStr, shortHashStr.GetLength(), 0);
+			}
 			int Left = m_revwidth;
 
 			if (m_bShowAuthor)
 			{
 				rc.right = rc.left + Left + m_authorwidth;
-				::ExtTextOut(hDC, Left, Y, ETO_CLIPPED, &rc, m_data.GetAuthor(i), m_data.GetAuthor(i).GetLength(), 0);
+				if (oldHash != hash)
+					::ExtTextOut(hDC, Left, Y, ETO_CLIPPED, &rc, m_data.GetAuthor(i), m_data.GetAuthor(i).GetLength(), 0);
 				Left += m_authorwidth;
 			}
 			if (m_bShowDate)
 			{
 				rc.right = rc.left + Left + m_datewidth;
-				::ExtTextOut(hDC, Left, Y, ETO_CLIPPED, &rc, m_data.GetDate(i), m_data.GetDate(i).GetLength(), 0);
+				if (oldHash != hash)
+					::ExtTextOut(hDC, Left, Y, ETO_CLIPPED, &rc, m_data.GetDate(i), m_data.GetDate(i).GetLength(), 0);
 				Left += m_datewidth;
 			}
 			if (m_bShowFilename)
 			{
 				rc.right = rc.left + Left + m_filenameWidth;
-				::ExtTextOut(hDC, Left, (int)Y, ETO_CLIPPED, &rc, m_data.GetFilename(i), m_data.GetFilename(i).GetLength(), 0);
+				if (oldFile != file)
+					::ExtTextOut(hDC, Left, Y, ETO_CLIPPED, &rc, m_data.GetFilename(i), m_data.GetFilename(i).GetLength(), 0);
 				Left += m_filenameWidth;
 			}
 			if (m_bShowOriginalLineNumber)
 			{
 				rc.right = rc.left + Left + m_originalLineNumberWidth;
 				CString str;
-				str.Format(_T("%5d"), m_data.GetOriginalLineNumber(i));
-				::ExtTextOut(hDC, Left, (int)Y, ETO_CLIPPED, &rc, str, str.GetLength(), 0);
+				str.Format(L"%5d", m_data.GetOriginalLineNumber(i));
+				::ExtTextOut(hDC, Left, Y, ETO_CLIPPED, &rc, str, str.GetLength(), 0);
 				Left += m_originalLineNumberWidth;
 			}
-			if ((i==m_SelectedLine)&&(m_pFindDialog))
-			{
-				LOGBRUSH brush;
-				brush.lbColor = m_textcolor;
-				brush.lbHatch = 0;
-				brush.lbStyle = BS_SOLID;
-				HPEN pen = ExtCreatePen(PS_SOLID | PS_GEOMETRIC, 2, &brush, 0, NULL);
-				HGDIOBJ hPenOld = SelectObject(hDC, pen);
-				RECT rc2 = rc;
-				rc2.top = (LONG)Y;
-				rc2.bottom = (LONG)(Y + height);
-				::MoveToEx(hDC, rc2.left, rc2.top, NULL);
-				::LineTo(hDC, rc2.right, rc2.top);
-				::LineTo(hDC, rc2.right, rc2.bottom);
-				::LineTo(hDC, rc2.left, rc2.bottom);
-				::LineTo(hDC, rc2.left, rc2.top);
-				SelectObject(hDC, hPenOld);
-				DeleteObject(pen);
-			}
-			Y += height;
-			::SelectObject(hDC, oldfont);
+			oldHash = hash;
+			oldFile = file;
 		}
-		else
+		if (i == m_SelectedLine && m_pFindDialog)
 		{
-			::SetBkColor(hDC, m_windowcolor);
-			for (int j=0; j< MAX_PATH; ++j)
-				buf[j]=' ';
-			::ExtTextOut(hDC, 0, (int)Y, ETO_CLIPPED, &rc, buf, MAX_PATH-1, 0);
-			Y += height;
+			LOGBRUSH brush;
+			brush.lbColor = m_textcolor;
+			brush.lbHatch = 0;
+			brush.lbStyle = BS_SOLID;
+			HPEN pen = ExtCreatePen(PS_SOLID | PS_GEOMETRIC, 2, &brush, 0, nullptr);
+			HGDIOBJ hPenOld = SelectObject(hDC, pen);
+			RECT rc2 = { CDPIAware::Instance().ScaleX(LOCATOR_WIDTH), Y + 1, m_blamewidth, Y + (wrapcount * height) - 1};
+			::MoveToEx(hDC, rc2.left, rc2.top, nullptr);
+			::LineTo(hDC, rc2.right, rc2.top);
+			::LineTo(hDC, rc2.right, rc2.bottom);
+			::LineTo(hDC, rc2.left, rc2.bottom);
+			::LineTo(hDC, rc2.left, rc2.top);
+			SelectObject(hDC, hPenOld);
+			DeleteObject(pen);
 		}
+		Y += wrapcount * height;
+		::SelectObject(hDC, oldfont);
 	}
 }
 
 void CTortoiseGitBlameView::DrawLocatorBar(HDC hDC)
 {
-	if (hDC == NULL)
+	if (!hDC)
 		return;
 
 	int line = (int)SendEditor(SCI_GETFIRSTVISIBLELINE);
@@ -996,14 +1009,14 @@ void CTortoiseGitBlameView::DrawLocatorBar(HDC hDC)
 	//::GetClientRect(wLocator, &rc);
 	this->GetClientRect(&rc);
 
-	rc.right=LOCATOR_WIDTH;
+	rc.right = CDPIAware::Instance().ScaleX(LOCATOR_WIDTH);
 
 	RECT lineRect = rc;
 	LONG height = rc.bottom-rc.top;
 
-	int numberOfLines = m_data.GetNumberOfLines();
+	auto numberOfLines = (int)m_data.GetNumberOfLines();
 	// draw the colored bar
-	for (int currentLine = 0; currentLine<numberOfLines; ++currentLine)
+	for (int currentLine = 0; currentLine < numberOfLines; ++currentLine)
 	{
 		COLORREF cr = GetLineColor(currentLine);
 		// get the line color
@@ -1013,8 +1026,8 @@ void CTortoiseGitBlameView::DrawLocatorBar(HDC hDC)
 		}
 		SetBkColor(hDC, cr);
 		lineRect.top = (LONG)Y;
-		lineRect.bottom = ((currentLine + 1) * height / numberOfLines);
-		::ExtTextOut(hDC, 0, 0, ETO_OPAQUE, &lineRect, NULL, 0, NULL);
+		lineRect.bottom = (((int)currentLine + 1) * height / (int)numberOfLines);
+		::ExtTextOut(hDC, 0, 0, ETO_OPAQUE, &lineRect, nullptr, 0, nullptr);
 		Y = lineRect.bottom;
 	}
 
@@ -1022,36 +1035,35 @@ void CTortoiseGitBlameView::DrawLocatorBar(HDC hDC)
 	{
 		// now draw two lines indicating the scroll position of the source view
 		SetBkColor(hDC, blackColor);
-		lineRect.top = (LONG)line * height / numberOfLines;
+		lineRect.top = (LONG)line * height / (int)numberOfLines;
 		lineRect.bottom = lineRect.top+1;
-		::ExtTextOut(hDC, 0, 0, ETO_OPAQUE, &lineRect, NULL, 0, NULL);
-		lineRect.top = (LONG)(line + linesonscreen) * height / numberOfLines;
+		::ExtTextOut(hDC, 0, 0, ETO_OPAQUE, &lineRect, nullptr, 0, nullptr);
+		lineRect.top = (LONG)(line + linesonscreen) * height / (int)numberOfLines;
 		lineRect.bottom = lineRect.top+1;
-		::ExtTextOut(hDC, 0, 0, ETO_OPAQUE, &lineRect, NULL, 0, NULL);
+		::ExtTextOut(hDC, 0, 0, ETO_OPAQUE, &lineRect, nullptr, 0, nullptr);
 	}
-
 }
 
 void CTortoiseGitBlameView::SetupLexer(CString filename)
 {
-	int start=filename.ReverseFind(_T('.'));
+	int start = filename.ReverseFind(L'.');
 	SendEditor(SCI_SETLEXER, SCLEX_NULL);
 	if (!m_bLexer)
 		return;
 	if (start > 0)
 	{
-		//_tcscpy_s(line, 20, lineptr+1);
-		//_tcslwr_s(line, 20);
+		//wcscpy_s(line, 20, lineptr+1);
+		//_wcslwr_s(line, 20);
 		CString ext=filename.Right(filename.GetLength()-start-1);
 		const TCHAR* line = ext;
 
-		if ((_tcscmp(line, _T("py"))==0)||
-			(_tcscmp(line, _T("pyw"))==0))
+		if ((wcscmp(line, L"py") == 0) ||
+			(wcscmp(line, L"pyw") == 0))
 		{
 			SendEditor(SCI_SETLEXER, SCLEX_PYTHON);
-			SendEditor(SCI_SETKEYWORDS, 0, (LPARAM)(m_TextView.StringForControl(_T("and assert break class continue def del elif \
+			SendEditor(SCI_SETKEYWORDS, 0, (LPARAM)(m_TextView.StringForControl(L"and assert break class continue def del elif \
 else except exec finally for from global if import in is lambda None \
-not or pass print raise return try while yield")).GetBuffer()));
+not or pass print raise return try while yield").GetBuffer()));
 			SetAStyle(SCE_P_DEFAULT, black);
 			SetAStyle(SCE_P_COMMENTLINE, darkGreen);
 			SetAStyle(SCE_P_NUMBER, RGB(0, 0x80, 0x80));
@@ -1067,27 +1079,27 @@ not or pass print raise return try while yield")).GetBuffer()));
 			SetAStyle(SCE_P_COMMENTBLOCK, darkGreen);
 			SetAStyle(SCE_P_STRINGEOL, red);
 		}
-		if ((_tcscmp(line, _T("c"))==0)||
-			(_tcscmp(line, _T("cc"))==0)||
-			(_tcscmp(line, _T("cpp"))==0)||
-			(_tcscmp(line, _T("cxx"))==0)||
-			(_tcscmp(line, _T("h"))==0)||
-			(_tcscmp(line, _T("hh"))==0)||
-			(_tcscmp(line, _T("hpp"))==0)||
-			(_tcscmp(line, _T("hxx"))==0)||
-			(_tcscmp(line, _T("dlg"))==0)||
-			(_tcscmp(line, _T("mak"))==0))
+		if ((wcscmp(line, L"c") == 0) ||
+			(wcscmp(line, L"cc") == 0) ||
+			(wcscmp(line, L"cpp") == 0) ||
+			(wcscmp(line, L"cxx") == 0) ||
+			(wcscmp(line, L"h") == 0) ||
+			(wcscmp(line, L"hh") == 0) ||
+			(wcscmp(line, L"hpp") == 0) ||
+			(wcscmp(line, L"hxx") == 0) ||
+			(wcscmp(line, L"dlg") == 0) ||
+			(wcscmp(line, L"mak") == 0))
 		{
 			SendEditor(SCI_SETLEXER, SCLEX_CPP);
-			SendEditor(SCI_SETKEYWORDS, 0, (LPARAM)(m_TextView.StringForControl(_T("and and_eq asm auto bitand bitor bool break \
+			SendEditor(SCI_SETKEYWORDS, 0, (LPARAM)(m_TextView.StringForControl(L"and and_eq asm auto bitand bitor bool break \
 case catch char class compl const const_cast continue \
 default delete do double dynamic_cast else enum explicit export extern false float for \
 friend goto if inline int long mutable namespace new not not_eq \
 operator or or_eq private protected public \
 register reinterpret_cast return short signed sizeof static static_cast struct switch \
 template this throw true try typedef typeid typename union unsigned using \
-virtual void volatile wchar_t while xor xor_eq")).GetBuffer()));
-			SendEditor(SCI_SETKEYWORDS, 3, (LPARAM)(m_TextView.StringForControl(_T("a addindex addtogroup anchor arg attention \
+virtual void volatile wchar_t while xor xor_eq").GetBuffer()));
+			SendEditor(SCI_SETKEYWORDS, 3, (LPARAM)(m_TextView.StringForControl(L"a addindex addtogroup anchor arg attention \
 author b brief bug c class code date def defgroup deprecated dontinclude \
 e em endcode endhtmlonly endif endlatexonly endlink endverbatim enum example exception \
 f$ f[ f] file fn hideinitializer htmlinclude htmlonly \
@@ -1096,40 +1108,40 @@ mainpage name namespace nosubgrouping note overload \
 p page par param post pre ref relates remarks return retval \
 sa section see showinitializer since skip skipline struct subsection \
 test throw todo typedef union until \
-var verbatim verbinclude version warning weakgroup $ @ \\ & < > # { }")).GetBuffer()));
+var verbatim verbinclude version warning weakgroup $ @ \\ & < > # { }").GetBuffer()));
 			SetupCppLexer();
 		}
-		if (_tcscmp(line, _T("cs"))==0)
+		if (wcscmp(line, L"cs") == 0)
 		{
 			SendEditor(SCI_SETLEXER, SCLEX_CPP);
-			SendEditor(SCI_SETKEYWORDS, 0, (LPARAM)(m_TextView.StringForControl(_T("abstract as base bool break byte case catch char checked class \
+			SendEditor(SCI_SETKEYWORDS, 0, (LPARAM)(m_TextView.StringForControl(L"abstract as base bool break byte case catch char checked class \
 const continue decimal default delegate do double else enum \
 event explicit extern false finally fixed float for foreach goto if \
 implicit in int interface internal is lock long namespace new null \
 object operator out override params private protected public \
 readonly ref return sbyte sealed short sizeof stackalloc static \
 string struct switch this throw true try typeof uint ulong \
-unchecked unsafe ushort using virtual void while")).GetBuffer()));
+unchecked unsafe ushort using virtual void while").GetBuffer()));
 			SetupCppLexer();
 		}
-		if ((_tcscmp(line, _T("rc"))==0)||
-			(_tcscmp(line, _T("rc2"))==0))
+		if ((wcscmp(line, L"rc") == 0) ||
+			(wcscmp(line, L"rc2") == 0))
 		{
 			SendEditor(SCI_SETLEXER, SCLEX_CPP);
-			SendEditor(SCI_SETKEYWORDS, 0, (LPARAM)(m_TextView.StringForControl(_T("ACCELERATORS ALT AUTO3STATE AUTOCHECKBOX AUTORADIOBUTTON \
+			SendEditor(SCI_SETKEYWORDS, 0, (LPARAM)(m_TextView.StringForControl(L"ACCELERATORS ALT AUTO3STATE AUTOCHECKBOX AUTORADIOBUTTON \
 BEGIN BITMAP BLOCK BUTTON CAPTION CHARACTERISTICS CHECKBOX CLASS \
 COMBOBOX CONTROL CTEXT CURSOR DEFPUSHBUTTON DIALOG DIALOGEX DISCARDABLE \
 EDITTEXT END EXSTYLE FONT GROUPBOX ICON LANGUAGE LISTBOX LTEXT \
 MENU MENUEX MENUITEM MESSAGETABLE POPUP \
 PUSHBUTTON RADIOBUTTON RCDATA RTEXT SCROLLBAR SEPARATOR SHIFT STATE3 \
-STRINGTABLE STYLE TEXTINCLUDE VALUE VERSION VERSIONINFO VIRTKEY")).GetBuffer()));
+STRINGTABLE STYLE TEXTINCLUDE VALUE VERSION VERSIONINFO VIRTKEY").GetBuffer()));
 			SetupCppLexer();
 		}
-		if ((_tcscmp(line, _T("idl"))==0)||
-			(_tcscmp(line, _T("odl"))==0))
+		if ((wcscmp(line, L"idl") == 0) ||
+			(wcscmp(line, L"odl") == 0))
 		{
 			SendEditor(SCI_SETLEXER, SCLEX_CPP);
-			SendEditor(SCI_SETKEYWORDS, 0, (LPARAM)(m_TextView.StringForControl(_T("aggregatable allocate appobject arrays async async_uuid \
+			SendEditor(SCI_SETKEYWORDS, 0, (LPARAM)(m_TextView.StringForControl(L"aggregatable allocate appobject arrays async async_uuid \
 auto_handle \
 bindable boolean broadcast byte byte_count \
 call_as callback char coclass code comm_status \
@@ -1160,55 +1172,55 @@ shape short signed size_is small source strict_context_handle \
 string struct switch switch_is switch_type \
 transmit_as typedef \
 uidefault union unique unsigned user_marshal usesgetlasterror uuid \
-v1_enum vararg version void wchar_t wire_marshal")).GetBuffer()));
+v1_enum vararg version void wchar_t wire_marshal").GetBuffer()));
 			SetupCppLexer();
 		}
-		if (_tcscmp(line, _T("java"))==0)
+		if (wcscmp(line, L"java") == 0)
 		{
 			SendEditor(SCI_SETLEXER, SCLEX_CPP);
-			SendEditor(SCI_SETKEYWORDS, 0, (LPARAM)(m_TextView.StringForControl(_T("abstract assert boolean break byte case catch char class \
+			SendEditor(SCI_SETKEYWORDS, 0, (LPARAM)(m_TextView.StringForControl(L"abstract assert boolean break byte case catch char class \
 const continue default do double else extends final finally float for future \
 generic goto if implements import inner instanceof int interface long \
 native new null outer package private protected public rest \
 return short static super switch synchronized this throw throws \
-transient try var void volatile while")).GetBuffer()));
+transient try var void volatile while").GetBuffer()));
 			SetupCppLexer();
 		}
-		if (_tcscmp(line, _T("js"))==0)
+		if (wcscmp(line, L"js") == 0)
 		{
 			SendEditor(SCI_SETLEXER, SCLEX_CPP);
-			SendEditor(SCI_SETKEYWORDS, 0, (LPARAM)(m_TextView.StringForControl(_T("abstract boolean break byte case catch char class \
+			SendEditor(SCI_SETKEYWORDS, 0, (LPARAM)(m_TextView.StringForControl(L"abstract boolean break byte case catch char class \
 const continue debugger default delete do double else enum export extends \
 final finally float for function goto if implements import in instanceof \
 int interface long native new package private protected public \
 return short static super switch synchronized this throw throws \
-transient try typeof var void volatile while with")).GetBuffer()));
+transient try typeof var void volatile while with").GetBuffer()));
 			SetupCppLexer();
 		}
-		if ((_tcscmp(line, _T("pas"))==0)||
-			(_tcscmp(line, _T("dpr"))==0)||
-			(_tcscmp(line, _T("pp"))==0))
+		if ((wcscmp(line, L"pas") == 0) ||
+			(wcscmp(line, L"dpr") == 0) ||
+			(wcscmp(line, L"pp") == 0))
 		{
 			SendEditor(SCI_SETLEXER, SCLEX_PASCAL);
-			SendEditor(SCI_SETKEYWORDS, 0, (LPARAM)(m_TextView.StringForControl(_T("and array as begin case class const constructor \
+			SendEditor(SCI_SETKEYWORDS, 0, (LPARAM)(m_TextView.StringForControl(L"and array as begin case class const constructor \
 destructor div do downto else end except file finally \
 for function goto if implementation in inherited \
 interface is mod not object of on or packed \
 procedure program property raise record repeat \
 set shl shr then threadvar to try type unit \
-until uses var while with xor")).GetBuffer()));
+until uses var while with xor").GetBuffer()));
 			SetupCppLexer();
 		}
-		if ((_tcscmp(line, _T("as"))==0)||
-			(_tcscmp(line, _T("asc"))==0)||
-			(_tcscmp(line, _T("jsfl"))==0))
+		if ((wcscmp(line, L"as") == 0) ||
+			(wcscmp(line, L"asc") == 0) ||
+			(wcscmp(line, L"jsfl") == 0))
 		{
 			SendEditor(SCI_SETLEXER, SCLEX_CPP);
-			SendEditor(SCI_SETKEYWORDS, 0, (LPARAM)(m_TextView.StringForControl(_T("add and break case catch class continue default delete do \
+			SendEditor(SCI_SETKEYWORDS, 0, (LPARAM)(m_TextView.StringForControl(L"add and break case catch class continue default delete do \
 dynamic else eq extends false finally for function ge get gt if implements import in \
 instanceof interface intrinsic le lt ne new not null or private public return \
-set static super switch this throw true try typeof undefined var void while with")).GetBuffer()));
-			SendEditor(SCI_SETKEYWORDS, 1, (LPARAM)(m_TextView.StringForControl(_T("Array Arguments Accessibility Boolean Button Camera Color \
+set static super switch this throw true try typeof undefined var void while with").GetBuffer()));
+			SendEditor(SCI_SETKEYWORDS, 1, (LPARAM)(m_TextView.StringForControl(L"Array Arguments Accessibility Boolean Button Camera Color \
 ContextMenu ContextMenuItem Date Error Function Key LoadVars LocalConnection Math \
 Microphone Mouse MovieClip MovieClipLoader NetConnection NetStream Number Object \
 PrintJob Selection SharedObject Sound Stage String StyleSheet System TextField \
@@ -1221,29 +1233,28 @@ loadVariables loadVariablesNum maxscroll mbchr mblength mbord mbsubstring MMExec
 NaN newline nextFrame nextScene on onClipEvent onUpdate ord parseFloat parseInt play \
 prevFrame prevScene print printAsBitmap printAsBitmapNum printNum random removeMovieClip \
 scroll set setInterval setProperty startDrag stop stopAllSounds stopDrag substring \
-targetPath tellTarget toggleHighQuality trace unescape unloadMovie unLoadMovieNum updateAfterEvent")).GetBuffer()));
+targetPath tellTarget toggleHighQuality trace unescape unloadMovie unLoadMovieNum updateAfterEvent").GetBuffer()));
 			SetupCppLexer();
 		}
-		if ((_tcscmp(line, _T("html"))==0)||
-			(_tcscmp(line, _T("htm"))==0)||
-			(_tcscmp(line, _T("shtml"))==0)||
-			(_tcscmp(line, _T("htt"))==0)||
-			(_tcscmp(line, _T("xml"))==0)||
-			(_tcscmp(line, _T("asp"))==0)||
-			(_tcscmp(line, _T("xsl"))==0)||
-			(_tcscmp(line, _T("php"))==0)||
-			(_tcscmp(line, _T("xhtml"))==0)||
-			(_tcscmp(line, _T("phtml"))==0)||
-			(_tcscmp(line, _T("cfm"))==0)||
-			(_tcscmp(line, _T("tpl"))==0)||
-			(_tcscmp(line, _T("dtd"))==0)||
-			(_tcscmp(line, _T("hta"))==0)||
-			(_tcscmp(line, _T("htd"))==0)||
-			(_tcscmp(line, _T("wxs"))==0))
+		if ((wcscmp(line, L"html") == 0) ||
+			(wcscmp(line, L"htm") == 0) ||
+			(wcscmp(line, L"shtml") == 0) ||
+			(wcscmp(line, L"htt") == 0) ||
+			(wcscmp(line, L"xml") == 0) ||
+			(wcscmp(line, L"asp") == 0) ||
+			(wcscmp(line, L"xsl") == 0) ||
+			(wcscmp(line, L"php") == 0) ||
+			(wcscmp(line, L"xhtml") == 0) ||
+			(wcscmp(line, L"phtml") == 0) ||
+			(wcscmp(line, L"cfm") == 0) ||
+			(wcscmp(line, L"tpl") == 0) ||
+			(wcscmp(line, L"dtd") == 0) ||
+			(wcscmp(line, L"hta") == 0) ||
+			(wcscmp(line, L"htd") == 0) ||
+			(wcscmp(line, L"wxs") == 0))
 		{
 			SendEditor(SCI_SETLEXER, SCLEX_HTML);
-			SendEditor(SCI_SETSTYLEBITS, 7);
-			SendEditor(SCI_SETKEYWORDS, 0, (LPARAM)(m_TextView.StringForControl(_T("a abbr acronym address applet area b base basefont \
+			SendEditor(SCI_SETKEYWORDS, 0, (LPARAM)(m_TextView.StringForControl(L"a abbr acronym address applet area b base basefont \
 bdo big blockquote body br button caption center \
 cite code col colgroup dd del dfn dir div dl dt em \
 fieldset font form frame frameset h1 h2 h3 h4 h5 h6 \
@@ -1273,30 +1284,30 @@ scheme scope selected shape size span src standby start style \
 summary tabindex target text title topmargin type usemap \
 valign value valuetype version vlink vspace width \
 text password checkbox radio submit reset \
-file hidden image")).GetBuffer()));
-			SendEditor(SCI_SETKEYWORDS, 1, (LPARAM)(m_TextView.StringForControl(_T("assign audio block break catch choice clear disconnect else elseif \
+file hidden image").GetBuffer()));
+			SendEditor(SCI_SETKEYWORDS, 1, (LPARAM)(m_TextView.StringForControl(L"assign audio block break catch choice clear disconnect else elseif \
 emphasis enumerate error exit field filled form goto grammar help \
 if initial link log menu meta noinput nomatch object option p paragraph \
 param phoneme prompt property prosody record reprompt return s say-as \
-script sentence subdialog submit throw transfer value var voice vxml")).GetBuffer()));
-			SendEditor(SCI_SETKEYWORDS, 2, (LPARAM)(m_TextView.StringForControl(_T("accept age alphabet anchor application base beep bridge category charset \
+script sentence subdialog submit throw transfer value var voice vxml").GetBuffer()));
+			SendEditor(SCI_SETKEYWORDS, 2, (LPARAM)(m_TextView.StringForControl(L"accept age alphabet anchor application base beep bridge category charset \
 classid cond connecttimeout content contour count dest destexpr dtmf dtmfterm \
 duration enctype event eventexpr expr expritem fetchtimeout finalsilence \
 gender http-equiv id level maxage maxstale maxtime message messageexpr \
 method mime modal mode name namelist next nextitem ph pitch range rate \
 scope size sizeexpr skiplist slot src srcexpr sub time timeexpr timeout \
-transferaudio type value variant version volume xml:lang")).GetBuffer()));
-			SendEditor(SCI_SETKEYWORDS, 3, (LPARAM)(m_TextView.StringForControl(_T("and assert break class continue def del elif \
+transferaudio type value variant version volume xml:lang").GetBuffer()));
+			SendEditor(SCI_SETKEYWORDS, 3, (LPARAM)(m_TextView.StringForControl(L"and assert break class continue def del elif \
 else except exec finally for from global if import in is lambda None \
-not or pass print raise return try while yield")).GetBuffer()));
-			SendEditor(SCI_SETKEYWORDS, 4, (LPARAM)(m_TextView.StringForControl(_T("and argv as argc break case cfunction class continue declare default do \
+not or pass print raise return try while yield").GetBuffer()));
+			SendEditor(SCI_SETKEYWORDS, 4, (LPARAM)(m_TextView.StringForControl(L"and argv as argc break case cfunction class continue declare default do \
 die echo else elseif empty enddeclare endfor endforeach endif endswitch \
 endwhile e_all e_parse e_error e_warning eval exit extends false for \
 foreach function global http_cookie_vars http_get_vars http_post_vars \
 http_post_files http_env_vars http_server_vars if include include_once \
 list new not null old_function or parent php_os php_self php_version \
 print require require_once return static switch stdclass this true var \
-xor virtual while __file__ __line__ __sleep __wakeup")).GetBuffer()));
+xor virtual while __file__ __line__ __sleep __wakeup").GetBuffer()));
 
 			SetAStyle(SCE_H_TAG, darkBlue);
 			SetAStyle(SCE_H_TAGUNKNOWN, red);
@@ -1329,14 +1340,14 @@ xor virtual while __file__ __line__ __sleep __wakeup")).GetBuffer()));
 			// Show the whole section of VBScript with light blue background
 			for (int bstyle = SCE_HB_DEFAULT; bstyle <= SCE_HB_STRINGEOL; ++bstyle) {
 				SendEditor(SCI_STYLESETFONT, bstyle,
-					reinterpret_cast<LPARAM>(m_TextView.StringForControl(_T("Lucida Console")).GetBuffer()));
+					reinterpret_cast<LPARAM>(m_TextView.StringForControl(L"Lucida Console").GetBuffer()));
 				SendEditor(SCI_STYLESETBACK, bstyle, lightBlue);
 				// This call extends the backround colour of the last style on the line to the edge of the window
 				SendEditor(SCI_STYLESETEOLFILLED, bstyle, 1);
 			}
 			SendEditor(SCI_STYLESETBACK, SCE_HB_STRINGEOL, RGB(0x7F,0x7F,0xFF));
 			SendEditor(SCI_STYLESETFONT, SCE_HB_COMMENTLINE,
-				reinterpret_cast<LPARAM>(m_TextView.StringForControl(_T("Lucida Console")).GetBuffer()));
+				reinterpret_cast<LPARAM>(m_TextView.StringForControl(L"Lucida Console").GetBuffer()));
 
 			SetAStyle(SCE_HBA_DEFAULT, black);
 			SetAStyle(SCE_HBA_COMMENTLINE, darkGreen);
@@ -1349,14 +1360,14 @@ xor virtual while __file__ __line__ __sleep __wakeup")).GetBuffer()));
 			// Show the whole section of ASP VBScript with bright yellow background
 			for (int bastyle = SCE_HBA_DEFAULT; bastyle <= SCE_HBA_STRINGEOL; ++bastyle) {
 				SendEditor(SCI_STYLESETFONT, bastyle,
-					reinterpret_cast<LPARAM>(m_TextView.StringForControl(_T("Lucida Console")).GetBuffer()));
+					reinterpret_cast<LPARAM>(m_TextView.StringForControl(L"Lucida Console").GetBuffer()));
 				SendEditor(SCI_STYLESETBACK, bastyle, RGB(0xFF, 0xFF, 0));
 				// This call extends the backround colour of the last style on the line to the edge of the window
 				SendEditor(SCI_STYLESETEOLFILLED, bastyle, 1);
 			}
 			SendEditor(SCI_STYLESETBACK, SCE_HBA_STRINGEOL, RGB(0xCF,0xCF,0x7F));
 			SendEditor(SCI_STYLESETFONT, SCE_HBA_COMMENTLINE,
-				reinterpret_cast<LPARAM>(m_TextView.StringForControl(_T("Lucida Console")).GetBuffer()));
+				reinterpret_cast<LPARAM>(m_TextView.StringForControl(L"Lucida Console").GetBuffer()));
 
 			// If there is no need to support embedded Javascript, the following code can be dropped.
 			// Javascript will still be correctly processed but will be displayed in just the default style.
@@ -1400,7 +1411,7 @@ xor virtual while __file__ __line__ __sleep __wakeup")).GetBuffer()));
 			// Show the whole section of Javascript with off white background
 			for (int jstyle = SCE_HJ_DEFAULT; jstyle <= SCE_HJ_SYMBOLS; ++jstyle) {
 				SendEditor(SCI_STYLESETFONT, jstyle,
-					reinterpret_cast<LPARAM>(m_TextView.StringForControl(_T("Lucida Console")).GetBuffer()));
+					reinterpret_cast<LPARAM>(m_TextView.StringForControl(L"Lucida Console").GetBuffer()));
 				SendEditor(SCI_STYLESETBACK, jstyle, offWhite);
 				SendEditor(SCI_STYLESETEOLFILLED, jstyle, 1);
 			}
@@ -1410,7 +1421,7 @@ xor virtual while __file__ __line__ __sleep __wakeup")).GetBuffer()));
 			// Show the whole section of Javascript with brown background
 			for (int jastyle = SCE_HJA_DEFAULT; jastyle <= SCE_HJA_SYMBOLS; ++jastyle) {
 				SendEditor(SCI_STYLESETFONT, jastyle,
-					reinterpret_cast<LPARAM>(m_TextView.StringForControl(_T("Lucida Console")).GetBuffer()));
+					reinterpret_cast<LPARAM>(m_TextView.StringForControl(L"Lucida Console").GetBuffer()));
 				SendEditor(SCI_STYLESETBACK, jastyle, RGB(0xDF, 0xDF, 0x7F));
 				SendEditor(SCI_STYLESETEOLFILLED, jastyle, 1);
 			}
@@ -1424,7 +1435,6 @@ xor virtual while __file__ __line__ __sleep __wakeup")).GetBuffer()));
 		SetupCppLexer();
 	}
 	SendEditor(SCI_COLOURISE, 0, -1);
-
 }
 
 void CTortoiseGitBlameView::SetupCppLexer()
@@ -1482,7 +1492,7 @@ void CTortoiseGitBlameView::ParseBlame()
 {
 	m_data.ParseBlameOutput(GetDocument()->m_BlameData, GetLogData()->m_pLogCache->m_HashMap, m_DateFormat, m_bRelativeTimes);
 	CString filename = GetDocument()->m_GitPath.GetGitPathString();
-	m_bBlameOuputContainsOtherFilenames = m_data.ContainsOnlyFilename(filename) ? FALSE : TRUE;
+	m_bBlameOutputContainsOtherFilenames = m_data.ContainsOnlyFilename(filename) ? FALSE : TRUE;
 }
 
 void CTortoiseGitBlameView::MapLineToLogIndex()
@@ -1490,17 +1500,17 @@ void CTortoiseGitBlameView::MapLineToLogIndex()
 	std::vector<int> lineToLogIndex;
 
 
-	int numberOfLines = m_data.GetNumberOfLines();
+	size_t numberOfLines = m_data.GetNumberOfLines();
 	lineToLogIndex.reserve(numberOfLines);
 	size_t logSize = this->GetLogData()->size();
-	for (int j = 0; j < numberOfLines; ++j)
+	for (size_t j = 0; j < numberOfLines; ++j)
 	{
 		CGitHash& hash = m_data.GetHash(j);
 
 		int index = -2;
 		for (size_t i = 0; i < logSize; ++i)
 		{
-			if (hash == this->GetLogData()->at(i))
+			if (hash == (*GetLogData())[i])
 			{
 				index = (int)i;
 				break;
@@ -1527,7 +1537,7 @@ void CTortoiseGitBlameView::UpdateInfo(int Encode)
 
 	int encoding = m_data.UpdateEncoding(Encode);
 
-	int numberOfLines = m_data.GetNumberOfLines();
+	auto numberOfLines = (int)m_data.GetNumberOfLines();
 	if (numberOfLines > 0)
 	{
 		CStringA text;
@@ -1546,7 +1556,7 @@ void CTortoiseGitBlameView::UpdateInfo(int Encode)
 		int cxWidth;
 		int nIndex = ((CMainFrame *)::AfxGetApp()->GetMainWnd())->m_wndStatusBar.CommandToIndex(ID_INDICATOR_ENCODING);
 		((CMainFrame *)::AfxGetApp()->GetMainWnd())->m_wndStatusBar.GetPaneInfo(nIndex, nID, nStyle, cxWidth);
-		CString sBarText = L"";
+		CString sBarText;
 		for (int i = 0; i < _countof(encodings); ++i)
 		{
 			if (encodings[i].id == encoding)
@@ -1626,9 +1636,9 @@ CString CTortoiseGitBlameView::ResolveCommitFile(const CString& path)
 	}
 }
 
-COLORREF CTortoiseGitBlameView::GetLineColor(int line)
+COLORREF CTortoiseGitBlameView::GetLineColor(size_t line)
 {
-	if (m_colorage && line >= 0 && (size_t)line < m_lineToLogIndex.size())
+	if (m_colorage && line < m_lineToLogIndex.size())
 	{
 		int logIndex = m_lineToLogIndex[line];
 		if (logIndex >= 0)
@@ -1658,12 +1668,8 @@ void CTortoiseGitBlameView::OnSciPainted(NMHDR *,LRESULT *)
 
 void CTortoiseGitBlameView::OnLButtonDown(UINT nFlags,CPoint point)
 {
-
-	int line = (int)SendEditor(SCI_GETFIRSTVISIBLELINE);
-	int height = (int)SendEditor(SCI_TEXTHEIGHT);
-	line = line + (int)(point.y/height);
-
-	if (line < m_data.GetNumberOfLines())
+	int line = GetLineUnderCursor(point);
+	if ((size_t)line < m_data.GetNumberOfLines())
 	{
 		SetSelectedLine(line);
 		if (m_data.GetHash(line) != m_SelectedHash)
@@ -1686,7 +1692,6 @@ void CTortoiseGitBlameView::OnLButtonDown(UINT nFlags,CPoint point)
 		{
 			m_SelectedHash.Empty();
 		}
-		//::InvalidateRect( NULL, FALSE);
 		this->Invalidate();
 		this->m_TextView.Invalidate();
 
@@ -1703,7 +1708,7 @@ void CTortoiseGitBlameView::OnSciGetBkColor(NMHDR* hdr, LRESULT* /*result*/)
 {
 	SCNotification *notification=reinterpret_cast<SCNotification *>(hdr);
 
-	if (notification->line < m_data.GetNumberOfLines())
+	if (notification->line < (Sci_Position)m_data.GetNumberOfLines())
 	{
 		if (m_data.GetHash(notification->line) == this->m_SelectedHash)
 			notification->lParam = m_selectedauthorcolor;
@@ -1733,10 +1738,7 @@ void CTortoiseGitBlameView::FocusOn(GitRevLoglist* pRev)
 
 void CTortoiseGitBlameView::OnMouseHover(UINT /*nFlags*/, CPoint point)
 {
-	int line = (int)SendEditor(SCI_GETFIRSTVISIBLELINE);
-	int height = (int)SendEditor(SCI_TEXTHEIGHT);
-	line = line + (point.y/height);
-
+	int line = GetLineUnderCursor(point);
 	if (m_data.IsValidLine(line))
 	{
 		if (line != m_MouseLine)
@@ -1758,7 +1760,7 @@ void CTortoiseGitBlameView::OnMouseHover(UINT /*nFlags*/, CPoint point)
 			int pos = 0;
 			while (iline++ < maxLine)
 			{
-				int pos2 = body.Find(_T("\n"), pos);
+				int pos2 = body.Find(L'\n', pos);
 				if (pos2 < 0)
 					break;
 				int lineLength = pos2 - pos - 1;
@@ -1767,25 +1769,20 @@ void CTortoiseGitBlameView::OnMouseHover(UINT /*nFlags*/, CPoint point)
 			}
 
 			CString filename;
-			if ((m_bShowCompleteLog && m_bFollowRenames) || !BlameIsLimitedToOneFilename(m_dwDetectMovedOrCopiedLines) || m_bBlameOuputContainsOtherFilenames)
-				filename.Format(_T("%s: %s\n"), (LPCTSTR)m_sFileName, (LPCTSTR)m_data.GetFilename(line));
+			if ((m_bShowCompleteLog && m_bFollowRenames && !m_bOnlyFirstParent) || !BlameIsLimitedToOneFilename(m_dwDetectMovedOrCopiedLines) || m_bBlameOutputContainsOtherFilenames)
+				filename.Format(L"%s: %s\n", (LPCTSTR)m_sFileName, (LPCTSTR)m_data.GetFilename(line));
 
 			CString str;
-			str.Format(_T("%s: %s\n%s%s: %s <%s>\n%s: %s\n%s:\n%s\n%s"),	(LPCTSTR)m_sRev, (LPCTSTR)pRev->m_CommitHash.ToString(), (LPCTSTR)filename,
+			str.Format(L"%s: %s\n%s%s: %s <%s>\n%s: %s\n%s:\n%s\n%s",	(LPCTSTR)m_sRev, (LPCTSTR)pRev->m_CommitHash.ToString(), (LPCTSTR)filename,
 																	(LPCTSTR)m_sAuthor, (LPCTSTR)pRev->GetAuthorName(), (LPCTSTR)pRev->GetAuthorEmail(),
 																	(LPCTSTR)m_sDate, (LPCTSTR)CLoglistUtils::FormatDateAndTime(pRev->GetAuthorDate(), m_DateFormat, true, m_bRelativeTimes),
 																	(LPCTSTR)m_sMessage, (LPCTSTR)pRev->GetSubject(),
-																	iline <= maxLine ? body : (body.Left(pos) + _T("\n....................")));
+																	iline <= maxLine ? (LPCTSTR)body : (body.Left(pos) + L"\n...................."));
 
 			m_ToolTip.Pop();
 			m_ToolTip.AddTool(this, str);
 
-			CRect rect;
-			rect.left=LOCATOR_WIDTH;
-			rect.right=this->m_blamewidth+rect.left;
-			rect.top = point.y - (LONG)height;
-			rect.bottom = point.y + (LONG)height;
-			this->InvalidateRect(rect);
+			Invalidate();
 		}
 	}
 }
@@ -1798,8 +1795,17 @@ void CTortoiseGitBlameView::OnMouseMove(UINT /*nFlags*/, CPoint /*point*/)
 	tme.hwndTrack=this->m_hWnd;
 	tme.dwHoverTime=1;
 	TrackMouseEvent(&tme);
+	Invalidate();
 }
 
+void CTortoiseGitBlameView::OnMouseLeave()
+{
+	if (m_MouseLine == -1)
+		return;
+	
+	m_MouseLine = -1;
+	Invalidate();
+}
 
 BOOL CTortoiseGitBlameView::PreTranslateMessage(MSG* pMsg)
 {
@@ -1815,7 +1821,7 @@ void CTortoiseGitBlameView::OnEditFind()
 
 	m_pFindDialog=new CFindReplaceDialog();
 
-	CString oneline = theApp.GetString(_T("FindString"));
+	CString oneline = m_sFindText;
 	if (m_TextView.Call(SCI_GETSELECTIONSTART) != m_TextView.Call(SCI_GETSELECTIONEND))
 	{
 		LRESULT bufsize = m_TextView.Call(SCI_GETSELECTIONEND) - m_TextView.Call(SCI_GETSELECTIONSTART);
@@ -1825,11 +1831,11 @@ void CTortoiseGitBlameView::OnEditFind()
 		oneline = m_TextView.StringFromControl(linebuf.get());
 	}
 
-	DWORD flags = FR_DOWN | FR_HIDEWHOLEWORD | FR_HIDEUPDOWN;
-	if (theApp.GetInt(_T("FindMatchCase")))
+	DWORD flags = FR_DOWN | FR_HIDEWHOLEWORD;
+	if (theApp.GetInt(L"FindMatchCase"))
 		flags |= FR_MATCHCASE;
 
-	m_pFindDialog->Create(TRUE, oneline, NULL, flags, this);
+	m_pFindDialog->Create(TRUE, oneline, nullptr, flags, this);
 }
 
 void CTortoiseGitBlameView::OnEditGoto()
@@ -1843,31 +1849,28 @@ void CTortoiseGitBlameView::OnEditGoto()
 
 LRESULT CTortoiseGitBlameView::OnFindDialogMessage(WPARAM /*wParam*/, LPARAM /*lParam*/)
 {
-	ASSERT(m_pFindDialog != NULL);
+	ASSERT(m_pFindDialog);
 
 	// If the FR_DIALOGTERM flag is set,
 	// invalidate the handle identifying the dialog box.
 	if (m_pFindDialog->IsTerminating())
 	{
-			m_pFindDialog = NULL;
+			m_pFindDialog = nullptr;
 			return 0;
 	}
-
-	if (m_data.GetNumberOfLines()==0)
-		return 0;
 
 	// If the FR_FINDNEXT flag is set,
 	// call the application-defined search routine
 	// to search for the requested string.
 	if(m_pFindDialog->FindNext())
 	{
-		m_bMatchCase = !!(m_pFindDialog->m_nFlags & FR_MATCHCASE);
+		m_bMatchCase = !!(m_pFindDialog->MatchCase());
 		m_sFindText = m_pFindDialog->GetFindString();
 
-		theApp.WriteInt(_T("FindMatchCase"), m_bMatchCase ? 1 : 0);
-		theApp.WriteString(_T("FindString"), m_sFindText);
+		theApp.WriteInt(L"FindMatchCase", m_bMatchCase ? 1 : 0);
+		theApp.WriteString(L"FindString", m_sFindText);
 
-		DoSearch(CTortoiseGitBlameData::SearchNext);
+		DoSearch(m_pFindDialog->SearchDown() ?  CTortoiseGitBlameData::SearchNext : CTortoiseGitBlameData::SearchPrevious);
 	}
 
 	return 0;
@@ -1892,7 +1895,7 @@ void CTortoiseGitBlameView::OnViewToggleAuthor()
 {
 	m_bShowAuthor = ! m_bShowAuthor;
 
-	theApp.WriteInt(_T("ShowAuthor"), m_bShowAuthor);
+	theApp.WriteInt(L"ShowAuthor", m_bShowAuthor);
 
 	CRect rect;
 	this->GetClientRect(&rect);
@@ -1910,7 +1913,7 @@ void CTortoiseGitBlameView::OnViewToggleDate()
 {
 	m_bShowDate = ! m_bShowDate;
 
-	theApp.WriteInt(_T("ShowDate"), m_bShowDate);
+	theApp.WriteInt(L"ShowDate", m_bShowDate);
 
 	CRect rect;
 	this->GetClientRect(&rect);
@@ -1928,7 +1931,7 @@ void CTortoiseGitBlameView::OnViewToggleShowFilename()
 {
 	m_bShowFilename = ! m_bShowFilename;
 
-	theApp.WriteInt(_T("ShowFilename"), m_bShowFilename);
+	theApp.WriteInt(L"ShowFilename", m_bShowFilename);
 
 	CRect rect;
 	this->GetClientRect(&rect);
@@ -1946,7 +1949,7 @@ void CTortoiseGitBlameView::OnViewToggleShowOriginalLineNumber()
 {
 	m_bShowOriginalLineNumber = ! m_bShowOriginalLineNumber;
 
-	theApp.WriteInt(_T("ShowOriginalLineNumber"), m_bShowOriginalLineNumber);
+	theApp.WriteInt(L"ShowOriginalLineNumber", m_bShowOriginalLineNumber);
 
 	CRect rect;
 	this->GetClientRect(&rect);
@@ -1966,9 +1969,9 @@ void CTortoiseGitBlameView::OnViewDetectMovedOrCopiedLines(DWORD dwDetectMovedOr
 
 	theApp.DoWaitCursor(1);
 
-	theApp.WriteInt(_T("DetectMovedOrCopiedLines"), m_dwDetectMovedOrCopiedLines);
+	theApp.WriteInt(L"DetectMovedOrCopiedLines", m_dwDetectMovedOrCopiedLines);
 
-	CTortoiseGitBlameDoc *document = (CTortoiseGitBlameDoc *) m_pDocument;
+	auto document = static_cast<CTortoiseGitBlameDoc*>(m_pDocument);
 	if (!document->m_CurrentFileName.IsEmpty())
 	{
 		document->m_lLine = (int)SendEditor(SCI_GETFIRSTVISIBLELINE) + 1;
@@ -2031,7 +2034,7 @@ void CTortoiseGitBlameView::OnUpdateViewDetectMovedOrCopiedLinesToggleFromExisti
 void CTortoiseGitBlameView::ReloadDocument()
 {
 	theApp.DoWaitCursor(1);
-	CTortoiseGitBlameDoc *document = (CTortoiseGitBlameDoc *) m_pDocument;
+	auto document = static_cast<CTortoiseGitBlameDoc*>(m_pDocument);
 	if (!document->m_CurrentFileName.IsEmpty())
 	{
 		document->m_lLine = (int)SendEditor(SCI_GETFIRSTVISIBLELINE) + 1;
@@ -2045,7 +2048,7 @@ void CTortoiseGitBlameView::OnViewToggleIgnoreWhitespace()
 {
 	m_bIgnoreWhitespace = ! m_bIgnoreWhitespace;
 
-	theApp.WriteInt(_T("IgnoreWhitespace"), m_bIgnoreWhitespace ? 1 : 0);
+	theApp.WriteInt(L"IgnoreWhitespace", m_bIgnoreWhitespace ? 1 : 0);
 
 	ReloadDocument();
 }
@@ -2059,37 +2062,51 @@ void CTortoiseGitBlameView::OnViewToggleShowCompleteLog()
 {
 	m_bShowCompleteLog = ! m_bShowCompleteLog;
 
-	theApp.WriteInt(_T("ShowCompleteLog"), m_bShowCompleteLog ? 1 : 0);
+	theApp.WriteInt(L"ShowCompleteLog", m_bShowCompleteLog ? 1 : 0);
+
+	ReloadDocument();
+}
+
+void CTortoiseGitBlameView::OnUpdateViewToggleOnlyFirstParent(CCmdUI* pCmdUI)
+{
+	pCmdUI->SetCheck(m_bOnlyFirstParent);
+}
+
+void CTortoiseGitBlameView::OnViewToggleOnlyFirstParent()
+{
+	m_bOnlyFirstParent = !m_bOnlyFirstParent;
+
+	theApp.WriteInt(L"OnlyFirstParent", m_bOnlyFirstParent ? 1 : 0);
 
 	ReloadDocument();
 }
 
 void CTortoiseGitBlameView::OnUpdateViewToggleShowCompleteLog(CCmdUI *pCmdUI)
 {
-	pCmdUI->Enable(BlameIsLimitedToOneFilename(m_dwDetectMovedOrCopiedLines));
-	pCmdUI->SetCheck(m_bShowCompleteLog && BlameIsLimitedToOneFilename(m_dwDetectMovedOrCopiedLines));
+	pCmdUI->Enable(BlameIsLimitedToOneFilename(m_dwDetectMovedOrCopiedLines) && !m_bOnlyFirstParent);
+	pCmdUI->SetCheck(m_bShowCompleteLog && BlameIsLimitedToOneFilename(m_dwDetectMovedOrCopiedLines) && !m_bOnlyFirstParent);
 }
 
 void CTortoiseGitBlameView::OnViewToggleFollowRenames()
 {
 	m_bFollowRenames = ! m_bFollowRenames;
 
-	theApp.WriteInt(_T("FollowRenames"), m_bFollowRenames ? 1 : 0);
+	theApp.WriteInt(L"FollowRenames", m_bFollowRenames ? 1 : 0);
 
 	ReloadDocument();
 }
 
 void CTortoiseGitBlameView::OnUpdateViewToggleFollowRenames(CCmdUI *pCmdUI)
 {
-	pCmdUI->Enable(m_bShowCompleteLog && BlameIsLimitedToOneFilename(m_dwDetectMovedOrCopiedLines));
-	pCmdUI->SetCheck(m_bFollowRenames && m_bShowCompleteLog && BlameIsLimitedToOneFilename(m_dwDetectMovedOrCopiedLines));
+	pCmdUI->Enable(m_bShowCompleteLog && BlameIsLimitedToOneFilename(m_dwDetectMovedOrCopiedLines) && !m_bOnlyFirstParent);
+	pCmdUI->SetCheck(m_bFollowRenames && m_bShowCompleteLog && BlameIsLimitedToOneFilename(m_dwDetectMovedOrCopiedLines) && !m_bOnlyFirstParent);
 }
 
 void CTortoiseGitBlameView::OnViewToggleColorByAge()
 {
 	m_colorage = ! m_colorage;
 
-	theApp.WriteInt(_T("ColorAge"), m_colorage);
+	theApp.WriteInt(L"ColorAge", m_colorage);
 
 	m_TextView.Invalidate();
 }
@@ -2103,7 +2120,7 @@ void CTortoiseGitBlameView::OnViewToggleLexer()
 {
 	m_bLexer = !m_bLexer;
 
-	theApp.WriteInt(_T("EnableLexer"), m_bLexer);
+	theApp.WriteInt(L"EnableLexer", m_bLexer);
 
 	InitialiseEditor();
 	SetupLexer(GetDocument()->m_CurrentFileName);
@@ -2115,16 +2132,31 @@ void CTortoiseGitBlameView::OnUpdateViewToggleLexer(CCmdUI *pCmdUI)
 	pCmdUI->SetCheck(m_bLexer);
 }
 
+void CTortoiseGitBlameView::OnViewWrapLongLines()
+{
+	m_bWrapLongLines = !m_bWrapLongLines;
+
+	theApp.WriteInt(L"WrapLongLines", m_bWrapLongLines);
+
+	if (m_bWrapLongLines)
+		SendEditor(SCI_SETWRAPMODE, SC_WRAP_WORD);
+	else
+		SendEditor(SCI_SETWRAPMODE, SC_WRAP_NONE);
+}
+
+void CTortoiseGitBlameView::OnUpdateViewWrapLongLines(CCmdUI* pCmdUI)
+{
+	pCmdUI->SetCheck(m_bWrapLongLines);
+}
+
 void CTortoiseGitBlameView::OnUpdateViewCopyToClipboard(CCmdUI *pCmdUI)
 {
 	CWnd * wnd = GetFocus();
 	if (wnd == GetLogList())
-	{
 		pCmdUI->Enable(GetLogList()->GetSelectedCount() > 0);
-	}
 	else if (wnd)
 	{
-		if (CString(wnd->GetRuntimeClass()->m_lpszClassName) == _T("CMFCPropertyGridCtrl"))
+		if (CString(wnd->GetRuntimeClass()->m_lpszClassName) == L"CMFCPropertyGridCtrl")
 		{
 			CMFCPropertyGridCtrl *grid = (CMFCPropertyGridCtrl *)wnd;
 			pCmdUI->Enable(grid->GetCurSel() && !grid->GetCurSel()->IsGroup() && !CString(grid->GetCurSel()->GetValue()).IsEmpty());
@@ -2134,4 +2166,26 @@ void CTortoiseGitBlameView::OnUpdateViewCopyToClipboard(CCmdUI *pCmdUI)
 	}
 	else
 		pCmdUI->Enable(FALSE);
+}
+
+void CTortoiseGitBlameView::OnSysColorChange()
+{
+	__super::OnSysColorChange();
+	m_windowcolor = ::GetSysColor(COLOR_WINDOW);
+	m_textcolor = ::GetSysColor(COLOR_WINDOWTEXT);
+	m_texthighlightcolor = ::GetSysColor(COLOR_HIGHLIGHTTEXT);
+	m_mouserevcolor = InterColor(m_windowcolor, m_textcolor, 20);
+	m_mouseauthorcolor = InterColor(m_windowcolor, m_textcolor, 10);
+	m_selectedrevcolor = ::GetSysColor(COLOR_HIGHLIGHT);
+	m_selectedauthorcolor = InterColor(m_selectedrevcolor, m_texthighlightcolor, 35);
+	InitialiseEditor();
+	SetupLexer(GetDocument()->m_CurrentFileName);
+}
+
+ULONG CTortoiseGitBlameView::GetGestureStatus(CPoint ptTouch)
+{
+	int line = GetLineUnderCursor(ptTouch);
+	if (m_data.IsValidLine(line))
+		return 0;
+	return __super::GetGestureStatus(ptTouch);
 }

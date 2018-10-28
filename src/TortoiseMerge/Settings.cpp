@@ -1,6 +1,6 @@
 // TortoiseGitMerge - a Diff/Patch program
 
-// Copyright (C) 2006, 2009-2010 - TortoiseSVN
+// Copyright (C) 2006, 2009-2010, 2014-2015, 2017-2018 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -21,18 +21,34 @@
 #include "SetMainPage.h"
 #include "SetColorPage.h"
 
+int CALLBACK PropSheetProc(HWND /*hWndDlg*/, UINT uMsg, LPARAM lParam)
+{
+	switch (uMsg)
+	{
+	case PSCB_PRECREATE:
+	{
+		auto pResource = reinterpret_cast<LPDLGTEMPLATE>(lParam);
+		CDialogTemplate dlgTemplate(pResource);
+		dlgTemplate.SetFont(L"MS Shell Dlg 2", 9);
+		memmove((void*)lParam, dlgTemplate.m_hTemplate, dlgTemplate.m_dwTemplateSize);
+	}
+	break;
+	}
+	return 0;
+}
+
 IMPLEMENT_DYNAMIC(CSettings, CPropertySheet)
 CSettings::CSettings(UINT nIDCaption, CWnd* pParentWnd, UINT iSelectPage)
 	: CPropertySheet(nIDCaption, pParentWnd, iSelectPage)
-	, m_pMainPage(NULL)
-	, m_pColorPage(NULL)
+	, m_pMainPage(nullptr)
+	, m_pColorPage(nullptr)
 {
 }
 
 CSettings::CSettings(LPCTSTR pszCaption, CWnd* pParentWnd, UINT iSelectPage)
 	: CPropertySheet(pszCaption, pParentWnd, iSelectPage)
-	, m_pMainPage(NULL)
-	, m_pColorPage(NULL)
+	, m_pMainPage(nullptr)
+	, m_pColorPage(nullptr)
 {
 	AddPropPages();
 }
@@ -49,14 +65,21 @@ void CSettings::AddPropPages()
 
 	AddPage(m_pMainPage);
 	AddPage(m_pColorPage);
+
+	// remove the "apply" button: changes show only after the settings dialog
+	// is closed, so the OK button is enough and the "apply" button only
+	// confuses users.
+	m_psh.dwFlags |= PSH_NOAPPLYNOW;
+	m_psh.pfnCallback = PropSheetProc;
+	m_psh.dwFlags |= PSH_USECALLBACK;
 }
 
 void CSettings::RemovePropPages()
 {
 	delete m_pMainPage;
-	m_pMainPage = NULL;
+	m_pMainPage = nullptr;
 	delete m_pColorPage;
-	m_pColorPage = NULL;
+	m_pColorPage = nullptr;
 }
 
 void CSettings::SaveData()

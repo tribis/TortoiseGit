@@ -1,7 +1,7 @@
-// TortoiseGit - a Windows shell extension for easy version control
+﻿// TortoiseGit - a Windows shell extension for easy version control
 
 // Copyright (C) 2003-2014 - TortoiseSVN
-// Copyright (C) 2008-2016 - TortoiseGit
+// Copyright (C) 2008-2018 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -24,8 +24,6 @@
 #include "AppUtils.h"
 #include "PathUtils.h"
 #include "Git.h"
-#include "registry.h"
-#include "GitStatus.h"
 #include "HistoryDlg.h"
 #include "Hooks.h"
 #include "UnicodeUtils.h"
@@ -40,6 +38,8 @@
 #include "LogDlg.h"
 #include "BstrSafeVector.h"
 #include "StringUtils.h"
+#include "FileTextLines.h"
+#include "DPIAware.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -47,18 +47,18 @@
 static char THIS_FILE[] = __FILE__;
 #endif
 
-UINT CCommitDlg::WM_AUTOLISTREADY = RegisterWindowMessage(_T("TORTOISEGIT_AUTOLISTREADY_MSG"));
-UINT CCommitDlg::WM_UPDATEOKBUTTON = RegisterWindowMessage(_T("TORTOISEGIT_COMMIT_UPDATEOKBUTTON"));
-UINT CCommitDlg::WM_UPDATEDATAFALSE = RegisterWindowMessage(_T("TORTOISEGIT_COMMIT_UPDATEDATAFALSE"));
+UINT CCommitDlg::WM_AUTOLISTREADY = RegisterWindowMessage(L"TORTOISEGIT_AUTOLISTREADY_MSG");
+UINT CCommitDlg::WM_UPDATEOKBUTTON = RegisterWindowMessage(L"TORTOISEGIT_COMMIT_UPDATEOKBUTTON");
+UINT CCommitDlg::WM_UPDATEDATAFALSE = RegisterWindowMessage(L"TORTOISEGIT_COMMIT_UPDATEDATAFALSE");
 
 IMPLEMENT_DYNAMIC(CCommitDlg, CResizableStandAloneDialog)
-CCommitDlg::CCommitDlg(CWnd* pParent /*=NULL*/)
+CCommitDlg::CCommitDlg(CWnd* pParent /*=nullptr*/)
 	: CResizableStandAloneDialog(CCommitDlg::IDD, pParent)
 	, m_bShowUnversioned(FALSE)
 	, m_bBlock(FALSE)
 	, m_bThreadRunning(FALSE)
 	, m_bRunThread(FALSE)
-	, m_pThread(NULL)
+	, m_pThread(nullptr)
 	, m_bWholeProject(FALSE)
 	, m_bWholeProject2(FALSE)
 	, m_bKeepChangeList(TRUE)
@@ -83,8 +83,9 @@ CCommitDlg::CCommitDlg(CWnd* pParent /*=NULL*/)
 	, m_hAccel(nullptr)
 	, m_bWarnDetachedHead(true)
 	, m_hAccelOkButton(nullptr)
+	, m_bDoNotStoreLastSelectedLine(true)
+	, m_bCommitAmend(FALSE)
 {
-	this->m_bCommitAmend=FALSE;
 }
 
 CCommitDlg::~CCommitDlg()
@@ -147,6 +148,7 @@ BEGIN_MESSAGE_MAP(CCommitDlg, CResizableStandAloneDialog)
 	ON_REGISTERED_MESSAGE(WM_UPDATEDATAFALSE, OnUpdateDataFalse)
 	ON_WM_TIMER()
 	ON_WM_SIZE()
+	ON_WM_SYSCOLORCHANGE()
 	ON_STN_CLICKED(IDC_EXTERNALWARNING, &CCommitDlg::OnStnClickedExternalwarning)
 	ON_BN_CLICKED(IDC_SIGNOFF, &CCommitDlg::OnBnClickedSignOff)
 	ON_BN_CLICKED(IDC_COMMIT_AMEND, &CCommitDlg::OnBnClickedCommitAmend)
@@ -169,26 +171,26 @@ END_MESSAGE_MAP()
 
 int GetCommitTemplate(CString &msg)
 {
-	CString tplFilename = g_Git.GetConfigValue(_T("commit.template"));
+	CString tplFilename = g_Git.GetConfigValue(L"commit.template");
 	if (tplFilename.IsEmpty())
 		return -1;
 
-	if (tplFilename[0] == _T('/'))
+	if (tplFilename[0] == L'/')
 	{
 		if (tplFilename.GetLength() >= 3)
 		{
 			// handle "/d/TortoiseGit/tpl.txt" -> "d:/TortoiseGit/tpl.txt"
-			if (tplFilename[2] == _T('/'))
+			if (tplFilename[2] == L'/')
 			{
 				LPWSTR buf = tplFilename.GetBuffer();
 				buf[0] = buf[1];
-				buf[1] = _T(':');
+				buf[1] = L':';
 				tplFilename.ReleaseBuffer();
 			}
 		}
 	}
 
-	tplFilename.Replace(_T('/'), _T('\\'));
+	tplFilename.Replace(L'/', L'\\');
 
 	if (!CGit::LoadTextFile(tplFilename, msg))
 		return -1;
@@ -206,26 +208,30 @@ BOOL CCommitDlg::OnInitDialog()
 			GetCommitTemplate(m_sLogMessage);
 
 		CString dotGitPath;
-		GitAdminDir::GetAdminDirPath(g_Git.m_CurrentDir, dotGitPath);
-		bool loadedMsg = !CGit::LoadTextFile(dotGitPath + _T("MERGE_MSG"), m_sLogMessage);
-		loadedMsg = loadedMsg && !CGit::LoadTextFile(dotGitPath + _T("SQUASH_MSG"), m_sLogMessage);
+		GitAdminDir::GetWorktreeAdminDirPath(g_Git.m_CurrentDir, dotGitPath);
+		CGit::LoadTextFile(dotGitPath + L"SQUASH_MSG", m_sLogMessage);
+		CGit::LoadTextFile(dotGitPath + L"MERGE_MSG", m_sLogMessage);
 	}
-	RunStartCommitHook();
+	if (!RunStartCommitHook())
+	{
+		EndDialog(IDCANCEL);
+		return FALSE;
+	}
 
-	m_regAddBeforeCommit = CRegDWORD(_T("Software\\TortoiseGit\\AddBeforeCommit"), TRUE);
+	m_regAddBeforeCommit = CRegDWORD(L"Software\\TortoiseGit\\AddBeforeCommit", TRUE);
 	m_bShowUnversioned = m_regAddBeforeCommit;
 
 	CString regPath(g_Git.m_CurrentDir);
-	regPath.Replace(_T(":"), _T("_"));
-	m_regShowWholeProject = CRegDWORD(_T("Software\\TortoiseGit\\TortoiseProc\\ShowWholeProject\\") + regPath, FALSE);
+	regPath.Replace(L':', L'_');
+	m_regShowWholeProject = CRegDWORD(L"Software\\TortoiseGit\\TortoiseProc\\ShowWholeProject\\" + regPath, FALSE);
 	m_bWholeProject = m_regShowWholeProject;
 
-	m_History.SetMaxHistoryItems((LONG)CRegDWORD(_T("Software\\TortoiseGit\\MaxHistoryItems"), 25));
+	m_History.SetMaxHistoryItems((LONG)CRegDWORD(L"Software\\TortoiseGit\\MaxHistoryItems", 25));
 
-	m_regKeepChangelists = CRegDWORD(_T("Software\\TortoiseGit\\KeepChangeLists"), FALSE);
+	m_regKeepChangelists = CRegDWORD(L"Software\\TortoiseGit\\KeepChangeLists", FALSE);
 	m_bKeepChangeList = m_regKeepChangelists;
 
-	m_regDoNotAutoselectSubmodules = CRegDWORD(_T("Software\\TortoiseGit\\DoNotAutoselectSubmodules"), FALSE);
+	m_regDoNotAutoselectSubmodules = CRegDWORD(L"Software\\TortoiseGit\\DoNotAutoselectSubmodules", FALSE);
 	m_bDoNotAutoselectSubmodules = m_regDoNotAutoselectSubmodules;
 
 	m_hAccel = LoadAccelerators(AfxGetResourceHandle(),MAKEINTRESOURCE(IDR_ACC_COMMITDLG));
@@ -251,7 +257,7 @@ BOOL CCommitDlg::OnInitDialog()
 
 	UpdateData(FALSE);
 
-	m_ListCtrl.Init(GITSLC_COLEXT | GITSLC_COLSTATUS | GITSLC_COLADD | GITSLC_COLDEL, _T("CommitDlg"), (GITSLC_POPALL ^ (GITSLC_POPCOMMIT | GITSLC_POPSAVEAS | GITSLC_PREPAREDIFF)), true, true);
+	m_ListCtrl.Init(GITSLC_COLEXT | GITSLC_COLSTATUS | GITSLC_COLADD | GITSLC_COLDEL, L"CommitDlg", (GITSLC_POPALL ^ (GITSLC_POPCOMMIT | GITSLC_POPSAVEAS | GITSLC_POPPREPAREDIFF)), true, true);
 	m_ListCtrl.SetStatLabel(GetDlgItem(IDC_STATISTICS));
 	m_ListCtrl.SetCancelBool(&m_bCancelled);
 	m_ListCtrl.SetEmptyString(IDS_COMMITDLG_NOTHINGTOCOMMIT);
@@ -262,7 +268,7 @@ BOOL CCommitDlg::OnInitDialog()
 	m_ProjectProperties.ReadProps();
 
 	m_cLogMessage.Init(m_ProjectProperties);
-	m_cLogMessage.SetFont((CString)CRegString(_T("Software\\TortoiseGit\\LogFontName"), _T("Courier New")), (DWORD)CRegDWORD(_T("Software\\TortoiseGit\\LogFontSize"), 8));
+	m_cLogMessage.SetFont(CAppUtils::GetLogFontName(), CAppUtils::GetLogFontSize());
 	m_cLogMessage.RegisterContextMenuHandler(this);
 	std::map<int, UINT> icons;
 	icons[AUTOCOMPLETE_SPELLING] = IDI_SPELL;
@@ -413,10 +419,10 @@ BOOL CCommitDlg::OnInitDialog()
 	AddAnchor(IDC_CHECKFILES, TOP_LEFT);
 	AddAnchor(IDC_CHECKSUBMODULES, TOP_LEFT);
 
-	if (hWndExplorer)
-		CenterWindow(CWnd::FromHandle(hWndExplorer));
-	EnableSaveRestore(_T("CommitDlg"));
-	DWORD yPos = CRegDWORD(_T("Software\\TortoiseGit\\TortoiseProc\\ResizableState\\CommitDlgSizer"));
+	if (GetExplorerHWND())
+		CenterWindow(CWnd::FromHandle(GetExplorerHWND()));
+	EnableSaveRestore(L"CommitDlg");
+	DWORD yPos = CRegDWORD(L"Software\\TortoiseGit\\TortoiseProc\\ResizableState\\CommitDlgSizer");
 	RECT rcDlg, rcLogMsg, rcFileList;
 	GetClientRect(&rcDlg);
 	m_cLogMessage.GetWindowRect(&rcLogMsg);
@@ -429,10 +435,11 @@ BOOL CCommitDlg::OnInitDialog()
 		m_wndSplitter.GetWindowRect(&rectSplitter);
 		ScreenToClient(&rectSplitter);
 		int delta = yPos - rectSplitter.top;
-		if ((rcLogMsg.bottom + delta > rcLogMsg.top)&&(rcLogMsg.bottom + delta < rcFileList.bottom - 30))
+		if ((rcLogMsg.bottom + delta > rcLogMsg.top) && (rcLogMsg.bottom + delta < rcFileList.bottom - CDPIAware::Instance().ScaleY(30)))
 		{
-			m_wndSplitter.SetWindowPos(NULL, rectSplitter.left, yPos, 0, 0, SWP_NOSIZE);
+			m_wndSplitter.SetWindowPos(nullptr, rectSplitter.left, yPos, 0, 0, SWP_NOSIZE);
 			DoSize(delta);
+			Invalidate();
 		}
 	}
 
@@ -449,11 +456,9 @@ BOOL CCommitDlg::OnInitDialog()
 			m_pathwatcher.AddPath(m_pathList[i]);
 	}*/
 
-	m_updatedPathList = m_pathList;
-
 	StartStatusThread();
-	CRegDWORD err = CRegDWORD(_T("Software\\TortoiseGit\\ErrorOccurred"), FALSE);
-	CRegDWORD historyhint = CRegDWORD(_T("Software\\TortoiseGit\\HistoryHintShown"), FALSE);
+	CRegDWORD err = CRegDWORD(L"Software\\TortoiseGit\\ErrorOccurred", FALSE);
+	CRegDWORD historyhint = CRegDWORD(L"Software\\TortoiseGit\\HistoryHintShown", FALSE);
 	if ((((DWORD)err)!=FALSE)&&((((DWORD)historyhint)==FALSE)))
 	{
 		historyhint = TRUE;
@@ -463,7 +468,7 @@ BOOL CCommitDlg::OnInitDialog()
 
 	this->m_ctrlShowPatch.SetURL(CString());
 
-	if (g_Git.GetConfigValueBool(_T("tgit.commitshowpatch")))
+	if (g_Git.GetConfigValueBool(L"tgit.commitshowpatch"))
 		OnStnClickedViewPatch();
 
 	if (CTGitPath(g_Git.m_CurrentDir).IsMergeActive())
@@ -482,6 +487,8 @@ BOOL CCommitDlg::OnInitDialog()
 
 void CCommitDlg::PrepareOkButton()
 {
+	if (m_bNoPostActions)
+		return;
 	m_regLastAction = CRegDWORD(L"Software\\TortoiseGit\\CommitLastAction", 0);
 	int i = 0;
 	for (auto labelId : { IDS_COMMIT_COMMIT, IDS_COMMIT_RECOMMIT, IDS_COMMIT_COMMITPUSH })
@@ -521,7 +528,7 @@ void CCommitDlg::PrepareOkButton()
 
 static bool UpdateIndex(CMassiveGitTask &mgt, CSysProgressDlg &sysProgressDlg, int progress, int maxProgress)
 {
-	if (!mgt.GetListCount())
+	if (mgt.IsListEmpty())
 		return true;
 
 	if (sysProgressDlg.HasUserCancelled())
@@ -540,20 +547,20 @@ static bool UpdateIndex(CMassiveGitTask &mgt, CSysProgressDlg &sysProgressDlg, i
 	return mgt.Execute(cancel);
 }
 
-static void DoPush()
+static void DoPush(HWND hWnd)
 {
 	CString head;
 	if (g_Git.GetCurrentBranchFromFile(g_Git.m_CurrentDir, head))
 		return;
 	CString remote, remotebranch;
-	g_Git.GetRemoteTrackedBranchForHEAD(remote, remotebranch);
+	g_Git.GetRemotePushBranch(head, remote, remotebranch);
 	if (remote.IsEmpty() || remotebranch.IsEmpty())
 	{
-		CAppUtils::Push();
+		CAppUtils::Push(hWnd);
 		return;
 	}
 
-	CAppUtils::DoPush(CAppUtils::IsSSHPutty(), false, false, false, false, false, false, head, remote, remotebranch, false, 0);
+	CAppUtils::DoPush(hWnd, CAppUtils::IsSSHPutty(), false, false, false, false, false, false, head, remote, remotebranch, false, 0);
 }
 
 void CCommitDlg::OnOK()
@@ -567,6 +574,28 @@ void CCommitDlg::OnOK()
 	}
 	this->UpdateData();
 
+	auto locker(m_ListCtrl.AcquireReadLock());
+
+	if (m_ListCtrl.GetConflictedCount() != 0 && CMessageBox::ShowCheck(GetSafeHwnd(), IDS_PROGRS_CONFLICTSOCCURRED, IDS_APPNAME, 1, IDI_EXCLAMATION, IDS_OKBUTTON, IDS_IGNOREBUTTON, 0, L"CommitWarnOnUnresolved") == 1)
+	{
+		auto pos = m_ListCtrl.GetFirstSelectedItemPosition();
+		while (pos)
+			m_ListCtrl.SetItemState(m_ListCtrl.GetNextSelectedItem(pos), 0, LVIS_SELECTED);
+		int nListItems = m_ListCtrl.GetItemCount();
+		for (int i = 0; i < nListItems; ++i)
+		{
+			auto entry = m_ListCtrl.GetListEntry(i);
+			if (entry->m_Action & CTGitPath::LOGACTIONS_UNMERGED)
+			{
+				m_ListCtrl.EnsureVisible(i, FALSE);
+				m_ListCtrl.SetItemState(i, LVIS_SELECTED, LVIS_SELECTED);
+				m_ListCtrl.SetFocus();
+				return;
+			}
+		}
+		return;
+	}
+
 	if (m_bCreateNewBranch)
 	{
 		if (!g_Git.IsBranchNameValid(m_sCreateNewBranch))
@@ -579,7 +608,7 @@ void CCommitDlg::OnOK()
 			// branch already exists
 			CString msg;
 			msg.LoadString(IDS_B_EXISTS);
-			msg += _T(" ") + CString(MAKEINTRESOURCE(IDS_B_DELETEORDIFFERENTNAME));
+			msg += L' ' + CString(MAKEINTRESOURCE(IDS_B_DELETEORDIFFERENTNAME));
 			ShowEditBalloon(IDC_NEWBRANCH, msg, CString(MAKEINTRESOURCE(IDS_WARN_WARNING)));
 			return;
 		}
@@ -623,6 +652,9 @@ void CCommitDlg::OnOK()
 			return;
 	}
 
+	if (CAppUtils::MessageContainsConflictHints(GetSafeHwnd(), m_sLogMessage))
+		return;
+
 	if (CHooks::Instance().IsHookPresent(pre_commit_hook, g_Git.m_CurrentDir)) {
 		DWORD exitcode = 0xFFFFFFFF;
 		CString error;
@@ -634,7 +666,7 @@ void CCommitDlg::OnOK()
 			{
 				CString temp;
 				temp.Format(IDS_ERR_HOOKFAILED, (LPCTSTR)error);
-				MessageBox(temp, _T("TortoiseGit"), MB_ICONERROR);
+				MessageBox(temp, L"TortoiseGit", MB_ICONERROR);
 				return;
 			}
 		}
@@ -643,7 +675,7 @@ void CCommitDlg::OnOK()
 	int nListItems = m_ListCtrl.GetItemCount();
 	for (int i = 0; i < nListItems && !m_bCommitMessageOnly; ++i)
 	{
-		CTGitPath *entry = (CTGitPath *)m_ListCtrl.GetItemData(i);
+		auto entry = m_ListCtrl.GetListEntry(i);
 		if (!entry->m_Checked || !entry->IsDirectory())
 			continue;
 
@@ -653,26 +685,26 @@ void CCommitDlg::OnOK()
 			CGit subgit;
 			subgit.m_CurrentDir = g_Git.CombinePath(entry);
 			CString subcmdout;
-			subgit.Run(_T("git.exe status --porcelain"), &subcmdout, CP_UTF8);
+			subgit.Run(L"git.exe status --porcelain", &subcmdout, CP_UTF8);
 			dirty = !subcmdout.IsEmpty();
 		}
 		else
 		{
 			CString cmd, cmdout;
-			cmd.Format(_T("git.exe diff -- \"%s\""), entry->GetWinPath());
+			cmd.Format(L"git.exe diff -- \"%s\"", entry->GetWinPath());
 			g_Git.Run(cmd, &cmdout, CP_UTF8);
-			dirty = cmdout.Right(7) == _T("-dirty\n");
+			dirty = CStringUtils::EndsWith(cmdout, L"-dirty\n");
 		}
 
 		if (dirty)
 		{
 			CString message;
 			message.Format(IDS_COMMITDLG_SUBMODULEDIRTY, (LPCTSTR)entry->GetGitPathString());
-			int result = CMessageBox::Show(m_hWnd, message, _T("TortoiseGit"), 1, IDI_QUESTION, CString(MAKEINTRESOURCE(IDS_PROGRS_CMD_COMMIT)), CString(MAKEINTRESOURCE(IDS_MSGBOX_IGNORE)), CString(MAKEINTRESOURCE(IDS_MSGBOX_CANCEL)));
+			int result = CMessageBox::Show(m_hWnd, message, L"TortoiseGit", 1, IDI_QUESTION, CString(MAKEINTRESOURCE(IDS_PROGRS_CMD_COMMIT)), CString(MAKEINTRESOURCE(IDS_MSGBOX_IGNORE)), CString(MAKEINTRESOURCE(IDS_MSGBOX_CANCEL)));
 			if (result == 1)
 			{
 				CString cmdCommit;
-				cmdCommit.Format(_T("/command:commit /path:\"%s\\%s\""), (LPCTSTR)g_Git.m_CurrentDir, entry->GetWinPath());
+				cmdCommit.Format(L"/command:commit /path:\"%s\\%s\"", (LPCTSTR)g_Git.m_CurrentDir, entry->GetWinPath());
 				CAppUtils::RunTortoiseGitProc(cmdCommit);
 				return;
 			}
@@ -691,8 +723,8 @@ void CCommitDlg::OnOK()
 	//and check if all versioned files are selected
 	int nchecked = 0;
 
-	CMassiveGitTask mgtReAddAfterCommit(_T("add --ignore-errors -f"));
-	CMassiveGitTask mgtReDelAfterCommit(_T("rm --cached --ignore-unmatch"));
+	CMassiveGitTask mgtReAddAfterCommit(L"add --ignore-errors -f");
+	CMassiveGitTask mgtReDelAfterCommit(L"rm --cached --ignore-unmatch");
 
 	CString cmd;
 	CString out;
@@ -721,45 +753,45 @@ void CCommitDlg::OnOK()
 			CAutoRepository repository(g_Git.GetGitRepository());
 			if (!repository)
 			{
-				CMessageBox::Show(m_hWnd, CGit::GetLibGit2LastErr(_T("Could not open repository.")), _T("TortoiseGit"), MB_OK | MB_ICONERROR);
+				CMessageBox::Show(GetSafeHwnd(), CGit::GetLibGit2LastErr(L"Could not open repository."), L"TortoiseGit", MB_OK | MB_ICONERROR);
 				break;
 			}
 
 			CGitHash revHash;
-			CString revRef = _T("HEAD");
+			CString revRef = L"HEAD";
 			if (m_bCommitAmend && !m_bAmendDiffToLastCommit)
-				revRef = _T("HEAD~1");
+				revRef = L"HEAD~1";
 			if (CGit::GetHash(repository, revHash, revRef))
 			{
-				MessageBox(g_Git.GetLibGit2LastErr(_T("Could not get HEAD hash after committing.")), _T("TortoiseGit"), MB_ICONERROR);
+				MessageBox(g_Git.GetLibGit2LastErr(L"Could not get HEAD hash after committing."), L"TortoiseGit", MB_ICONERROR);
 				break;
 			}
 
 			CAutoCommit commit;
 			if (!revHash.IsEmpty() && git_commit_lookup(commit.GetPointer(), repository, (const git_oid*)revHash.m_hash))
 			{
-				CMessageBox::Show(m_hWnd, CGit::GetLibGit2LastErr(_T("Could not get last commit.")), _T("TortoiseGit"), MB_OK | MB_ICONERROR);
+				CMessageBox::Show(GetSafeHwnd(), CGit::GetLibGit2LastErr(L"Could not get last commit."), L"TortoiseGit", MB_OK | MB_ICONERROR);
 				break;
 			}
 
 			CAutoTree tree;
 			if (!revHash.IsEmpty() && git_commit_tree(tree.GetPointer(), commit))
 			{
-				CMessageBox::Show(m_hWnd, CGit::GetLibGit2LastErr(_T("Could not read tree of commit.")), _T("TortoiseGit"), MB_OK | MB_ICONERROR);
+				CMessageBox::Show(GetSafeHwnd(), CGit::GetLibGit2LastErr(L"Could not read tree of commit."), L"TortoiseGit", MB_OK | MB_ICONERROR);
 				break;
 			}
 
 			CAutoIndex index;
 			if (git_repository_index(index.GetPointer(), repository))
 			{
-				CMessageBox::Show(m_hWnd, CGit::GetLibGit2LastErr(_T("Could not get the repository index.")), _T("TortoiseGit"), MB_OK | MB_ICONERROR);
+				CMessageBox::Show(GetSafeHwnd(), CGit::GetLibGit2LastErr(L"Could not get the repository index."), L"TortoiseGit", MB_OK | MB_ICONERROR);
 				break;
 			}
 
 			CAutoIndex indexOld;
 			if (!revHash.IsEmpty() && (git_index_new(indexOld.GetPointer()) || git_index_read_tree(indexOld, tree)))
 			{
-				CMessageBox::Show(m_hWnd, CGit::GetLibGit2LastErr(_T("Could not read the tree into the index.")), _T("TortoiseGit"), MB_OK | MB_ICONERROR);
+				CMessageBox::Show(GetSafeHwnd(), CGit::GetLibGit2LastErr(L"Could not read the tree into the index."), L"TortoiseGit", MB_OK | MB_ICONERROR);
 				break;
 			}
 
@@ -767,7 +799,7 @@ void CCommitDlg::OnOK()
 
 			for (int j = 0; j < nListItems; ++j)
 			{
-				CTGitPath *entry = (CTGitPath*)m_ListCtrl.GetItemData(j);
+				auto entry = m_ListCtrl.GetListEntry(j);
 
 				if (sysProgressDlg.IsVisible())
 				{
@@ -780,7 +812,7 @@ void CCommitDlg::OnOK()
 					}
 				}
 
-				CStringA filePathA = CUnicodeUtils::GetMulti(entry->GetGitPathString(), CP_UTF8).TrimRight(_T('/'));
+				CStringA filePathA = CUnicodeUtils::GetMulti(entry->GetGitPathString(), CP_UTF8).TrimRight(L'/');
 
 				if (entry->m_Checked && !m_bCommitMessageOnly)
 				{
@@ -791,7 +823,7 @@ void CCommitDlg::OnOK()
 						if (git_index_add_bypath(index, filePathA))
 						{
 							bAddSuccess = false;
-							CMessageBox::Show(m_hWnd, CGit::GetLibGit2LastErr(_T("Could not add \"") + entry->GetGitPathString() + _T("\" to index.")), _T("TortoiseGit"), MB_OK | MB_ICONERROR);
+							CMessageBox::Show(GetSafeHwnd(), CGit::GetLibGit2LastErr(L"Could not add \"" + entry->GetGitPathString() + L"\" to index."), L"TortoiseGit", MB_OK | MB_ICONERROR);
 							break;
 						}
 					}
@@ -814,7 +846,7 @@ void CCommitDlg::OnOK()
 							if ((oldIndexEntry = git_index_get_bypath(indexOld, CUnicodeUtils::GetUTF8(entry->GetGitOldPathString()), 0)) == nullptr || git_index_add(index, oldIndexEntry))
 							{
 								bAddSuccess = false;
-								CMessageBox::Show(m_hWnd, CGit::GetLibGit2LastErr(_T("Could not reset \"") + entry->GetGitOldPathString() + _T("\" to old index entry.")), _T("TortoiseGit"), MB_OK | MB_ICONERROR);
+								CMessageBox::Show(GetSafeHwnd(), CGit::GetLibGit2LastErr(L"Could not reset \"" + entry->GetGitOldPathString() + L"\" to old index entry."), L"TortoiseGit", MB_OK | MB_ICONERROR);
 								break;
 							}
 							mgtReDelAfterCommit.AddFile(entry->GetGitOldPathString());
@@ -826,7 +858,7 @@ void CCommitDlg::OnOK()
 						if ((oldIndexEntry = git_index_get_bypath(indexOld, filePathA, 0)) == nullptr || git_index_add(index, oldIndexEntry))
 						{
 							bAddSuccess = false;
-							CMessageBox::Show(m_hWnd, CGit::GetLibGit2LastErr(_T("Could not reset \"") + entry->GetGitPathString() + _T("\" to old index entry.")), _T("TortoiseGit"), MB_OK | MB_ICONERROR);
+							CMessageBox::Show(GetSafeHwnd(), CGit::GetLibGit2LastErr(L"Could not reset \"" + entry->GetGitPathString() + L"\" to old index entry."), L"TortoiseGit", MB_OK | MB_ICONERROR);
 							break;
 						}
 						if (entry->m_Action & CTGitPath::LOGACTIONS_DELETED && !(entry->m_Action & CTGitPath::LOGACTIONS_MISSING))
@@ -844,7 +876,7 @@ void CCommitDlg::OnOK()
 				bAddSuccess = false;
 
 			for (int j = 0; bAddSuccess && j < nListItems; ++j)
-				CShellUpdater::Instance().AddPathForUpdate(*(CTGitPath*)m_ListCtrl.GetItemData(j));
+				CShellUpdater::Instance().AddPathForUpdate(*m_ListCtrl.GetListEntry(j));
 		} while (0);
 	}
 	else
@@ -852,22 +884,22 @@ void CCommitDlg::OnOK()
 		// ***************************************************
 		// ATTENTION: Similar code in RebaseDlg.cpp!!!
 		// ***************************************************
-		CMassiveGitTask mgtAdd(_T("add -f"));
-		CMassiveGitTask mgtUpdateIndexForceRemove(_T("update-index --force-remove"));
-		CMassiveGitTask mgtUpdateIndex(_T("update-index"));
-		CMassiveGitTask mgtRm(_T("rm --ignore-unmatch"));
-		CMassiveGitTask mgtRmFCache(_T("rm -f --cache"));
-		CString resetCmd = _T("reset");
+		CMassiveGitTask mgtAdd(L"add -f");
+		CMassiveGitTask mgtUpdateIndexForceRemove(L"update-index --force-remove");
+		CMassiveGitTask mgtUpdateIndex(L"update-index");
+		CMassiveGitTask mgtRm(L"rm --ignore-unmatch");
+		CMassiveGitTask mgtRmFCache(L"rm -f --cache");
+		CString resetCmd = L"reset";
 		if (m_bCommitAmend && !m_bAmendDiffToLastCommit)
-			resetCmd += _T(" HEAD~1");;
+			resetCmd += L" HEAD~1";;
 		CMassiveGitTask mgtReset(resetCmd, TRUE, true);
 		for (int j = 0; j < nListItems; ++j)
 		{
-			CTGitPath *entry = (CTGitPath*)m_ListCtrl.GetItemData(j);
+			auto entry = m_ListCtrl.GetListEntry(j);
 
 			if (entry->m_Checked && !m_bCommitMessageOnly)
 			{
-				if (entry->m_Action & CTGitPath::LOGACTIONS_UNVER)
+				if ((entry->m_Action & CTGitPath::LOGACTIONS_UNVER) || (entry->IsDirectory() && !(entry->m_Action & CTGitPath::LOGACTIONS_DELETED)))
 					mgtAdd.AddFile(entry->GetGitPathString());
 				else if (entry->m_Action & CTGitPath::LOGACTIONS_DELETED)
 					mgtUpdateIndexForceRemove.AddFile(entry->GetGitPathString());
@@ -918,7 +950,7 @@ void CCommitDlg::OnOK()
 			bAddSuccess = false;
 
 		for (int j = 0; bAddSuccess && j < nListItems; ++j)
-			CShellUpdater::Instance().AddPathForUpdate(*(CTGitPath*)m_ListCtrl.GetItemData(j));
+			CShellUpdater::Instance().AddPathForUpdate(*m_ListCtrl.GetListEntry(j));
 	}
 
 	if (sysProgressDlg.HasUserCancelled())
@@ -928,14 +960,14 @@ void CCommitDlg::OnOK()
 
 	if (bAddSuccess && m_bCreateNewBranch)
 	{
-		if (g_Git.Run(_T("git.exe branch ") + m_sCreateNewBranch, &out, CP_UTF8))
+		if (g_Git.Run(L"git.exe branch " + m_sCreateNewBranch, &out, CP_UTF8))
 		{
-			MessageBox(_T("Creating new branch failed:\n") + out, _T("TortoiseGit"), MB_OK | MB_ICONERROR);
+			MessageBox(L"Creating new branch failed:\n" + out, L"TortoiseGit", MB_OK | MB_ICONERROR);
 			bAddSuccess = false;
 		}
-		if (g_Git.Run(_T("git.exe checkout ") + m_sCreateNewBranch + _T(" --"), &out, CP_UTF8))
+		if (g_Git.Run(L"git.exe checkout " + m_sCreateNewBranch + L" --", &out, CP_UTF8))
 		{
-			MessageBox(_T("Switching to new branch failed:\n") + out, _T("TortoiseGit"), MB_OK | MB_ICONERROR);
+			MessageBox(L"Switching to new branch failed:\n" + out, L"TortoiseGit", MB_OK | MB_ICONERROR);
 			bAddSuccess = false;
 		}
 	}
@@ -948,18 +980,18 @@ void CCommitDlg::OnOK()
 	sExistingBugID.Trim();
 	if (!m_sBugID.IsEmpty() && m_sBugID.Compare(sExistingBugID))
 	{
-		m_sBugID.Replace(_T(", "), _T(","));
-		m_sBugID.Replace(_T(" ,"), _T(","));
+		m_sBugID.Replace(L", ", L",");
+		m_sBugID.Replace(L" ,", L",");
 		CString sBugID = m_ProjectProperties.sMessage;
-		sBugID.Replace(_T("%BUGID%"), m_sBugID);
+		sBugID.Replace(L"%BUGID%", m_sBugID);
 		if (m_ProjectProperties.bAppend)
-			m_sLogMessage += _T("\n") + sBugID + _T("\n");
+			m_sLogMessage += L'\n' + sBugID + L'\n';
 		else
-			m_sLogMessage = sBugID + _T("\n") + m_sLogMessage;
+			m_sLogMessage = sBugID + L'\n' + m_sLogMessage;
 	}
 
 	// now let the bugtraq plugin check the commit message
-	CComPtr<IBugTraqProvider2> pProvider2 = NULL;
+	CComPtr<IBugTraqProvider2> pProvider2;
 	if (m_BugTraqProvider)
 	{
 		HRESULT hr = m_BugTraqProvider.QueryInterface(&pProvider2);
@@ -979,15 +1011,15 @@ void CCommitDlg::OnOK()
 			{
 				COMError ce(hr);
 				CString sErr;
-				sErr.Format(IDS_ERR_FAILEDISSUETRACKERCOM, (LPCTSTR)m_bugtraq_association.GetProviderName(), ce.GetMessageAndDescription().c_str());
-				CMessageBox::Show(m_hWnd, sErr, _T("TortoiseGit"), MB_ICONERROR);
+				sErr.FormatMessage(IDS_ERR_FAILEDISSUETRACKERCOM, (LPCTSTR)m_bugtraq_association.GetProviderName(), ce.GetMessageAndDescription().c_str());
+				CMessageBox::Show(GetSafeHwnd(), sErr, L"TortoiseGit", MB_ICONERROR);
 			}
 			else
 			{
 				CString sError = temp;
 				if (!sError.IsEmpty())
 				{
-					CMessageBox::Show(m_hWnd, sError, _T("TortoiseGit"), MB_ICONERROR);
+					CMessageBox::Show(GetSafeHwnd(), sError, L"TortoiseGit", MB_ICONERROR);
 					InterlockedExchange(&m_bBlock, FALSE);
 					return;
 				}
@@ -1003,7 +1035,7 @@ void CCommitDlg::OnOK()
 
 		if (CAppUtils::SaveCommitUnicodeFile(tempfile, m_sLogMessage))
 		{
-			CMessageBox::Show(nullptr, _T("Could not save commit message"), _T("TortoiseGit"), MB_OK | MB_ICONERROR);
+			CMessageBox::Show(GetSafeHwnd(), L"Could not save commit message", L"TortoiseGit", MB_OK | MB_ICONERROR);
 			InterlockedExchange(&m_bBlock, FALSE);
 			return;
 		}
@@ -1012,12 +1044,11 @@ void CCommitDlg::OnOK()
 
 		BOOL IsGitSVN = path.GetAdminDirMask() & ITEMIS_GITSVN;
 
-		out =_T("");
+		out.Empty();
 		CString amend;
 		if(this->m_bCommitAmend)
-		{
-			amend=_T("--amend");
-		}
+			amend = L"--amend";
+
 		CString dateTime;
 		if (m_bSetCommitDateTime)
 		{
@@ -1025,16 +1056,16 @@ void CCommitDlg::OnOK()
 			m_CommitDate.GetTime(date);
 			m_CommitTime.GetTime(time);
 			if (m_bCommitAmend && m_AsCommitDateCtrl.GetCheck())
-				dateTime = CAppUtils::GetMsysgitVersion() > 0x02010000 ? L"--date=\"now\"" : L"--date=\"\"" ;
+				dateTime = L"--date=\"now\"";
 			else
-				dateTime.Format(_T("--date=%sT%s"), (LPCTSTR)date.Format(_T("%Y-%m-%d")), (LPCTSTR)time.Format(_T("%H:%M:%S")));
+				dateTime.Format(L"--date=%sT%s", (LPCTSTR)date.Format(L"%Y-%m-%d"), (LPCTSTR)time.Format(L"%H:%M:%S"));
 		}
 		CString author;
 		if (m_bSetAuthor)
-			author.Format(_T("--author=\"%s\""), (LPCTSTR)m_sAuthor);
-		CString allowEmpty = m_bCommitMessageOnly ? _T("--allow-empty") : _T("");
+			author.Format(L"--author=\"%s\"", (LPCTSTR)m_sAuthor);
+		CString allowEmpty = m_bCommitMessageOnly ? L"--allow-empty" : L"";
 		// TODO: make sure notes.amend.rewrite does still work when switching to libgit2
-		cmd.Format(_T("git.exe commit %s %s %s %s -F \"%s\""), (LPCTSTR)author, (LPCTSTR)dateTime, (LPCTSTR)amend, (LPCTSTR)allowEmpty, (LPCTSTR)tempfile);
+		cmd.Format(L"git.exe commit %s %s %s %s -F \"%s\"", (LPCTSTR)author, (LPCTSTR)dateTime, (LPCTSTR)amend, (LPCTSTR)allowEmpty, (LPCTSTR)tempfile);
 
 		CCommitProgressDlg progress;
 		progress.m_bBufferAll=true; // improve show speed when there are many file added.
@@ -1061,9 +1092,75 @@ void CCommitDlg::OnOK()
 		m_PostCmd = GIT_POSTCOMMIT_CMD_NOTHING;
 		progress.DoModal();
 
-		m_regLastAction = (int)m_ctrlOkButton.GetCurrentEntry();
+		if (!m_bNoPostActions)
+			m_regLastAction = (int)m_ctrlOkButton.GetCurrentEntry();
 		if (m_ctrlOkButton.GetCurrentEntry() == 1)
 			m_PostCmd = GIT_POSTCOMMIT_CMD_RECOMMIT;
+
+		::DeleteFile(tempfile);
+
+		if (m_BugTraqProvider && progress.m_GitStatus == 0)
+		{
+			CComPtr<IBugTraqProvider2> pProvider;
+			HRESULT hr = m_BugTraqProvider.QueryInterface(&pProvider);
+			if (SUCCEEDED(hr))
+			{
+				ATL::CComBSTR commonRoot(g_Git.m_CurrentDir);
+				CBstrSafeVector pathList(m_selectedPathList.GetCount());
+
+				for (LONG index = 0; index < m_selectedPathList.GetCount(); ++index)
+					pathList.PutElement(index, m_selectedPathList[index].GetGitPathString());
+
+				ATL::CComBSTR logMessage(m_sLogMessage);
+
+				CGitHash hash;
+				if (g_Git.GetHash(hash, L"HEAD"))
+					MessageBox(g_Git.GetGitLastErr(L"Could not get HEAD hash after committing."), L"TortoiseGit", MB_ICONERROR);
+				LONG version = g_Git.Hash2int(hash);
+
+				ATL::CComBSTR temp;
+				if (FAILED(hr = pProvider->OnCommitFinished(GetSafeHwnd(),
+					commonRoot,
+					pathList,
+					logMessage,
+					(LONG)version,
+					&temp)))
+				{
+					CString sErr = temp;
+					if (!sErr.IsEmpty())
+						CMessageBox::Show(GetSafeHwnd(), sErr, L"TortoiseGit", MB_OK | MB_ICONERROR);
+					else
+					{
+						COMError ce(hr);
+						sErr.FormatMessage(IDS_ERR_FAILEDISSUETRACKERCOM, ce.GetSource().c_str(), ce.GetMessageAndDescription().c_str());
+						CMessageBox::Show(GetSafeHwnd(), sErr, L"TortoiseGit", MB_OK | MB_ICONERROR);
+					}
+				}
+			}
+		}
+		RestoreFiles(progress.m_GitStatus == 0, false);
+		if (((DWORD)CRegStdDWORD(L"Software\\TortoiseGit\\ReaddUnselectedAddedFilesAfterCommit", TRUE)) == TRUE)
+		{
+			BOOL cancel = FALSE;
+			mgtReAddAfterCommit.Execute(cancel);
+			mgtReDelAfterCommit.Execute(cancel);
+		}
+
+		if (!progress.m_GitStatus)
+		{
+			DWORD exitcode = 0xFFFFFFFF;
+			CString error;
+			if (CHooks::Instance().PostCommit(g_Git.m_CurrentDir, amend.IsEmpty(), exitcode, error))
+			{
+				if (exitcode)
+				{
+					CString temp;
+					temp.Format(IDS_ERR_HOOKFAILED, (LPCTSTR)error);
+					MessageBox(temp, L"TortoiseGit", MB_ICONERROR);
+					bCloseCommitDlg = false;
+				}
+			}
+		}
 
 		if (progress.m_GitStatus || m_PostCmd == GIT_POSTCOMMIT_CMD_RECOMMIT)
 		{
@@ -1079,7 +1176,6 @@ void CCommitDlg::OnOK()
 
 				this->m_sLogMessage.Empty();
 				GetCommitTemplate(m_sLogMessage);
-				RunStartCommitHook();
 				m_cLogMessage.SetText(m_sLogMessage);
 				if (m_bCreateNewBranch)
 				{
@@ -1087,64 +1183,26 @@ void CCommitDlg::OnOK()
 					GetDlgItem(IDC_NEWBRANCH)->ShowWindow(SW_HIDE);
 				}
 				m_bCreateNewBranch = FALSE;
+				m_ListCtrl.Clear();
+				if (!RunStartCommitHook())
+					bCloseCommitDlg = true;
 			}
 
 			if (!progress.m_GitStatus)
 			{
 				m_AmendStr.Empty();
 				m_bCommitAmend = FALSE;
+				GetDlgItem(IDC_COMMIT_AMENDDIFF)->ShowWindow(SW_HIDE);
+				m_bSetCommitDateTime = FALSE;
+				m_AsCommitDateCtrl.ShowWindow(SW_HIDE);
+				m_AsCommitDateCtrl.SetCheck(FALSE);
+				GetDlgItem(IDC_COMMIT_DATEPICKER)->ShowWindow(SW_HIDE);
+				GetDlgItem(IDC_COMMIT_TIMEPICKER)->ShowWindow(SW_HIDE);
+				m_bSetAuthor = FALSE;
+				GetDlgItem(IDC_COMMIT_AUTHORDATA)->ShowWindow(SW_HIDE);
 			}
 
 			UpdateData(FALSE);
-		}
-
-		::DeleteFile(tempfile);
-
-		if (m_BugTraqProvider && progress.m_GitStatus == 0)
-		{
-			CComPtr<IBugTraqProvider2> pProvider = NULL;
-			HRESULT hr = m_BugTraqProvider.QueryInterface(&pProvider);
-			if (SUCCEEDED(hr))
-			{
-				ATL::CComBSTR commonRoot(g_Git.m_CurrentDir);
-				CBstrSafeVector pathList(m_selectedPathList.GetCount());
-
-				for (LONG index = 0; index < m_selectedPathList.GetCount(); ++index)
-					pathList.PutElement(index, m_selectedPathList[index].GetGitPathString());
-
-				ATL::CComBSTR logMessage(m_sLogMessage);
-
-				CGitHash hash;
-				if (g_Git.GetHash(hash, _T("HEAD")))
-					MessageBox(g_Git.GetGitLastErr(_T("Could not get HEAD hash after committing.")), _T("TortoiseGit"), MB_ICONERROR);
-				LONG version = g_Git.Hash2int(hash);
-
-				ATL::CComBSTR temp;
-				if (FAILED(hr = pProvider->OnCommitFinished(GetSafeHwnd(),
-					commonRoot,
-					pathList,
-					logMessage,
-					(LONG)version,
-					&temp)))
-				{
-					CString sErr = temp;
-					if (!sErr.IsEmpty())
-						CMessageBox::Show(NULL,(sErr),_T("TortoiseGit"),MB_OK|MB_ICONERROR);
-					else
-					{
-						COMError ce(hr);
-						sErr.Format(IDS_ERR_FAILEDISSUETRACKERCOM, ce.GetSource().c_str(), ce.GetMessageAndDescription().c_str());
-						CMessageBox::Show(NULL,(sErr),_T("TortoiseGit"),MB_OK|MB_ICONERROR);
-					}
-				}
-			}
-		}
-		RestoreFiles(progress.m_GitStatus == 0, false);
-		if (((DWORD)CRegStdDWORD(_T("Software\\TortoiseGit\\ReaddUnselectedAddedFilesAfterCommit"), TRUE)) == TRUE)
-		{
-			BOOL cancel = FALSE;
-			mgtReAddAfterCommit.Execute(cancel);
-			mgtReDelAfterCommit.Execute(cancel);
 		}
 	}
 	else if(bAddSuccess)
@@ -1173,11 +1231,12 @@ void CCommitDlg::OnOK()
 	if (bCloseCommitDlg)
 	{
 		if (m_ctrlOkButton.GetCurrentEntry() == 2)
-			DoPush();
+			DoPush(GetSafeHwnd());
 		CResizableStandAloneDialog::OnOK();
 	}
 	else if (m_PostCmd == GIT_POSTCOMMIT_CMD_RECOMMIT)
 	{
+		m_bDoNotStoreLastSelectedLine = true;
 		this->Refresh();
 		this->BringWindowToTop();
 	}
@@ -1189,7 +1248,7 @@ void CCommitDlg::SaveSplitterPos()
 {
 	if (!IsIconic())
 	{
-		CRegDWORD regPos(_T("Software\\TortoiseGit\\TortoiseProc\\ResizableState\\CommitDlgSizer"));
+		CRegDWORD regPos(L"Software\\TortoiseGit\\TortoiseProc\\ResizableState\\CommitDlgSizer");
 		RECT rectSplitter;
 		m_wndSplitter.GetWindowRect(&rectSplitter);
 		ScreenToClient(&rectSplitter);
@@ -1205,9 +1264,9 @@ UINT CCommitDlg::StatusThreadEntry(LPVOID pVoid)
 void CCommitDlg::ReloadHistoryEntries()
 {
 	CString reg;
-	reg.Format(_T("Software\\TortoiseGit\\History\\commit%s"), (LPCTSTR)m_ListCtrl.m_sUUID);
-	reg.Replace(_T(':'), _T('_'));
-	m_History.Load(reg, _T("logmsgs"));
+	reg.Format(L"Software\\TortoiseGit\\History\\commit%s", (LPCTSTR)m_ListCtrl.m_sUUID);
+	reg.Replace(L':', L'_');
+	m_History.Load(reg, L"logmsgs");
 }
 
 UINT CCommitDlg::StatusThread()
@@ -1216,9 +1275,6 @@ UINT CCommitDlg::StatusThread()
 	//and show the ones which have to be committed to the user
 	//in a list control.
 	m_pathwatcher.Stop();
-
-	m_ListCtrl.SetBusy(true);
-	g_Git.RefreshGitIndex();
 
 	m_bCancelled = false;
 
@@ -1243,15 +1299,19 @@ UINT CCommitDlg::StatusThread()
 	DialogEnableWindow(IDC_CHECKFILES, false);
 	DialogEnableWindow(IDC_CHECKSUBMODULES, false);
 
+	g_Git.RefreshGitIndex();
+
 	CString dotGitPath;
-	GitAdminDir::GetAdminDirPath(g_Git.m_CurrentDir, dotGitPath);
-	if (PathFileExists(dotGitPath + _T("CHERRY_PICK_HEAD")))
+	GitAdminDir::GetWorktreeAdminDirPath(g_Git.m_CurrentDir, dotGitPath);
+	if (PathFileExists(dotGitPath + L"CHERRY_PICK_HEAD"))
 	{
 		GetDlgItem(IDC_COMMIT_AMENDDIFF)->ShowWindow(SW_HIDE);
 		m_bCommitAmend = FALSE;
 		SendMessage(WM_UPDATEDATAFALSE);
 	}
 
+	if (!m_bDoNotStoreLastSelectedLine)
+		m_ListCtrl.StoreScrollPos();
 	// Initialise the list control with the status of the files/folders below us
 	m_ListCtrl.Clear();
 	BOOL success;
@@ -1260,7 +1320,7 @@ UINT CCommitDlg::StatusThread()
 	m_ListCtrl.m_bDoNotAutoselectSubmodules = (m_bDoNotAutoselectSubmodules == TRUE);
 
 	if(m_bWholeProject || m_bWholeProject2)
-		pList=NULL;
+		pList = nullptr;
 	else
 		pList = &m_pathList;
 
@@ -1272,18 +1332,17 @@ UINT CCommitDlg::StatusThread()
 
 	m_ListCtrl.CheckIfChangelistsArePresent(false);
 
-	DWORD dwShow = GITSLC_SHOWVERSIONEDBUTNORMALANDEXTERNALSFROMDIFFERENTREPOS | GITSLC_SHOWLOCKS | GITSLC_SHOWINCHANGELIST | GITSLC_SHOWDIRECTFILES;
+	DWORD dwShow = GITSLC_SHOWVERSIONEDBUTNORMALANDEXTERNALSFROMDIFFERENTREPOS | GITSLC_SHOWINCHANGELIST | GITSLC_SHOWDIRECTFILES;
 	dwShow |= DWORD(m_regAddBeforeCommit) ? GITSLC_SHOWUNVERSIONED : 0;
 	if (success)
 	{
-		if (!m_checkedPathList.IsEmpty())
+		/*if (!m_checkedPathList.IsEmpty())
 			m_ListCtrl.Show(dwShow, m_checkedPathList);
-		else
+		else*/
 		{
 			DWORD dwCheck = m_bSelectFilesForCommit ? dwShow : 0;
 			dwCheck &=~(CTGitPath::LOGACTIONS_UNVER); //don't check unversion file default.
 			m_ListCtrl.Show(dwShow, dwCheck);
-			m_bSelectFilesForCommit = true;
 		}
 
 		if (m_ListCtrl.HasExternalsFromDifferentRepos())
@@ -1294,7 +1353,7 @@ UINT CCommitDlg::StatusThread()
 
 		SetDlgItemText(IDC_COMMIT_TO, g_Git.GetCurrentBranch());
 		m_tooltips.AddTool(GetDlgItem(IDC_STATISTICS), m_ListCtrl.GetStatisticsString());
-		if (m_ListCtrl.GetItemCount() != 0)
+		if (m_ListCtrl.GetItemCount() != 0 && m_ListCtrl.GetTopIndex() == 0 && (m_bDoNotStoreLastSelectedLine || CRegDWORD(L"Software\\TortoiseGit\\RememberFileListPosition", TRUE) != TRUE))
 			m_ListCtrl.SetItemState(0, LVIS_SELECTED, LVIS_SELECTED);
 	}
 	if (!success)
@@ -1303,17 +1362,18 @@ UINT CCommitDlg::StatusThread()
 			m_ListCtrl.SetEmptyString(m_ListCtrl.GetLastErrorMessage());
 		m_ListCtrl.Show(dwShow);
 	}
+	m_bDoNotStoreLastSelectedLine = false;
 
 	if ((m_ListCtrl.GetItemCount()==0)&&(m_ListCtrl.HasUnversionedItems())
-		 && !PathFileExists(dotGitPath + _T("MERGE_HEAD")))
+		 && !PathFileExists(dotGitPath + L"MERGE_HEAD"))
 	{
 		CString temp;
 		temp.LoadString(IDS_COMMITDLG_NOTHINGTOCOMMITUNVERSIONED);
-		if (CMessageBox::ShowCheck(m_hWnd, temp, _T("TortoiseGit"), MB_ICONINFORMATION | MB_YESNO, _T("NothingToCommitShowUnversioned"), NULL)==IDYES)
+		if (CMessageBox::ShowCheck(GetSafeHwnd(), temp, L"TortoiseGit", MB_ICONINFORMATION | MB_YESNO, L"NothingToCommitShowUnversioned", nullptr) == IDYES)
 		{
 			m_bShowUnversioned = TRUE;
 			GetDlgItem(IDC_SHOWUNVERSIONED)->SendMessage(BM_SETCHECK, BST_CHECKED);
-			dwShow = (DWORD)(GITSLC_SHOWVERSIONEDBUTNORMALANDEXTERNALSFROMDIFFERENTREPOS | GITSLC_SHOWUNVERSIONED | GITSLC_SHOWLOCKS);
+			dwShow = (DWORD)(GITSLC_SHOWVERSIONEDBUTNORMALANDEXTERNALSFROMDIFFERENTREPOS | GITSLC_SHOWUNVERSIONED);
 			m_ListCtrl.UpdateFileList(CGitStatusListCtrl::FILELIST_UNVER);
 			m_ListCtrl.Show(dwShow,dwShow&(~CTGitPath::LOGACTIONS_UNVER));
 		}
@@ -1321,18 +1381,19 @@ UINT CCommitDlg::StatusThread()
 
 	SetDlgTitle();
 
-	m_autolist.clear();
 	// we don't have to block the commit dialog while we fetch the
 	// auto completion list.
 	m_pathwatcher.ClearChangedPaths();
 	InterlockedExchange(&m_bBlock, FALSE);
-	if ((DWORD)CRegDWORD(_T("Software\\TortoiseGit\\Autocompletion"), TRUE)==TRUE)
+	std::map<CString, int> autolist;
+	if ((DWORD)CRegDWORD(L"Software\\TortoiseGit\\Autocompletion", TRUE) == TRUE)
 	{
-		m_ListCtrl.Block(TRUE, TRUE);
-		GetAutocompletionList();
-		m_ListCtrl.Block(FALSE, FALSE);
+		m_ListCtrl.BusyCursor(true);
+		GetAutocompletionList(autolist);
+		m_ListCtrl.BusyCursor(false);
 	}
 	SendMessage(WM_UPDATEOKBUTTON);
+	m_ListCtrl.Invalidate();
 	if (m_bRunThread)
 	{
 		DialogEnableWindow(IDC_SHOWUNVERSIONED, true);
@@ -1355,18 +1416,18 @@ UINT CCommitDlg::StatusThread()
 				SendMessage(WM_UPDATEDATAFALSE);
 			}
 			else
-				GetDlgItem(IDC_COMMIT_AMEND)->EnableWindow(!PathFileExists(dotGitPath + _T("CHERRY_PICK_HEAD")));
+				GetDlgItem(IDC_COMMIT_AMEND)->EnableWindow(!PathFileExists(dotGitPath + L"CHERRY_PICK_HEAD"));
 
 			CGitHash hash;
-			if (g_Git.GetHash(hash, _T("HEAD")))
+			if (g_Git.GetHash(hash, L"HEAD"))
 			{
-				MessageBox(g_Git.GetGitLastErr(_T("Could not get HEAD hash.")), _T("TortoiseGit"), MB_ICONERROR);
+				MessageBox(g_Git.GetGitLastErr(L"Could not get HEAD hash."), L"TortoiseGit", MB_ICONERROR);
 			}
 			if (!hash.IsEmpty())
 			{
 				GitRev headRevision;
 				if (headRevision.GetParentFromHash(hash))
-					MessageBox(headRevision.GetLastErr(), _T("TortoiseGit"), MB_ICONERROR);
+					MessageBox(headRevision.GetLastErr(), L"TortoiseGit", MB_ICONERROR);
 				// do not allow to show diff to "last" revision if it has more that one parent
 				if (headRevision.ParentsCount() != 1)
 				{
@@ -1381,7 +1442,7 @@ UINT CCommitDlg::StatusThread()
 		UpdateCheckLinks();
 
 		// we have the list, now signal the main thread about it
-		SendMessage(WM_AUTOLISTREADY);	// only send the message if the thread wasn't told to quit!
+		SendMessage(WM_AUTOLISTREADY, 0, (LPARAM)&autolist);	// only send the message if the thread wasn't told to quit!
 	}
 
 	InterlockedExchange(&m_bRunThread, FALSE);
@@ -1410,6 +1471,38 @@ void CCommitDlg::SetDlgTitle()
 
 void CCommitDlg::OnCancel()
 {
+	UpdateData();
+	m_sBugID.Trim();
+	m_sLogMessage = m_cLogMessage.GetText();
+	if (!m_sBugID.IsEmpty())
+	{
+		m_sBugID.Replace(L", ", L",");
+		m_sBugID.Replace(L" ,", L",");
+		CString sBugID = m_ProjectProperties.sMessage;
+		sBugID.Replace(L"%BUGID%", m_sBugID);
+		if (m_ProjectProperties.bAppend)
+			m_sLogMessage += L'\n' + sBugID + L'\n';
+		else
+			m_sLogMessage = sBugID + L'\n' + m_sLogMessage;
+	}
+
+	bool hasChangedMessage = (m_sLogTemplate.Compare(m_sLogMessage) != 0) && !m_sLogMessage.IsEmpty();
+
+	CString tmp;
+	tmp.LoadString(IDS_REALLYCANCEL);
+	tmp.AppendChar(L'\n');
+	tmp.AppendChar(L'\n');
+	tmp.Append(CString(MAKEINTRESOURCE(IDS_HINTLASTMESSAGES)));
+	CString dontaskagain;
+	dontaskagain.LoadString(IDS_MSGBOX_DONOTSHOWAGAIN);
+	BOOL dontaskagainchecked = FALSE;
+	if ((hasChangedMessage || m_ListCtrl.GetItemCount() > 0) && CMessageBox::ShowCheck(GetSafeHwnd(), tmp, L"TortoiseGit", MB_ICONQUESTION | MB_DEFBUTTON2 | MB_YESNO, L"CommitAskBeforeCancel", dontaskagain, &dontaskagainchecked) == IDNO)
+	{
+		if (dontaskagainchecked)
+			CMessageBox::SetRegistryValue(L"CommitAskBeforeCancel", IDYES);
+		return;
+	}
+
 	m_bCancelled = true;
 	m_pathwatcher.Stop();
 
@@ -1417,21 +1510,7 @@ void CCommitDlg::OnCancel()
 		StopStatusThread();
 	if (!RestoreFiles())
 		return;
-	UpdateData();
-	m_sBugID.Trim();
-	m_sLogMessage = m_cLogMessage.GetText();
-	if (!m_sBugID.IsEmpty())
-	{
-		m_sBugID.Replace(_T(", "), _T(","));
-		m_sBugID.Replace(_T(" ,"), _T(","));
-		CString sBugID = m_ProjectProperties.sMessage;
-		sBugID.Replace(_T("%BUGID%"), m_sBugID);
-		if (m_ProjectProperties.bAppend)
-			m_sLogMessage += _T("\n") + sBugID + _T("\n");
-		else
-			m_sLogMessage = sBugID + _T("\n") + m_sLogMessage;
-	}
-	if ((m_sLogTemplate.Compare(m_sLogMessage) != 0) && !m_sLogMessage.IsEmpty())
+	if (hasChangedMessage)
 	{
 		ReloadHistoryEntries();
 		m_History.AddEntry(m_sLogMessage);
@@ -1468,9 +1547,7 @@ BOOL CCommitDlg::PreTranslateMessage(MSG* pMsg)
 				if (GetAsyncKeyState(VK_CONTROL)&0x8000)
 				{
 					if ( GetDlgItem(IDOK)->IsWindowEnabled() )
-					{
 						PostMessage(WM_COMMAND, IDOK);
-					}
 					return TRUE;
 				}
 				if ( GetFocus()==GetDlgItem(IDC_BUGID) )
@@ -1520,13 +1597,13 @@ void CCommitDlg::StartStatusThread()
 void CCommitDlg::StopStatusThread()
 {
 	InterlockedExchange(&m_bRunThread, FALSE);
-	WaitForSingleObject(m_pThread->m_hThread, 1000);
+	WaitForSingleObject(m_pThread->m_hThread, 5000);
 	if (!m_bThreadRunning)
 		return;
 
 	// we gave the thread a chance to quit. Since the thread didn't
 	// listen to us we have to kill it.
-	TerminateThread(m_pThread->m_hThread, (DWORD)-1);
+	g_Git.KillRelatedThreads(m_pThread);
 	InterlockedExchange(&m_bThreadRunning, FALSE);
 }
 
@@ -1545,10 +1622,11 @@ void CCommitDlg::OnBnClickedShowunversioned()
 		if(dwShow & GITSLC_SHOWUNVERSIONED)
 		{
 			if (m_bWholeProject || m_bWholeProject2)
-				m_ListCtrl.GetStatus(NULL,false,false,true);
+				m_ListCtrl.GetStatus(nullptr, false, false, true);
 			else
 				m_ListCtrl.GetStatus(&this->m_pathList,false,false,true);
 		}
+		m_ListCtrl.StoreScrollPos();
 		m_ListCtrl.Show(dwShow, 0, true, dwShow & ~(CTGitPath::LOGACTIONS_UNVER), true);
 		UpdateCheckLinks();
 	}
@@ -1572,7 +1650,7 @@ LRESULT CCommitDlg::OnGitStatusListCtrlItemCountChanged(WPARAM, LPARAM)
 		if (CMessageBox::Show(*this, IDS_COMMITDLG_NOTHINGTOCOMMITUNVERSIONED, IDS_APPNAME, MB_ICONINFORMATION | MB_YESNO)==IDYES)
 		{
 			m_bShowUnversioned = TRUE;
-			DWORD dwShow = GitSLC_SHOWVERSIONEDBUTNORMALANDEXTERNALSFROMDIFFERENTREPOS | GitSLC_SHOWUNVERSIONED | GitSLC_SHOWLOCKS;
+			DWORD dwShow = GitSLC_SHOWVERSIONEDBUTNORMALANDEXTERNALSFROMDIFFERENTREPOS | GitSLC_SHOWUNVERSIONED;
 			m_ListCtrl.Show(dwShow);
 			UpdateData(FALSE);
 		}
@@ -1587,9 +1665,8 @@ LRESULT CCommitDlg::OnGitStatusListCtrlNeedsRefresh(WPARAM, LPARAM)
 	return 0;
 }
 
-LRESULT CCommitDlg::OnFileDropped(WPARAM, LPARAM /*lParam*/)
+LRESULT CCommitDlg::OnFileDropped(WPARAM, LPARAM lParam)
 {
-#if 0
 	BringWindowToTop();
 	SetForegroundWindow();
 	SetActiveWindow();
@@ -1605,11 +1682,17 @@ LRESULT CCommitDlg::OnFileDropped(WPARAM, LPARAM /*lParam*/)
 	CTGitPath path;
 	path.SetFromWin((LPCTSTR)lParam);
 
+	// check whether the dropped file belongs to the very same repository
+	CString projectDir;
+	if (!path.HasAdminDir(&projectDir) || !CPathUtils::ArePathStringsEqual(g_Git.m_CurrentDir, projectDir))
+		return 0;
+
 	// just add all the items we get here.
 	// if the item is versioned, the add will fail but nothing
 	// more will happen.
-	Git Git;
-	Git.Add(CTGitPathList(path), &m_ProjectProperties, Git_depth_empty, false, true, true);
+	CString cmd;
+	cmd.Format(L"git.exe add -- \"%s\"", (LPCTSTR)path.GetWinPathString());
+	g_Git.Run(cmd, nullptr, CP_UTF8);
 
 	if (!m_ListCtrl.HasPath(path))
 	{
@@ -1617,8 +1700,6 @@ LRESULT CCommitDlg::OnFileDropped(WPARAM, LPARAM /*lParam*/)
 		{
 			m_pathList.AddPath(path);
 			m_pathList.RemoveDuplicates();
-			m_updatedPathList.AddPath(path);
-			m_updatedPathList.RemoveDuplicates();
 		}
 		else
 		{
@@ -1639,22 +1720,20 @@ LRESULT CCommitDlg::OnFileDropped(WPARAM, LPARAM /*lParam*/)
 			{
 				m_pathList.AddPath(path);
 				m_pathList.RemoveDuplicates();
-				m_updatedPathList.AddPath(path);
-				m_updatedPathList.RemoveDuplicates();
 			}
 		}
 	}
+	m_ListCtrl.ResetChecked(path);
 
 	// Always start the timer, since the status of an existing item might have changed
-	SetTimer(REFRESHTIMER, 200, NULL);
-	CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": Item %s dropped, timer started\n"), path.GetWinPath());
-#endif
+	SetTimer(REFRESHTIMER, 200, nullptr);
+	CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) L": Item %s dropped, timer started\n", path.GetWinPath());
 	return 0;
 }
 
-LRESULT CCommitDlg::OnAutoListReady(WPARAM, LPARAM)
+LRESULT CCommitDlg::OnAutoListReady(WPARAM, LPARAM lparam)
 {
-	m_cLogMessage.SetAutoCompletionList(m_autolist, '*');
+	m_cLogMessage.SetAutoCompletionList(std::move(*reinterpret_cast<std::map<CString, int>*>(lparam)), '*');
 	return 0;
 }
 
@@ -1670,6 +1749,10 @@ void CCommitDlg::ParseRegexFile(const CString& sFile, std::map<CString, CString>
 		CStdioFile file(sFile, CFile::typeText | CFile::modeRead | CFile::shareDenyWrite);
 		while (m_bRunThread && file.ReadString(strLine))
 		{
+			if (strLine.IsEmpty())
+				continue;
+			if (strLine[0] == L'#')
+				continue;
 			int eqpos = strLine.Find('=');
 			CString rgx;
 			rgx = strLine.Mid(eqpos+1).Trim();
@@ -1701,15 +1784,36 @@ void CCommitDlg::ParseSnippetFile(const CString& sFile, std::map<CString, CStrin
 		{
 			if (strLine.IsEmpty())
 				continue;
-			if (strLine.Left(1) == _T('#')) // comment char
+			if (strLine[0] == L'#') // comment char
 				continue;
-			int eqpos = strLine.Find('=');
+			int eqpos = strLine.Find(L'=');
+			if (eqpos <= 0)
+				continue;
 			CString key = strLine.Left(eqpos);
-			CString value = strLine.Mid(eqpos + 1);
-			value.Replace(_T("\\\t"), _T("\t"));
-			value.Replace(_T("\\\r"), _T("\r"));
-			value.Replace(_T("\\\n"), _T("\n"));
-			value.Replace(_T("\\\\"), _T("\\"));
+			auto rawvalue = strLine.GetBuffer() + eqpos + 1;
+			CString value;
+			bool isEscaped = false;
+			for (int i = 0, len = strLine.GetLength() - eqpos - 1; i < len; ++i)
+			{
+				wchar_t c = rawvalue[i];
+				if (isEscaped)
+				{
+					switch (c)
+					{
+					case L't': c = L'\t'; break;
+					case L'n': c = L'\n'; break;
+					case L'r': c = L'\r'; break;
+					case L'\\': c = L'\\'; break;
+					default: value += rawvalue[i - 1]; break; // i is known to be > 0
+					}
+					value += c;
+					isEscaped = false;
+				}
+				else if (c == L'\\')
+					isEscaped = true;
+				else
+					value += c;
+			}
 			mapSnippet[key] = value;
 		}
 		file.Close();
@@ -1721,7 +1825,7 @@ void CCommitDlg::ParseSnippetFile(const CString& sFile, std::map<CString, CStrin
 	}
 }
 
-void CCommitDlg::GetAutocompletionList()
+void CCommitDlg::GetAutocompletionList(std::map<CString, int>& autolist)
 {
 	// the auto completion list is made of strings from each selected files.
 	// the strings used are extracted from the files with regexes found
@@ -1734,27 +1838,27 @@ void CCommitDlg::GetAutocompletionList()
 
 	std::map<CString, CString> mapRegex;
 	CString sRegexFile = CPathUtils::GetAppDirectory();
-	CRegDWORD regtimeout = CRegDWORD(_T("Software\\TortoiseGit\\AutocompleteParseTimeout"), 5);
+	CRegDWORD regtimeout = CRegDWORD(L"Software\\TortoiseGit\\AutocompleteParseTimeout", 5);
 	ULONGLONG timeoutvalue = ULONGLONG(DWORD(regtimeout)) * 1000UL;;
-	sRegexFile += _T("autolist.txt");
+	sRegexFile += L"autolist.txt";
 	if (!m_bRunThread)
 		return;
 	ParseRegexFile(sRegexFile, mapRegex);
 	sRegexFile = CPathUtils::GetAppDataDirectory();
-	sRegexFile += _T("autolist.txt");
+	sRegexFile += L"autolist.txt";
 	if (PathFileExists(sRegexFile))
 		ParseRegexFile(sRegexFile, mapRegex);
 
 	m_snippet.clear();
 	CString sSnippetFile = CPathUtils::GetAppDirectory();
-	sSnippetFile += _T("snippet.txt");
+	sSnippetFile += L"snippet.txt";
 	ParseSnippetFile(sSnippetFile, m_snippet);
 	sSnippetFile = CPathUtils::GetAppDataDirectory();
-	sSnippetFile += _T("snippet.txt");
+	sSnippetFile += L"snippet.txt";
 	if (PathFileExists(sSnippetFile))
 		ParseSnippetFile(sSnippetFile, m_snippet);
 	for (const auto& snip : m_snippet)
-		m_autolist.emplace(snip.first, AUTOCOMPLETE_SNIPPET);
+		autolist.emplace(snip.first, AUTOCOMPLETE_SNIPPET);
 
 	ULONGLONG starttime = GetTickCount64();
 
@@ -1772,13 +1876,23 @@ void CCommitDlg::GetAutocompletionList()
 		if ((!m_bRunThread) || (GetTickCount64() - starttime > timeoutvalue))
 			return;
 
-		CTGitPath *path = (CTGitPath*)m_ListCtrl.GetItemData(i);
+		CString sWinPath;
+		CString sPartPath;
+		CString sExt;
+		int action;
+		{
+			auto locker(m_ListCtrl.AcquireReadLock());
+			auto path = m_ListCtrl.GetListEntry(i);
 
-		if(path == NULL)
-			continue;
+			if (!path)
+				continue;
 
-		CString sPartPath =path->GetGitPathString();
-		m_autolist.emplace(sPartPath, AUTOCOMPLETE_FILENAME);
+			sWinPath = path->GetWinPathString();
+			sPartPath = path->GetGitPathString();
+			sExt = path->GetFileExtension();
+			action = path->m_Action;
+		}
+		autolist.emplace(sPartPath, AUTOCOMPLETE_FILENAME);
 
 		int pos = 0;
 		int lastPos = 0;
@@ -1786,104 +1900,129 @@ void CCommitDlg::GetAutocompletionList()
 		{
 			++pos;
 			lastPos = pos;
-			m_autolist.emplace(sPartPath.Mid(pos), AUTOCOMPLETE_FILENAME);
+			autolist.emplace(sPartPath.Mid(pos), AUTOCOMPLETE_FILENAME);
 		}
 
 		// Last inserted entry is a file name.
 		// Some users prefer to also list file name without extension.
-		if (CRegDWORD(_T("Software\\TortoiseGit\\AutocompleteRemovesExtensions"), FALSE))
+		if (CRegDWORD(L"Software\\TortoiseGit\\AutocompleteRemovesExtensions", FALSE))
 		{
 			int dotPos = sPartPath.ReverseFind('.');
 			if ((dotPos >= 0) && (dotPos > lastPos))
-				m_autolist.emplace(sPartPath.Mid(lastPos, dotPos - lastPos), AUTOCOMPLETE_FILENAME);
+				autolist.emplace(sPartPath.Mid(lastPos, dotPos - lastPos), AUTOCOMPLETE_FILENAME);
 		}
 
-		if (path->m_Action == CTGitPath::LOGACTIONS_UNVER && !CRegDWORD(_T("Software\\TortoiseGit\\AutocompleteParseUnversioned"), FALSE))
+		if (action == CTGitPath::LOGACTIONS_UNVER && !CRegDWORD(L"Software\\TortoiseGit\\AutocompleteParseUnversioned", FALSE))
 			continue;
-		if (path->m_Action == CTGitPath::LOGACTIONS_IGNORE)
+		if (action == CTGitPath::LOGACTIONS_IGNORE)
 			continue;
 
-		CString sExt = path->GetFileExtension();
 		sExt.MakeLower();
 		// find the regex string which corresponds to the file extension
 		CString rdata = mapRegex[sExt];
 		if (rdata.IsEmpty())
 			continue;
 
-		ScanFile(path->GetWinPathString(), rdata, sExt);
+		ScanFile(autolist, sWinPath, rdata, sExt);
 	}
-	CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": Auto completion list loaded in %I64u msec\n"), GetTickCount64() - starttime);
+	CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) L": Auto completion list loaded in %I64u msec\n", GetTickCount64() - starttime);
 }
 
-void CCommitDlg::ScanFile(const CString& sFilePath, const CString& sRegex, const CString& sExt)
+void CCommitDlg::ScanFile(std::map<CString, int>& autolist, const CString& sFilePath, const CString& sRegex, const CString& sExt)
 {
-	static std::map<CString, std::tr1::wregex> regexmap;
+	static std::map<CString, std::wregex> regexmap;
 
 	std::wstring sFileContent;
-	CAutoFile hFile = CreateFile(sFilePath, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, NULL, NULL);
+	CAutoFile hFile = CreateFile(sFilePath, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
 	if (hFile)
 	{
-		DWORD size = GetFileSize(hFile, NULL);
-		if (size > CRegDWORD(_T("Software\\TortoiseGit\\AutocompleteParseMaxSize"), 300000L))
+		DWORD size = GetFileSize(hFile, nullptr);
+		if (size > CRegDWORD(L"Software\\TortoiseGit\\AutocompleteParseMaxSize", 300000L))
 		{
 			// no files bigger than 300k
 			return;
 		}
 		// allocate memory to hold file contents
-		auto buffer = std::make_unique<char[]>(size);
+		CBuffer oFile;
+		try
+		{
+			oFile.SetLength(size);
+		}
+		catch (CMemoryException*)
+		{
+			return;
+		}
 		DWORD readbytes;
-		if (!ReadFile(hFile, buffer.get(), size, &readbytes, NULL))
+		if (!ReadFile(hFile, oFile, size, &readbytes, nullptr))
 			return;
-		int opts = 0;
-		IsTextUnicode(buffer.get(), readbytes, &opts);
-		if (opts & IS_TEXT_UNICODE_NULL_BYTES)
+		oFile.SetLength(readbytes);
+		CFileTextLines filetextlines;
+		CFileTextLines::UnicodeType type = filetextlines.CheckUnicodeType(oFile, readbytes);
+		try
+		{
+			CBaseFilter* pFilter = nullptr;
+			switch (type)
+			{
+			case CFileTextLines::BINARY:
+				return;
+			case CFileTextLines::UTF8:
+			case CFileTextLines::UTF8BOM:
+				pFilter = new CUtf8Filter(NULL);
+				break;
+			default:
+			case CFileTextLines::ASCII:
+				pFilter = new CAsciiFilter(NULL);
+				break;
+			case CFileTextLines::UTF16_BE:
+			case CFileTextLines::UTF16_BEBOM:
+				pFilter = new CUtf16beFilter(NULL);
+				break;
+			case CFileTextLines::UTF16_LE:
+			case CFileTextLines::UTF16_LEBOM:
+				pFilter = new CUtf16leFilter(NULL);
+				break;
+			case CFileTextLines::UTF32_BE:
+				pFilter = new CUtf32beFilter(NULL);
+				break;
+			case CFileTextLines::UTF32_LE:
+				pFilter = new CUtf32leFilter(NULL);
+				break;
+			}
+			pFilter->Decode(oFile);
+			delete pFilter;
+		}
+		catch (CMemoryException*)
 		{
 			return;
 		}
-		if (opts & IS_TEXT_UNICODE_UNICODE_MASK)
-		{
-			sFileContent = std::wstring((wchar_t*)buffer.get(), readbytes / sizeof(WCHAR));
-		}
-		if ((opts & IS_TEXT_UNICODE_NOT_UNICODE_MASK) || (opts == 0))
-		{
-			const int ret = MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, (LPCSTR)buffer.get(), readbytes, NULL, 0);
-			auto pWideBuf = std::make_unique<wchar_t[]>(ret);
-			const int ret2 = MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, (LPCSTR)buffer.get(), readbytes, pWideBuf.get(), ret);
-			if (ret2 == ret)
-				sFileContent = std::wstring(pWideBuf.get(), ret);
-		}
+		sFileContent = std::wstring((wchar_t*)oFile, oFile.GetLength() / sizeof(wchar_t));
 	}
 	if (sFileContent.empty() || !m_bRunThread)
-	{
 		return;
-	}
 
 	try
 	{
-
-		std::tr1::wregex regCheck;
-		std::map<CString, std::tr1::wregex>::const_iterator regIt;
+		std::wregex regCheck;
+		std::map<CString, std::wregex>::const_iterator regIt;
 		if ((regIt = regexmap.find(sExt)) != regexmap.end())
 			regCheck = regIt->second;
 		else
 		{
-			regCheck = std::tr1::wregex(sRegex, std::tr1::regex_constants::icase | std::tr1::regex_constants::ECMAScript);
+			regCheck = std::wregex(sRegex, std::regex_constants::icase | std::regex_constants::ECMAScript);
 			regexmap[sExt] = regCheck;
 		}
-		const std::tr1::wsregex_iterator end;
-		for (std::tr1::wsregex_iterator it(sFileContent.cbegin(), sFileContent.cend(), regCheck); it != end; ++it)
+		const std::wsregex_iterator end;
+		for (std::wsregex_iterator it(sFileContent.cbegin(), sFileContent.cend(), regCheck); it != end; ++it)
 		{
-			const std::tr1::wsmatch match = *it;
+			const std::wsmatch match = *it;
 			for (size_t i = 1; i < match.size(); ++i)
 			{
 				if (match[i].second-match[i].first)
-				{
-					m_autolist.emplace(std::wstring(match[i]).c_str(), AUTOCOMPLETE_PROGRAMCODE);
-				}
+					autolist.emplace(std::wstring(match[i]).c_str(), AUTOCOMPLETE_PROGRAMCODE);
 			}
 		}
 	}
-	catch (std::exception) {}
+	catch (std::exception&) {}
 }
 
 // CSciEditContextMenuInterface
@@ -1925,7 +2064,8 @@ bool CCommitDlg::HandleMenuItemClick(int cmd, CSciEdit * pSciEdit)
 		dlg.SetSelect(true);
 		// only one revision must be selected however
 		dlg.SingleSelection(true);
-		if (dlg.DoModal() == IDOK)
+		dlg.ShowWorkingTreeChanges(false);
+		if (dlg.DoModal() == IDOK && !dlg.GetSelectedHash().empty())
 			pSciEdit->InsertText(dlg.GetSelectedHash().at(0).ToString());
 		return true;
 	}
@@ -1938,15 +2078,16 @@ bool CCommitDlg::HandleMenuItemClick(int cmd, CSciEdit * pSciEdit)
 		dlg.SetSelect(true);
 		// only one revision must be selected however
 		dlg.SingleSelection(true);
-		if (dlg.DoModal() == IDOK)
+		dlg.ShowWorkingTreeChanges(false);
+		if (dlg.DoModal() == IDOK && !dlg.GetSelectedHash().empty())
 		{
 			GitRev rev;
 			if (rev.GetCommit(dlg.GetSelectedHash().at(0).ToString()))
 			{
-				MessageBox(rev.GetLastErr(), _T("TortoiseGit"), MB_ICONERROR);
+				MessageBox(rev.GetLastErr(), L"TortoiseGit", MB_ICONERROR);
 				return false;
 			}
-			CString message = rev.GetSubject() + _T("\r\n") + rev.GetBody();
+			CString message = rev.GetSubject() + L"\r\n" + rev.GetBody();
 			pSciEdit->InsertText(message);
 		}
 		return true;
@@ -1955,24 +2096,23 @@ bool CCommitDlg::HandleMenuItemClick(int cmd, CSciEdit * pSciEdit)
 	if (cmd == m_nPopupPasteListCmd)
 	{
 		CString logmsg;
+		auto locker(m_ListCtrl.AcquireReadLock());
 		int nListItems = m_ListCtrl.GetItemCount();
 		for (int i=0; i<nListItems; ++i)
 		{
-			CTGitPath * entry = (CTGitPath*)m_ListCtrl.GetItemData(i);
+			auto entry = m_ListCtrl.GetListEntry(i);
 			if (entry&&entry->m_Checked)
 			{
-				CString line;
 				CString status = entry->GetActionName();
 				if(entry->m_Action & CTGitPath::LOGACTIONS_UNVER)
-					status = _T("Add"); // I18N TODO
+					status = L"Add"; // I18N TODO
 
 				//git_wc_status_kind status = entry->status;
-				WORD langID = (WORD)CRegStdDWORD(_T("Software\\TortoiseGit\\LanguageID"), GetUserDefaultLangID());
+				WORD langID = (WORD)CRegStdDWORD(L"Software\\TortoiseGit\\LanguageID", GetUserDefaultLangID());
 				if (m_ProjectProperties.bFileListInEnglish)
 					langID = 1033;
 
-				line.Format(_T("%-10s %s\r\n"),status , (LPCTSTR)m_ListCtrl.GetItemText(i,0));
-				logmsg += line;
+				logmsg.AppendFormat(L"%-10s %s\r\n", (LPCTSTR)status, (LPCTSTR)m_ListCtrl.GetItemText(i, 0));
 			}
 		}
 		pSciEdit->InsertText(logmsg);
@@ -2019,7 +2159,7 @@ void CCommitDlg::OnTimer(UINT_PTR nIDEvent)
 	case REFRESHTIMER:
 		if (m_bThreadRunning)
 		{
-			SetTimer(REFRESHTIMER, 200, NULL);
+			SetTimer(REFRESHTIMER, 200, nullptr);
 			CTraceToOutputDebugString::Instance()(__FUNCTION__ ": Wait some more before refreshing\n");
 		}
 		else
@@ -2053,9 +2193,7 @@ void CCommitDlg::OnBnClickedHistory()
 	{
 		CString sBugID = m_ProjectProperties.FindBugID(sMsg);
 		if ((!sBugID.IsEmpty()) && ((GetDlgItem(IDC_BUGID)->IsWindowVisible())))
-		{
 			SetDlgItemText(IDC_BUGID, sBugID);
-		}
 		if (m_sLogTemplate.Compare(m_cLogMessage.GetText()) != 0)
 			m_cLogMessage.InsertText(sMsg, !m_cLogMessage.GetText().IsEmpty());
 		else
@@ -2064,7 +2202,6 @@ void CCommitDlg::OnBnClickedHistory()
 
 	SendMessage(WM_UPDATEOKBUTTON);
 	GetDlgItem(IDC_LOGMESSAGE)->SetFocus();
-
 }
 
 void CCommitDlg::OnBnClickedBugtraqbutton()
@@ -2072,7 +2209,7 @@ void CCommitDlg::OnBnClickedBugtraqbutton()
 	m_tooltips.Pop();	// hide the tooltips
 	CString sMsg = m_cLogMessage.GetText();
 
-	if (m_BugTraqProvider == NULL)
+	if (!m_BugTraqProvider)
 		return;
 
 	ATL::CComBSTR parameters(m_bugtraq_association.GetParameters());
@@ -2086,7 +2223,7 @@ void CCommitDlg::OnBnClickedBugtraqbutton()
 	ATL::CComBSTR temp;
 
 	// first try the IBugTraqProvider2 interface
-	CComPtr<IBugTraqProvider2> pProvider2 = NULL;
+	CComPtr<IBugTraqProvider2> pProvider2;
 	HRESULT hr = m_BugTraqProvider.QueryInterface(&pProvider2);
 	bool bugIdOutSet = false;
 	if (SUCCEEDED(hr))
@@ -2100,8 +2237,8 @@ void CCommitDlg::OnBnClickedBugtraqbutton()
 		if (FAILED(hr = pProvider2->GetCommitMessage2(GetSafeHwnd(), parameters, repositoryRoot, commonRoot, pathList, originalMessage, bugID, &bugIDOut, &revPropNames, &revPropValues, &temp)))
 		{
 			CString sErr;
-			sErr.Format(IDS_ERR_FAILEDISSUETRACKERCOM, m_bugtraq_association.GetProviderName(), _com_error(hr).ErrorMessage());
-			CMessageBox::Show(m_hWnd, sErr, _T("TortoiseGit"), MB_ICONERROR);
+			sErr.FormatMessage(IDS_ERR_FAILEDISSUETRACKERCOM, (LPCTSTR)m_bugtraq_association.GetProviderName(), _com_error(hr).ErrorMessage());
+			CMessageBox::Show(GetSafeHwnd(), sErr, L"TortoiseGit", MB_ICONERROR);
 		}
 		else
 		{
@@ -2112,46 +2249,26 @@ void CCommitDlg::OnBnClickedBugtraqbutton()
 				SetDlgItemText(IDC_BUGID, m_sBugID);
 			}
 			m_cLogMessage.SetText((LPCTSTR)temp);
-			BSTR HUGEP *pbRevNames;
-			BSTR HUGEP *pbRevValues;
-
-			HRESULT hr1 = SafeArrayAccessData(revPropNames, (void HUGEP**)&pbRevNames);
-			if (SUCCEEDED(hr1))
-			{
-				HRESULT hr2 = SafeArrayAccessData(revPropValues, (void HUGEP**)&pbRevValues);
-				if (SUCCEEDED(hr2))
-				{
-					if (revPropNames->rgsabound->cElements == revPropValues->rgsabound->cElements)
-					{
-						for (ULONG i = 0; i < revPropNames->rgsabound->cElements; ++i)
-						{
-//							m_revProps[pbRevNames[i]] = pbRevValues[i];
-						}
-					}
-					SafeArrayUnaccessData(revPropValues);
-				}
-				SafeArrayUnaccessData(revPropNames);
-			}
 		}
 	}
 	else
 	{
 		// if IBugTraqProvider2 failed, try IBugTraqProvider
-		CComPtr<IBugTraqProvider> pProvider = NULL;
+		CComPtr<IBugTraqProvider> pProvider;
 		hr = m_BugTraqProvider.QueryInterface(&pProvider);
 		if (FAILED(hr))
 		{
 			CString sErr;
-			sErr.Format(IDS_ERR_FAILEDISSUETRACKERCOM, (LPCTSTR)m_bugtraq_association.GetProviderName(), _com_error(hr).ErrorMessage());
-			CMessageBox::Show(m_hWnd, sErr, _T("TortoiseGit"), MB_ICONERROR);
+			sErr.FormatMessage(IDS_ERR_FAILEDISSUETRACKERCOM, (LPCTSTR)m_bugtraq_association.GetProviderName(), _com_error(hr).ErrorMessage());
+			CMessageBox::Show(GetSafeHwnd(), sErr, L"TortoiseGit", MB_ICONERROR);
 			return;
 		}
 
 		if (FAILED(hr = pProvider->GetCommitMessage(GetSafeHwnd(), parameters, commonRoot, pathList, originalMessage, &temp)))
 		{
 			CString sErr;
-			sErr.Format(IDS_ERR_FAILEDISSUETRACKERCOM, m_bugtraq_association.GetProviderName(), _com_error(hr).ErrorMessage());
-			CMessageBox::Show(m_hWnd, sErr, _T("TortoiseGit"), MB_ICONERROR);
+			sErr.FormatMessage(IDS_ERR_FAILEDISSUETRACKERCOM, (LPCTSTR)m_bugtraq_association.GetProviderName(), _com_error(hr).ErrorMessage());
+			CMessageBox::Show(GetSafeHwnd(), sErr, L"TortoiseGit", MB_ICONERROR);
 		}
 		else
 			m_cLogMessage.SetText((LPCTSTR)temp);
@@ -2161,9 +2278,7 @@ void CCommitDlg::OnBnClickedBugtraqbutton()
 	{
 		CString sBugID = m_ProjectProperties.FindBugID(m_sLogMessage);
 		if (!sBugID.IsEmpty() && !bugIdOutSet)
-		{
 			SetDlgItemText(IDC_BUGID, sBugID);
-		}
 	}
 
 	m_cLogMessage.SetFocus();
@@ -2176,23 +2291,29 @@ void CCommitDlg::FillPatchView(bool onlySetTimer)
 		KillTimer(FILLPATCHVTIMER);
 		if (onlySetTimer)
 		{
-			SetTimer(FILLPATCHVTIMER, 100, NULL);
+			SetTimer(FILLPATCHVTIMER, 100, nullptr);
 			return;
 		}
 
+		auto locker(m_ListCtrl.AcquireReadWeakLock(50));
+		if (!locker.IsAcquired())
+		{
+			SetTimer(FILLPATCHVTIMER, 100, nullptr);
+			return;
+		}
 		POSITION pos=m_ListCtrl.GetFirstSelectedItemPosition();
 		CString cmd,out;
 
 		while(pos)
 		{
 			int nSelect = m_ListCtrl.GetNextSelectedItem(pos);
-			CTGitPath * p=(CTGitPath*)m_ListCtrl.GetItemData(nSelect);
+			auto p = m_ListCtrl.GetListEntry(nSelect);
 			if(p && !(p->m_Action&CTGitPath::LOGACTIONS_UNVER) )
 			{
-				CString head = _T("HEAD");
+				CString head = L"HEAD";
 				if(m_bCommitAmend==TRUE && m_bAmendDiffToLastCommit==FALSE)
-					head = _T("HEAD~1");
-				cmd.Format(_T("git.exe diff %s -- \"%s\""), (LPCTSTR)head, (LPCTSTR)p->GetGitPathString());
+					head = L"HEAD~1";
+				cmd.Format(L"git.exe diff %s -- \"%s\"", (LPCTSTR)head, (LPCTSTR)p->GetGitPathString());
 				g_Git.Run(cmd, &out, CP_UTF8);
 			}
 		}
@@ -2303,7 +2424,7 @@ void CCommitDlg::SetSplitterRange()
 		m_ListCtrl.GetWindowRect(rcMiddle);
 		ScreenToClient(rcMiddle);
 		if (rcMiddle.Height() && rcMiddle.Width())
-			m_wndSplitter.SetRange(rcTop.top + 100, rcMiddle.bottom - 80);
+			m_wndSplitter.SetRange(rcTop.top + CDPIAware::Instance().ScaleY(120), rcMiddle.bottom - CDPIAware::Instance().ScaleY(80));
 	}
 }
 
@@ -2335,30 +2456,32 @@ void CCommitDlg::DoSize(int delta)
 	RemoveAnchor(IDC_CHECKFILES);
 	RemoveAnchor(IDC_CHECKSUBMODULES);
 
-	CSplitterControl::ChangeHeight(&m_cLogMessage, delta, CW_TOPALIGN);
-	CSplitterControl::ChangeHeight(GetDlgItem(IDC_MESSAGEGROUP), delta, CW_TOPALIGN);
-	CSplitterControl::ChangeHeight(&m_ListCtrl, -delta, CW_BOTTOMALIGN);
-	CSplitterControl::ChangeHeight(GetDlgItem(IDC_LISTGROUP), -delta, CW_BOTTOMALIGN);
-	CSplitterControl::ChangePos(GetDlgItem(IDC_SIGNOFF),0,delta);
-	CSplitterControl::ChangePos(GetDlgItem(IDC_COMMIT_AMEND),0,delta);
-	CSplitterControl::ChangePos(GetDlgItem(IDC_COMMIT_AMENDDIFF),0,delta);
-	CSplitterControl::ChangePos(GetDlgItem(IDC_COMMIT_SETDATETIME),0,delta);
-	CSplitterControl::ChangePos(GetDlgItem(IDC_COMMIT_DATEPICKER),0,delta);
-	CSplitterControl::ChangePos(GetDlgItem(IDC_COMMIT_TIMEPICKER),0,delta);
-	CSplitterControl::ChangePos(GetDlgItem(IDC_COMMIT_AS_COMMIT_DATE), 0, delta);
-	CSplitterControl::ChangePos(GetDlgItem(IDC_COMMIT_SETAUTHOR), 0, delta);
-	CSplitterControl::ChangePos(GetDlgItem(IDC_COMMIT_AUTHORDATA), 0, delta);
-	CSplitterControl::ChangePos(GetDlgItem(IDC_TEXT_INFO),0,delta);
-	CSplitterControl::ChangePos(GetDlgItem(IDC_SELECTLABEL), 0, delta);
-	CSplitterControl::ChangePos(GetDlgItem(IDC_CHECKALL), 0, delta);
-	CSplitterControl::ChangePos(GetDlgItem(IDC_CHECKNONE), 0, delta);
-	CSplitterControl::ChangePos(GetDlgItem(IDC_CHECKUNVERSIONED), 0, delta);
-	CSplitterControl::ChangePos(GetDlgItem(IDC_CHECKVERSIONED), 0, delta);
-	CSplitterControl::ChangePos(GetDlgItem(IDC_CHECKADDED), 0, delta);
-	CSplitterControl::ChangePos(GetDlgItem(IDC_CHECKDELETED), 0, delta);
-	CSplitterControl::ChangePos(GetDlgItem(IDC_CHECKMODIFIED), 0, delta);
-	CSplitterControl::ChangePos(GetDlgItem(IDC_CHECKFILES), 0, delta);
-	CSplitterControl::ChangePos(GetDlgItem(IDC_CHECKSUBMODULES), 0, delta);
+	auto hdwp = BeginDeferWindowPos(24);
+	CSplitterControl::ChangeRect(hdwp, &m_cLogMessage, 0, 0, 0, delta);
+	CSplitterControl::ChangeRect(hdwp, GetDlgItem(IDC_MESSAGEGROUP), 0, 0, 0, delta);
+	CSplitterControl::ChangeRect(hdwp, &m_ListCtrl, 0, delta, 0, 0);
+	CSplitterControl::ChangeRect(hdwp, GetDlgItem(IDC_LISTGROUP), 0, delta, 0, 0);
+	CSplitterControl::ChangeRect(hdwp, GetDlgItem(IDC_SIGNOFF), 0, delta, 0, delta);
+	CSplitterControl::ChangeRect(hdwp, GetDlgItem(IDC_COMMIT_AMEND), 0, delta, 0, delta);
+	CSplitterControl::ChangeRect(hdwp, GetDlgItem(IDC_COMMIT_AMENDDIFF), 0, delta, 0, delta);
+	CSplitterControl::ChangeRect(hdwp, GetDlgItem(IDC_COMMIT_SETDATETIME), 0, delta, 0, delta);
+	CSplitterControl::ChangeRect(hdwp, GetDlgItem(IDC_COMMIT_DATEPICKER), 0, delta, 0, delta);
+	CSplitterControl::ChangeRect(hdwp, GetDlgItem(IDC_COMMIT_TIMEPICKER), 0, delta, 0, delta);
+	CSplitterControl::ChangeRect(hdwp, GetDlgItem(IDC_COMMIT_AS_COMMIT_DATE), 0, delta, 0, delta);
+	CSplitterControl::ChangeRect(hdwp, GetDlgItem(IDC_COMMIT_SETAUTHOR), 0, delta, 0, delta);
+	CSplitterControl::ChangeRect(hdwp, GetDlgItem(IDC_COMMIT_AUTHORDATA), 0, delta, 0, delta);
+	CSplitterControl::ChangeRect(hdwp, GetDlgItem(IDC_TEXT_INFO), 0, delta, 0, delta);
+	CSplitterControl::ChangeRect(hdwp, GetDlgItem(IDC_SELECTLABEL), 0, delta, 0, delta);
+	CSplitterControl::ChangeRect(hdwp, GetDlgItem(IDC_CHECKALL), 0, delta, 0, delta);
+	CSplitterControl::ChangeRect(hdwp, GetDlgItem(IDC_CHECKNONE), 0, delta, 0, delta);
+	CSplitterControl::ChangeRect(hdwp, GetDlgItem(IDC_CHECKUNVERSIONED), 0, delta, 0, delta);
+	CSplitterControl::ChangeRect(hdwp, GetDlgItem(IDC_CHECKVERSIONED), 0, delta, 0, delta);
+	CSplitterControl::ChangeRect(hdwp, GetDlgItem(IDC_CHECKADDED), 0, delta, 0, delta);
+	CSplitterControl::ChangeRect(hdwp, GetDlgItem(IDC_CHECKDELETED), 0, delta, 0, delta);
+	CSplitterControl::ChangeRect(hdwp, GetDlgItem(IDC_CHECKMODIFIED), 0, delta, 0, delta);
+	CSplitterControl::ChangeRect(hdwp, GetDlgItem(IDC_CHECKFILES), 0, delta, 0, delta);
+	CSplitterControl::ChangeRect(hdwp, GetDlgItem(IDC_CHECKSUBMODULES), 0, delta, 0, delta);
+	EndDeferWindowPos(hdwp);
 
 	AddAnchor(IDC_MESSAGEGROUP, TOP_LEFT, TOP_RIGHT);
 	AddAnchor(IDC_LOGMESSAGE, TOP_LEFT, TOP_RIGHT);
@@ -2412,10 +2535,10 @@ CString CCommitDlg::GetSignedOffByLine()
 
 	CString username = g_Git.GetUserName();
 	CString email = g_Git.GetUserEmail();
-	username.Remove(_T('\n'));
-	email.Remove(_T('\n'));
+	username.Remove(L'\n');
+	email.Remove(L'\n');
 
-	str.Format(_T("Signed-off-by: %s <%s>"), (LPCTSTR)username, (LPCTSTR)email);
+	str.Format(L"Signed-off-by: %s <%s>", (LPCTSTR)username, (LPCTSTR)email);
 
 	return str;
 }
@@ -2426,15 +2549,15 @@ void CCommitDlg::OnBnClickedSignOff()
 
 	if (m_cLogMessage.GetText().Find(str) == -1) {
 		m_cLogMessage.SetText(m_cLogMessage.GetText().TrimRight());
-		int lastNewline = m_cLogMessage.GetText().ReverseFind(_T('\n'));
+		int lastNewline = m_cLogMessage.GetText().ReverseFind(L'\n');
 		int foundByLine = -1;
 		if (lastNewline > 0)
-			foundByLine = m_cLogMessage.GetText().Find(_T("-by: "), lastNewline);
+			foundByLine = m_cLogMessage.GetText().Find(L"-by: ", lastNewline);
 
 		if (foundByLine == -1 || foundByLine < lastNewline)
-			str = _T("\r\n") + str;
+			str = L"\r\n" + str;
 
-		m_cLogMessage.SetText(m_cLogMessage.GetText()+_T("\r\n")+str+_T("\r\n"));
+		m_cLogMessage.SetText(m_cLogMessage.GetText() + L"\r\n" + str + L"\r\n");
 	}
 }
 
@@ -2444,9 +2567,9 @@ void CCommitDlg::OnBnClickedCommitAmend()
 	if(this->m_bCommitAmend && this->m_AmendStr.IsEmpty())
 	{
 		GitRev rev;
-		if (rev.GetCommit(CString(_T("HEAD"))))
-			MessageBox(rev.GetLastErr(), _T("TortoiseGit"), MB_ICONERROR);
-		m_AmendStr=rev.GetSubject()+_T("\n")+rev.GetBody();
+		if (rev.GetCommit(L"HEAD"))
+			MessageBox(rev.GetLastErr(), L"TortoiseGit", MB_ICONERROR);
+		m_AmendStr = rev.GetSubject() + L'\n' + rev.GetBody();
 	}
 
 	if(this->m_bCommitAmend)
@@ -2489,7 +2612,7 @@ void CCommitDlg::OnBnClickedWholeProject()
 	if (!m_bBlock)
 	{
 		if (m_bWholeProject || m_bWholeProject2)
-			m_ListCtrl.GetStatus(NULL,true,false,true);
+			m_ListCtrl.GetStatus(nullptr, true, false, true);
 		else
 			m_ListCtrl.GetStatus(&this->m_pathList,true,false,true);
 
@@ -2501,6 +2624,7 @@ void CCommitDlg::OnBnClickedWholeProject()
 		else
 			dwShow &= ~GITSLC_SHOWUNVERSIONED;
 
+		m_ListCtrl.StoreScrollPos();
 		m_ListCtrl.Show(dwShow, dwShow & ~(CTGitPath::LOGACTIONS_UNVER), true);
 		UpdateCheckLinks();
 	}
@@ -2520,12 +2644,12 @@ void CCommitDlg::OnFocusFileList()
 
 void CCommitDlg::OnScnUpdateUI(NMHDR * /*pNMHDR*/, LRESULT *pResult)
 {
-	int pos = (int)this->m_cLogMessage.Call(SCI_GETCURRENTPOS);
-	int line = (int)this->m_cLogMessage.Call(SCI_LINEFROMPOSITION,pos);
-	int column = (int)this->m_cLogMessage.Call(SCI_GETCOLUMN,pos);
+	auto pos = (Sci_Position)m_cLogMessage.Call(SCI_GETCURRENTPOS);
+	auto line = (int)m_cLogMessage.Call(SCI_LINEFROMPOSITION, pos);
+	auto column = (int)m_cLogMessage.Call(SCI_GETCOLUMN, pos);
 
 	CString str;
-	str.Format(_T("%d/%d"),line+1,column+1);
+	str.Format(L"%d/%d", line + 1, column + 1);
 	this->GetDlgItem(IDC_TEXT_INFO)->SetWindowText(str);
 
 	if(*pResult)
@@ -2543,9 +2667,9 @@ void CCommitDlg::OnStnClickedViewPatch()
 	if(!IsWindow(this->m_patchViewdlg.m_hWnd))
 	{
 		BOOL viewPatchEnabled = FALSE;
-		viewPatchEnabled = g_Git.GetConfigValueBool(_T("tgit.commitshowpatch"));
+		viewPatchEnabled = g_Git.GetConfigValueBool(L"tgit.commitshowpatch");
 		if (viewPatchEnabled == FALSE)
-			g_Git.SetConfigValue(_T("tgit.commitshowpatch"), _T("true"));
+			g_Git.SetConfigValue(L"tgit.commitshowpatch", L"true");
 		m_patchViewdlg.Create(IDD_PATCH_VIEW,this);
 		m_patchViewdlg.m_ctrlPatchView.Call(SCI_SETSCROLLWIDTHTRACKING, TRUE);
 		CRect rect;
@@ -2553,15 +2677,17 @@ void CCommitDlg::OnStnClickedViewPatch()
 
 		m_patchViewdlg.ShowWindow(SW_SHOW);
 
-		m_patchViewdlg.SetWindowPos(NULL,rect.right,rect.top,rect.Width(),rect.Height(),
+		m_patchViewdlg.SetWindowPos(nullptr, rect.right, rect.top, (DWORD)CRegStdDWORD(L"Software\\TortoiseGit\\TortoiseProc\\PatchDlgWidth", rect.Width()), rect.Height(),
 				SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_NOZORDER);
+
+		GetDlgItem(IDC_LOGMESSAGE)->SetFocus();
 
 		ShowViewPatchText(false);
 		FillPatchView();
 	}
 	else
 	{
-		g_Git.SetConfigValue(_T("tgit.commitshowpatch"), _T("false"));
+		g_Git.SetConfigValue(L"tgit.commitshowpatch", L"false");
 		m_patchViewdlg.ShowWindow(SW_HIDE);
 		m_patchViewdlg.DestroyWindow();
 		ShowViewPatchText(true);
@@ -2583,12 +2709,11 @@ void CCommitDlg::OnMoving(UINT fwSide, LPRECT pRect)
 			GetWindowRect(&thisrect);
 			if (patchrect.left == thisrect.right)
 			{
-				m_patchViewdlg.SetWindowPos(NULL, patchrect.left - (thisrect.left - pRect->left), patchrect.top - (thisrect.top - pRect->top),
+				m_patchViewdlg.SetWindowPos(nullptr, patchrect.left - (thisrect.left - pRect->left), patchrect.top - (thisrect.top - pRect->top),
 					0, 0, SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_NOSIZE | SWP_NOZORDER);
 			}
 		}
 	}
-
 }
 
 void CCommitDlg::OnSizing(UINT fwSide, LPRECT pRect)
@@ -2606,13 +2731,9 @@ void CCommitDlg::OnSizing(UINT fwSide, LPRECT pRect)
 			patchrect.right-= (thisrect.right - pRect->right);
 
 			if(	patchrect.bottom == thisrect.bottom)
-			{
 				patchrect.bottom -= (thisrect.bottom - pRect->bottom);
-			}
 			if(	patchrect.top == thisrect.top)
-			{
 				patchrect.top -=  thisrect.top-pRect->top;
-			}
 			m_patchViewdlg.MoveWindow(patchrect);
 		}
 	}
@@ -2629,10 +2750,10 @@ int CCommitDlg::CheckHeadDetach()
 	CString output;
 	if (CGit::GetCurrentBranchFromFile(g_Git.m_CurrentDir, output))
 	{
-		int retval = CMessageBox::Show(NULL, IDS_PROC_COMMIT_DETACHEDWARNING, IDS_APPNAME, MB_YESNOCANCEL | MB_ICONWARNING);
+		int retval = CMessageBox::Show(GetSafeHwnd(), IDS_PROC_COMMIT_DETACHEDWARNING, IDS_APPNAME, MB_YESNOCANCEL | MB_ICONWARNING);
 		if(retval == IDYES)
 		{
-			if (CAppUtils::CreateBranchTag(FALSE, NULL, true) == FALSE)
+			if (CAppUtils::CreateBranchTag(GetSafeHwnd(), FALSE, nullptr, true) == FALSE)
 				return 1;
 		}
 		else if (retval == IDCANCEL)
@@ -2663,8 +2784,8 @@ void CCommitDlg::OnBnClickedCommitSetDateTime()
 		if (m_bCommitAmend)
 		{
 			GitRev headRevision;
-			if (headRevision.GetCommit(_T("HEAD")))
-				MessageBox(headRevision.GetLastErr(), _T("TortoiseGit"), MB_ICONERROR);
+			if (headRevision.GetCommit(L"HEAD"))
+				MessageBox(headRevision.GetLastErr(), L"TortoiseGit", MB_ICONERROR);
 			authordate = headRevision.GetAuthorDate();
 			m_AsCommitDateCtrl.ShowWindow(SW_SHOW);
 		}
@@ -2746,13 +2867,13 @@ void CCommitDlg::OnBnClickedCommitSetauthor()
 
 	if (m_bSetAuthor)
 	{
-		m_sAuthor.Format(_T("%s <%s>"), (LPCTSTR)g_Git.GetUserName(), (LPCTSTR)g_Git.GetUserEmail());
+		m_sAuthor.Format(L"%s <%s>", (LPCTSTR)g_Git.GetUserName(), (LPCTSTR)g_Git.GetUserEmail());
 		if (m_bCommitAmend)
 		{
 			GitRev headRevision;
-			if (headRevision.GetCommit(_T("HEAD")))
-				MessageBox(headRevision.GetLastErr(), _T("TortoiseGit"), MB_ICONERROR);
-			m_sAuthor.Format(_T("%s <%s>"), (LPCTSTR)headRevision.GetAuthorName(), (LPCTSTR)headRevision.GetAuthorEmail());
+			if (headRevision.GetCommit(L"HEAD"))
+				MessageBox(headRevision.GetLastErr(), L"TortoiseGit", MB_ICONERROR);
+			m_sAuthor.Format(L"%s <%s>", (LPCTSTR)headRevision.GetAuthorName(), (LPCTSTR)headRevision.GetAuthorEmail());
 		}
 
 		UpdateData(FALSE);
@@ -2763,7 +2884,7 @@ void CCommitDlg::OnBnClickedCommitSetauthor()
 		GetDlgItem(IDC_COMMIT_AUTHORDATA)->ShowWindow(SW_HIDE);
 }
 
-void CCommitDlg::RunStartCommitHook()
+bool CCommitDlg::RunStartCommitHook()
 {
 	DWORD exitcode = 0xFFFFFFFF;
 	CString error;
@@ -2773,8 +2894,16 @@ void CCommitDlg::RunStartCommitHook()
 		{
 			CString temp;
 			temp.Format(IDS_ERR_HOOKFAILED, (LPCTSTR)error);
-			MessageBox(temp, _T("TortoiseGit"), MB_ICONERROR);
-			return;
+			MessageBox(temp, L"TortoiseGit", MB_ICONERROR);
+			return false;
 		}
 	}
+	return true;
+}
+
+void CCommitDlg::OnSysColorChange()
+{
+	__super::OnSysColorChange();
+	m_cLogMessage.SetColors(true);
+	m_cLogMessage.SetFont(CAppUtils::GetLogFontName(), CAppUtils::GetLogFontSize());
 }

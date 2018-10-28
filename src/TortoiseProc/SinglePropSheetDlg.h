@@ -27,14 +27,14 @@ class CSinglePropSheetDlg : public TreePropSheet::CTreePropSheet
 	DECLARE_DYNAMIC(CSinglePropSheetDlg)
 
 public:
-	CSinglePropSheetDlg(const TCHAR* szCaption, ISettingsPropPage* pThePropPage, CWnd* pParent = NULL);   // standard constructor
+	CSinglePropSheetDlg(const TCHAR* szCaption, ISettingsPropPage* pThePropPage, CWnd* pParent = nullptr);   // standard constructor
 	virtual ~CSinglePropSheetDlg();
 
 	void AddPropPages();
 	void RemovePropPages();
 
 protected:
-	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
+	virtual void DoDataExchange(CDataExchange* pDX) override;    // DDX/DDV support
 
 	DECLARE_MESSAGE_MAP()
 
@@ -42,5 +42,5 @@ private:
 	ISettingsPropPage*	m_pThePropPage;
 
 public:
-	virtual BOOL OnInitDialog();
+	virtual BOOL OnInitDialog() override;
 };

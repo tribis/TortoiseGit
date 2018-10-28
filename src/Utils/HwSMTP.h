@@ -19,7 +19,7 @@
 投稿说明：
 ****************************************************************************************************************/
 #define NOTE_SpeedPostMail \
-_T("\
+L"\
 			【软件名称】\r\n\
 	无须SMTP服务器中转直接将E-Mail电子邮件发送到对方邮箱\r\n\
 			【版    本】\r\n\
@@ -36,7 +36,7 @@ Wins、网卡MAC地址等相关信息；还提供了SMTP协议解析类，该类
 	你可以任意修改复制本代码，但请保留这段文字不要修改。\r\n\
 	希望我能为中国的软件行业尽一份薄力！\r\n\
 			【开发日期】\r\n\
-	2008-11-23 3:54\r\n")
+	2008-11-23 3:54\r\n"
 
 #include <afxsock.h>
 
@@ -75,11 +75,11 @@ public:
 		LPCTSTR lpszSubject,
 		LPCTSTR lpszBody,
 		LPCTSTR lpszCharSet,						// 字符集类型，例如：繁体中文这里应输入"big5"，简体中文时输入"gb2312"
-		CStringArray *pStrAryAttach=NULL,
-		LPCTSTR pStrAryCC=NULL,
+		CStringArray* pStrAryAttach = nullptr,
+		LPCTSTR pStrAryCC = nullptr,
 		UINT nSmtpSrvPort=25,
-		LPCTSTR pSend = NULL,
-		LPCTSTR pToList = NULL,
+		LPCTSTR pSend = nullptr,
+		LPCTSTR pToList = nullptr,
 		DWORD secLevel = SECURITY_LEVEL::none
 		);
 	BOOL SendSpeedEmail
@@ -89,16 +89,16 @@ public:
 			LPCTSTR lpszSubject,
 			LPCTSTR lpszBody,
 			LPCTSTR lpszCharSet,						// 字符集类型，例如：繁体中文这里应输入"big5"，简体中文时输入"gb2312"
-			CStringArray *pStrAryAttach=NULL,
-			LPCTSTR pStrAryCC=NULL,
-			LPCTSTR pSend = NULL
+			CStringArray* pStrAryAttach = nullptr,
+			LPCTSTR pStrAryCC = nullptr,
+			LPCTSTR pSend = nullptr
 		);
 	CHwSMTP();
 	virtual ~CHwSMTP();
+	static CString CHwSMTP::GetEncodedHeader(const CString& text);
 
 protected:
-	CString GetServerAddress(CString &email);
-	void GetNameAddress(CString &in, CString &name,CString &address);
+	CString GetServerAddress(const CString& in);
 
 private:
 	BOOL SendSubject(const CString &hostname);
@@ -143,6 +143,5 @@ private:
 	CString m_csMIMEContentType;
 	CString m_csPartBoundary;
 	CString m_csNoMIMEText;
-
 };
 #endif // !defined(AFX_HwSMTP_H__633A52B7_1CBE_41D7_BDA3_188D98D692AF__INCLUDED_)

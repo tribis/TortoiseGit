@@ -18,7 +18,6 @@
 #define IDD_ABOUTBOX                    100
 #define IDP_OLE_INIT_FAILED             100
 #define ID_VIEW_CUSTOMIZE               126
-#define IDR_TortoiseGitBlamTYPE         130
 #define ID_VIEW_OUTPUTWND               149
 #define ID_VIEW_PROPERTIESWND           150
 #define IDI_OUTPUT_WND                  165
@@ -26,17 +25,6 @@
 #define IDI_PROPERTIES_WND              167
 #define IDI_PROPERTIES_WND_HC           168
 #define IDR_OUTPUT_POPUP                182
-#define ID_VIEW_APPLOOK_WIN_2000        208
-#define ID_VIEW_APPLOOK_VS_2008         209
-#define ID_VIEW_APPLOOK_WIN7            210
-#define ID_VIEW_APPLOOK_OFF_XP          211
-#define ID_VIEW_APPLOOK_WIN_XP          212
-#define ID_VIEW_APPLOOK_OFF_2003        213
-#define ID_VIEW_APPLOOK_VS_2005         214
-#define ID_VIEW_APPLOOK_OFF_2007_BLUE   215
-#define ID_VIEW_APPLOOK_OFF_2007_BLACK  216
-#define ID_VIEW_APPLOOK_OFF_2007_SILVER 217
-#define ID_VIEW_APPLOOK_OFF_2007_AQUA   218
 #define ID_EDIT_GOTO                    220
 #define IDD_GOTODLG                     221
 #define IDC_LINENUMBER                  222
@@ -47,17 +35,18 @@
 #define IDC_COPYRIGHT                   1001
 #define IDC_SCINTILLA                   1002
 #define IDC_LOG                         1003
+#define IDC_STATIC_AUTHORS              1829
 #define ID_INDICATOR_ENCODING           2000
-#define IDS_STATUS_PANE1                20122
-#define IDS_STATUS_PANE2                20123
-#define IDS_TOOLBAR_STANDARD            20124
-#define IDS_TOOLBAR_CUSTOMIZE           20125
-#define IDS_OUTPUT_WND                  20157
-#define IDS_PROPERTIES_WND              20158
-#define IDS_EDIT_MENU                   20306
-#define IDS_GIT_LOG_TAB                 20307
-#define ID_VIEW_NEXT                    20308
-#define ID_VIEW_PREV                    20309
+#define IDS_STATUS_PANE1                25122
+#define IDS_STATUS_PANE2                25123
+#define IDS_TOOLBAR_STANDARD            25124
+#define IDS_TOOLBAR_CUSTOMIZE           25125
+#define IDS_OUTPUT_WND                  25157
+#define IDS_PROPERTIES_WND              25158
+#define IDS_EDIT_MENU                   25306
+#define IDS_GIT_LOG_TAB                 25307
+#define ID_VIEW_NEXT                    25308
+#define ID_VIEW_PREV                    25309
 #define ID_EDIT_ENCODING                32771
 #define ID_EDIT_ENCODE                  32772
 #define ID_ENCODE_AUTO                  32774
@@ -87,13 +76,15 @@
 #define ID_FIND_NEXT                    32804
 #define ID_FIND_PREV                    32805
 #define ID_VIEW_ENABLELEXER             32806
+#define ID_VIEW_ONLYCONSIDERFIRSTPARENTS 32807
+#define ID_VIEW_WRAPLONGLINES           32808
 
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        312
-#define _APS_NEXT_COMMAND_VALUE         32807
+#define _APS_NEXT_COMMAND_VALUE         32809
 #define _APS_NEXT_CONTROL_VALUE         1004
 #define _APS_NEXT_SYMED_VALUE           310
 #endif

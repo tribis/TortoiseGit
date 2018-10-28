@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2009, 2011-2013, 2015 - TortoiseGit
+// Copyright (C) 2008-2009, 2011-2013, 2015-2018 - TortoiseGit
 // Copyright (C) 2003-2011, 2013 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -23,13 +23,16 @@
 #include "RenameDlg.h"
 #include "AppUtils.h"
 #include "ControlsBridge.h"
+#include "Git.h"
+#include "MessageBox.h"
 
 IMPLEMENT_DYNAMIC(CRenameDlg, CHorizontalResizableStandAloneDialog)
-CRenameDlg::CRenameDlg(CWnd* pParent /*=NULL*/)
+CRenameDlg::CRenameDlg(CWnd* pParent /*=nullptr*/)
 	: CHorizontalResizableStandAloneDialog(CRenameDlg::IDD, pParent)
 	, m_renameRequired(true)
-	, m_pInputValidator(NULL)
+	, m_pInputValidator(nullptr)
 	, m_bBalloonVisible(false)
+	, m_sBaseDir(g_Git.m_CurrentDir)
 {
 }
 
@@ -46,6 +49,7 @@ void CRenameDlg::DoDataExchange(CDataExchange* pDX)
 
 BEGIN_MESSAGE_MAP(CRenameDlg, CHorizontalResizableStandAloneDialog)
 	ON_EN_SETFOCUS(IDC_NAME, &CRenameDlg::OnEnSetfocusName)
+	ON_BN_CLICKED(IDC_BUTTON_BROWSE_REF, &CRenameDlg::OnBnClickedButtonBrowseRef)
 END_MESSAGE_MAP()
 
 BOOL CRenameDlg::OnInitDialog()
@@ -70,13 +74,14 @@ BOOL CRenameDlg::OnInitDialog()
 	AddAnchor(IDC_RENINFOLABEL, TOP_LEFT, TOP_RIGHT);
 	AddAnchor(IDC_LABEL, TOP_LEFT);
 	AddAnchor(IDC_NAME, TOP_LEFT, TOP_RIGHT);
+	AddAnchor(IDC_BUTTON_BROWSE_REF, TOP_RIGHT);
 	AddAnchor(IDOK, BOTTOM_RIGHT);
 	AddAnchor(IDCANCEL, BOTTOM_RIGHT);
 
 	CControlsBridge::AlignHorizontally(this, IDC_LABEL, IDC_NAME);
-	if (hWndExplorer)
-		CenterWindow(CWnd::FromHandle(hWndExplorer));
-	EnableSaveRestore(_T("RenameDlg"));
+	if (GetExplorerHWND())
+		CenterWindow(CWnd::FromHandle(GetExplorerHWND()));
+	EnableSaveRestore(L"RenameDlg");
 	m_originalName = m_name;
 	return TRUE;
 }
@@ -85,16 +90,6 @@ void CRenameDlg::OnOK()
 {
 	UpdateData();
 	m_name.Trim();
-	if (m_pInputValidator)
-	{
-		CString sError = m_pInputValidator->Validate(IDC_NAME, m_name);
-		if (!sError.IsEmpty())
-		{
-			m_bBalloonVisible = true;
-			ShowEditBalloon(IDC_NAME, sError, CString(MAKEINTRESOURCE(IDS_ERR_ERROR)), TTI_ERROR);
-			return;
-		}
-	}
 	bool nameAllowed = ((m_originalName != m_name) || !m_renameRequired) && !m_name.IsEmpty();
 	if (!nameAllowed)
 	{
@@ -104,12 +99,24 @@ void CRenameDlg::OnOK()
 	}
 
 	CTGitPath path(m_name);
-	if (!path.IsValidOnWindows())
+	if (!path.IsValidOnWindows() || !PathIsRelative(m_name))
 	{
 		m_bBalloonVisible = true;
 		ShowEditBalloon(IDC_NAME, IDS_WARN_NOVALIDPATH, IDS_ERR_ERROR, TTI_ERROR);
 		return;
 	}
+
+	if (m_pInputValidator)
+	{
+		CString sError = m_pInputValidator(IDC_NAME, m_name);
+		if (!sError.IsEmpty())
+		{
+			m_bBalloonVisible = true;
+			ShowEditBalloon(IDC_NAME, sError, CString(MAKEINTRESOURCE(IDS_ERR_ERROR)), TTI_ERROR);
+			return;
+		}
+	}
+
 	CHorizontalResizableStandAloneDialog::OnOK();
 }
 
@@ -120,6 +127,7 @@ void CRenameDlg::OnCancel()
 	if (m_bBalloonVisible)
 	{
 		Edit_HideBalloonTip(GetDlgItem(IDC_NAME)->GetSafeHwnd());
+		m_bBalloonVisible = false;
 		return;
 	}
 
@@ -129,4 +137,37 @@ void CRenameDlg::OnCancel()
 void CRenameDlg::OnEnSetfocusName()
 {
 	m_bBalloonVisible = false;
+}
+
+void CRenameDlg::OnBnClickedButtonBrowseRef()
+{
+	CString ext;
+	CString path;
+	if (!m_originalName.IsEmpty())
+	{
+		CTGitPath origname(m_sBaseDir);
+		origname.AppendPathString(m_originalName);
+		ext = origname.GetFileExtension();
+		path = origname.GetWinPathString();
+	}
+
+	if (CAppUtils::FileOpenSave(path, nullptr, AFX_IDD_FILESAVE, 0, false, GetSafeHwnd(), ext.Mid(1), !path.IsEmpty()))
+	{
+		GetDlgItem(IDC_NAME)->SetFocus();
+		CTGitPath target(path);
+		CString targetRoot;
+		if (!target.HasAdminDir(&targetRoot) || g_Git.m_CurrentDir.CompareNoCase(targetRoot) != 0)
+		{
+			CMessageBox::Show(GetSafeHwnd(), IDS_ERR_MUSTBESAMEWT, IDS_APPNAME, MB_OK | MB_ICONEXCLAMATION);
+			return;
+		}
+		CString relPath;
+		m_sBaseDir.Replace(L"/", L"\\");
+		if (!PathRelativePathTo(CStrBuf(relPath, MAX_PATH), m_sBaseDir, FILE_ATTRIBUTE_DIRECTORY, path, FILE_ATTRIBUTE_DIRECTORY))
+			return;
+		if (CStringUtils::StartsWith(relPath, L".\\"))
+			relPath = relPath.Mid(2);
+		m_name = relPath;
+		UpdateData(FALSE);
+	}
 }

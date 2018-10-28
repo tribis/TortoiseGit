@@ -1,7 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
 // External Cache Copyright (C) 2005-2008 - TortoiseSVN
-// Copyright (C) 2008-2011,2013,2015 - TortoiseGit
+// Copyright (C) 2008-2011,2013,2015-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -20,14 +20,15 @@
 
 #include "stdafx.h"
 #include <ShlObj.h>
+#include "GitAdminDir.h"
 #include "GitStatusCache.h"
 
 CShellUpdater::CShellUpdater(void)
+	: m_bRunning(FALSE)
+	, m_bItemsAddedSinceLastUpdate(false)
 {
-	m_hWakeEvent = CreateEvent(NULL,FALSE,FALSE,NULL);
-	m_hTerminationEvent = CreateEvent(NULL,TRUE,FALSE,NULL);
-	m_bRunning = FALSE;
-	m_bItemsAddedSinceLastUpdate = false;
+	m_hWakeEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+	m_hTerminationEvent = CreateEvent(nullptr, TRUE, FALSE, nullptr);
 }
 
 CShellUpdater::~CShellUpdater(void)
@@ -42,9 +43,7 @@ void CShellUpdater::Stop()
 	{
 		SetEvent(m_hTerminationEvent);
 		if(WaitForSingleObject(m_hThread, 200) != WAIT_OBJECT_0)
-		{
 			CTraceToOutputDebugString::Instance()(__FUNCTION__ ": Error terminating shell updater thread\n");
-		}
 	}
 	m_hThread.CloseHandle();
 	m_hTerminationEvent.CloseHandle();
@@ -63,7 +62,7 @@ void CShellUpdater::Initialise()
 
 	InterlockedExchange(&m_bRunning, TRUE);
 	unsigned int threadId;
-	m_hThread = (HANDLE)_beginthreadex(NULL,0,ThreadEntry,this,0,&threadId);
+	m_hThread = (HANDLE)_beginthreadex(nullptr, 0, ThreadEntry, this, 0, &threadId);
 	SetThreadPriority(m_hThread, THREAD_PRIORITY_LOWEST);
 }
 
@@ -71,11 +70,6 @@ void CShellUpdater::AddPathForUpdate(const CTGitPath& path)
 {
 	{
 		AutoLocker lock(m_critSec);
-		for (unsigned int i = 0; i < m_pathsToUpdate.size(); ++i)
-		{
-			if(m_pathsToUpdate[i] == path)
-				return;
-		}
 
 		m_pathsToUpdate.push_back(path);
 
@@ -90,7 +84,7 @@ void CShellUpdater::AddPathForUpdate(const CTGitPath& path)
 
 unsigned int CShellUpdater::ThreadEntry(void* pContext)
 {
-	((CShellUpdater*)pContext)->WorkerThread();
+	reinterpret_cast<CShellUpdater*>(pContext)->WorkerThread();
 	return 0;
 }
 
@@ -139,32 +133,27 @@ void CShellUpdater::WorkerThread()
 			}
 			if (workingPath.IsEmpty())
 				continue;
-			CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": shell notification for %s\n"), workingPath.GetWinPath());
+			CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) L": shell notification for %s\n", workingPath.GetWinPath());
 			if (workingPath.IsDirectory())
 			{
-				// check if the path is monitored by the watcher. If it isn't, then we have to invalidate the cache
-				// for that path and add it to the watcher.
-				if (!CGitStatusCache::Instance().IsPathWatched(workingPath))
-				{
-					if (workingPath.HasAdminDir())
-						CGitStatusCache::Instance().AddPathToWatch(workingPath);
-				}
 				// first send a notification about a sub folder change, so explorer doesn't discard
 				// the folder notification. Since we only know for sure that the git admin
 				// dir is present, we send a notification for that folder.
-				CString admindir = workingPath.GetWinPathString() + _T("\\") + GitAdminDir::GetAdminDirName();
+				CString admindir(workingPath.GetWinPathString());
+				admindir += L'\\';
+				admindir += GitAdminDir::GetAdminDirName();
 				if(::PathFileExists(admindir))
-					SHChangeNotify(SHCNE_UPDATEITEM, SHCNF_PATH | SHCNF_FLUSHNOWAIT, (LPCTSTR)admindir, NULL);
+					SHChangeNotify(SHCNE_UPDATEITEM, SHCNF_PATH | SHCNF_FLUSHNOWAIT, (LPCTSTR)admindir, nullptr);
 
-				SHChangeNotify(SHCNE_UPDATEITEM, SHCNF_PATH | SHCNF_FLUSHNOWAIT, workingPath.GetWinPath(), NULL);
+				SHChangeNotify(SHCNE_UPDATEITEM, SHCNF_PATH | SHCNF_FLUSHNOWAIT, workingPath.GetWinPath(), nullptr);
 				// Sending an UPDATEDIR notification somehow overwrites/deletes the UPDATEITEM message. And without
 				// that message, the folder overlays in the current view don't get updated without hitting F5.
 				// Drawback is, without UPDATEDIR, the left tree view isn't always updated...
 
-				SHChangeNotify(SHCNE_UPDATEDIR, SHCNF_PATH | SHCNF_FLUSHNOWAIT, workingPath.GetWinPath(), NULL);
+				//SHChangeNotify(SHCNE_UPDATEDIR, SHCNF_PATH | SHCNF_FLUSHNOWAIT, workingPath.GetWinPath(), nullptr);
 			}
 			else
-				SHChangeNotify(SHCNE_UPDATEITEM, SHCNF_PATH | SHCNF_FLUSHNOWAIT, workingPath.GetWinPath(), NULL);
+				SHChangeNotify(SHCNE_UPDATEITEM, SHCNF_PATH | SHCNF_FLUSHNOWAIT, workingPath.GetWinPath(), nullptr);
 		}
 	}
 	_endthread();

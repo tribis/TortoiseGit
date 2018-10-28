@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2013, 2015 - TortoiseGit
+// Copyright (C) 2008-2013, 2015-2016 - TortoiseGit
 // Copyright (C) 2011-2013 Sven Strickroth <email@cs-ware.de>
 
 // This program is free software; you can redistribute it and/or
@@ -69,7 +69,7 @@ END_MESSAGE_MAP()
 
 void CPropertiesWnd::AdjustLayout()
 {
-	if (GetSafeHwnd() == NULL)
+	if (!GetSafeHwnd())
 	{
 		return;
 	}
@@ -77,7 +77,7 @@ void CPropertiesWnd::AdjustLayout()
 	CRect rectClient,rectCombo;
 	GetClientRect(rectClient);
 
-	m_wndPropList.SetWindowPos(NULL, rectClient.left, rectClient.top, rectClient.Width(), rectClient.Height(), SWP_NOACTIVATE | SWP_NOZORDER);
+	m_wndPropList.SetWindowPos(nullptr, rectClient.left, rectClient.top, rectClient.Width(), rectClient.Height(), SWP_NOACTIVATE | SWP_NOZORDER);
 }
 
 int CPropertiesWnd::OnCreate(LPCREATESTRUCT lpCreateStruct)
@@ -120,71 +120,69 @@ void CPropertiesWnd::InitPropList()
 
 	m_CommitHash = new CMFCPropertyGridProperty(
 				CString(MAKEINTRESOURCE(IDS_LOG_HASH)),
-				_T(""),
+				L"",
 				CString(MAKEINTRESOURCE(IDS_LOG_HASH))
 				);
 	pGroup1->AddSubItem(m_CommitHash);
 
 	m_AuthorName = new CMFCPropertyGridProperty(
 				CString(MAKEINTRESOURCE(IDS_LOG_AUTHOR)),
-				_T(""),
+				L"",
 				CString(MAKEINTRESOURCE(IDS_LOG_AUTHOR))
 				);
 	pGroup1->AddSubItem(m_AuthorName);
 
 	m_AuthorDate = new CMFCPropertyGridProperty(
 				CString(MAKEINTRESOURCE(IDS_LOG_DATE)),
-				_T(""),
+				L"",
 				CString(MAKEINTRESOURCE(IDS_LOG_DATE))
 				);
 	pGroup1->AddSubItem(m_AuthorDate);
 
 	m_AuthorEmail= new CMFCPropertyGridProperty(
 				CString(MAKEINTRESOURCE(IDS_LOG_EMAIL)),
-				_T(""),
+				L"",
 				CString(MAKEINTRESOURCE(IDS_LOG_EMAIL))
 				);
 	pGroup1->AddSubItem(m_AuthorEmail);
 
 	m_CommitterName = new CMFCPropertyGridProperty(
 				CString(MAKEINTRESOURCE(IDS_LOG_COMMIT_NAME)),
-				_T(""),
+				L"",
 				CString(MAKEINTRESOURCE(IDS_LOG_COMMIT_NAME))
 				);
 	pGroup1->AddSubItem(m_CommitterName);
 
 	m_CommitterEmail =new CMFCPropertyGridProperty(
 				CString(MAKEINTRESOURCE(IDS_LOG_COMMIT_EMAIL)),
-				_T(""),
+				L"",
 				CString(MAKEINTRESOURCE(IDS_LOG_COMMIT_EMAIL))
 				);
 	pGroup1->AddSubItem(m_CommitterEmail);
 
 	m_CommitterDate = new CMFCPropertyGridProperty(
 				CString(MAKEINTRESOURCE(IDS_LOG_COMMIT_DATE)),
-				_T(""),
+				L"",
 				CString(MAKEINTRESOURCE(IDS_LOG_COMMIT_DATE))
 				);;
 	pGroup1->AddSubItem(m_CommitterDate);
 
 	m_Subject = new CMFCPropertyGridProperty(
 				CString(MAKEINTRESOURCE(IDS_SUBJECT)),
-				_T(""),
+				L"",
 				CString(MAKEINTRESOURCE(IDS_SUBJECT))
 				);;;
 	pGroup1->AddSubItem(m_Subject);
 
 	m_Body = new CMFCPropertyGridProperty(
 				CString(MAKEINTRESOURCE(IDS_BODY)),
-				_T(""),
+				L"",
 				CString(MAKEINTRESOURCE(IDS_BODY))
 				);;;;
 	pGroup1->AddSubItem(m_Body);
 
 	for (int i = 0; i < pGroup1->GetSubItemsCount(); ++i)
-	{
 		pGroup1->GetSubItem(i)->AllowEdit(FALSE);
-	}
 
 	m_wndPropList.AddProperty(pGroup1);
 	m_BaseInfoGroup=pGroup1;
@@ -244,18 +242,18 @@ void CPropertiesWnd::UpdateProperties(GitRevLoglist* pRev)
 		if (pRev->m_ParentHash.empty())
 		{
 			if (pRev->GetParentFromHash(pRev->m_CommitHash))
-				MessageBox(pRev->GetLastErr(), _T("TortoiseGit"), MB_ICONERROR);
+				MessageBox(pRev->GetLastErr(), L"TortoiseGit", MB_ICONERROR);
 		}
 		CString hash = pRev->m_CommitHash.ToString();
 		m_CommitHash->SetValue(hash);
 		m_AuthorName->SetValue(pRev->GetAuthorName());
-		CString authorDate = pRev->GetAuthorDate().Format(_T("%Y-%m-%d %H:%M"));
+		CString authorDate = pRev->GetAuthorDate().Format(L"%Y-%m-%d %H:%M");
 		m_AuthorDate->SetValue(authorDate);
 		m_AuthorEmail->SetValue(pRev->GetAuthorEmail());
 
 		m_CommitterName->SetValue(pRev->GetAuthorName());
 		m_CommitterEmail->SetValue(pRev->GetCommitterEmail());
-		CString committerDate = pRev->GetCommitterDate().Format(_T("%Y-%m-%d %H:%M"));
+		CString committerDate = pRev->GetCommitterDate().Format(L"%Y-%m-%d %H:%M");
 		m_CommitterDate->SetValue(committerDate);
 
 		m_Subject->SetValue(pRev->GetSubject());
@@ -263,7 +261,7 @@ void CPropertiesWnd::UpdateProperties(GitRevLoglist* pRev)
 
 		RemoveParent();
 
-		CLogDataVector *pLogEntry = &((CMainFrame*)AfxGetApp()->GetMainWnd())->m_wndOutput.m_LogList.m_logEntries;
+		CLogDataVector* pLogEntry = &static_cast<CMainFrame*>(AfxGetApp()->GetMainWnd())->m_wndOutput.m_LogList.m_logEntries;
 
 		CGitHashMap & hashMap = pLogEntry->m_pLogCache->m_HashMap;
 		for (size_t i = 0; i < pRev->m_ParentHash.size(); ++i)
@@ -275,7 +273,7 @@ void CPropertiesWnd::UpdateProperties(GitRevLoglist* pRev)
 			if (it != hashMap.end())
 				parentsubject = it->second.GetSubject();
 
-			str.Format(_T("%u - %s\n%s"), i, (LPCTSTR)pRev->m_ParentHash[i].ToString(), (LPCTSTR)parentsubject);
+			str.Format(L"%u - %s\n%s", i, (LPCTSTR)pRev->m_ParentHash[i].ToString(), (LPCTSTR)parentsubject);
 
 			CMFCPropertyGridProperty *pProperty = new CMFCPropertyGridProperty(pRev->m_ParentHash[i].ToString().Left(8), parentsubject, str);
 			pProperty->AllowEdit(FALSE);
@@ -287,22 +285,22 @@ void CPropertiesWnd::UpdateProperties(GitRevLoglist* pRev)
 	}
 	else
 	{
-		m_CommitHash->SetValue(_T(""));
-		m_AuthorName->SetValue(_T(""));
-		m_AuthorDate->SetValue(_T(""));
-		m_AuthorEmail->SetValue(_T(""));
+		m_CommitHash->SetValue(L"");
+		m_AuthorName->SetValue(L"");
+		m_AuthorDate->SetValue(L"");
+		m_AuthorEmail->SetValue(L"");
 
-		m_CommitterName->SetValue(_T(""));
-		m_CommitterEmail->SetValue(_T(""));
-		m_CommitterDate->SetValue(_T(""));
+		m_CommitterName->SetValue(L"");
+		m_CommitterEmail->SetValue(L"");
+		m_CommitterDate->SetValue(L"");
 
-		m_Subject->SetValue(_T(""));
-		m_Body->SetValue(_T(""));
+		m_Subject->SetValue(L"");
+		m_Body->SetValue(L"");
 
 		RemoveParent();
 
 		for (int i = 0; i < m_BaseInfoGroup->GetSubItemsCount(); ++i)
-			m_BaseInfoGroup->GetSubItem(i)->SetDescription(_T(""));
+			m_BaseInfoGroup->GetSubItem(i)->SetDescription(L"");
 	}
 	m_wndPropList.AdjustLayout();
 }
@@ -318,7 +316,7 @@ void CPropertiesWnd::OnContextMenu(CWnd* /*pWnd*/, CPoint point)
 		sMenuItemText.LoadString(IDS_SCIEDIT_COPY);
 		popup.AppendMenu(MF_STRING | MF_ENABLED, WM_COPY, sMenuItemText);
 
-		int cmd = popup.TrackPopupMenu(TPM_RETURNCMD | TPM_LEFTALIGN | TPM_NONOTIFY, point.x, point.y, this, 0);
+		int cmd = popup.TrackPopupMenu(TPM_RETURNCMD | TPM_LEFTALIGN | TPM_NONOTIFY, point.x, point.y, this);
 		switch (cmd)
 		{
 		case 0:

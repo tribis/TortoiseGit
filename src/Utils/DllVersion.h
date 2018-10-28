@@ -27,15 +27,13 @@ inline HRESULT GetDllVersion(
 	_In_ HINSTANCE hInstDLL,
 	_Out_ DLLVERSIONINFO* pDllVersionInfo)
 {
-	ATLENSURE(pDllVersionInfo != NULL);
+	ATLENSURE(pDllVersionInfo);
 
 	// We must get this function explicitly because some DLLs don't implement it.
 	DLLGETVERSIONPROC pfnDllGetVersion = (DLLGETVERSIONPROC)::GetProcAddress(hInstDLL, "DllGetVersion");
 
-	if(pfnDllGetVersion == NULL)
-	{
+	if (!pfnDllGetVersion)
 		return E_NOTIMPL;
-	}
 
 	return (*pfnDllGetVersion)(pDllVersionInfo);
 }
@@ -45,10 +43,8 @@ inline HRESULT GetDllVersion(
 	_Out_ DLLVERSIONINFO* pDllVersionInfo)
 {
 	HINSTANCE hInstDLL = ::LoadLibrary(lpstrDllName);
-	if(hInstDLL == NULL)
-	{
+	if (!hInstDLL)
 		return AtlHresultFromLastError();
-	}
 	HRESULT hRet = GetDllVersion(hInstDLL, pDllVersionInfo);
 	::FreeLibrary(hInstDLL);
 	return hRet;
@@ -64,12 +60,11 @@ inline HRESULT GetShellVersion(
 	_Out_ LPDWORD pdwMajor,
 	_Out_ LPDWORD pdwMinor)
 {
-	ATLENSURE(( pdwMajor != NULL) && ( pdwMinor != NULL ));
+	ATLENSURE(pdwMajor && pdwMinor);
 
-	DLLVERSIONINFO dvi;
-	memset(&dvi, 0, sizeof(dvi));
+	DLLVERSIONINFO dvi = { 0 };
 	dvi.cbSize = sizeof(dvi);
-	HRESULT hRet = GetDllVersion(_T("shell32.dll"), &dvi);
+	HRESULT hRet = GetDllVersion(L"shell32.dll", &dvi);
 
 	if(SUCCEEDED(hRet))
 	{

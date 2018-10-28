@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2011, 2013 - TortoiseGit
+// Copyright (C) 2008-2011, 2013, 2016 - TortoiseGit
 // Copyright (C) 2003-2008, 2013 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -20,14 +20,14 @@
 #pragma once
 #include "SettingsPropPage.h"
 #include "registry.h"
-
+#include "ConfigureGitExe.h"
 
 /**
  * \ingroup TortoiseProc
  * This is the main page of the settings. It contains all the most important
  * settings.
  */
-class CSetMainPage : public ISettingsPropPage
+class CSetMainPage : public ISettingsPropPage, public CConfigureGitExe
 {
 	DECLARE_DYNAMIC(CSetMainPage)
 
@@ -35,28 +35,28 @@ public:
 	CSetMainPage();
 	virtual ~CSetMainPage();
 
-	UINT GetIconID() {return IDI_GENERAL;}
+	UINT GetIconID() override { return IDI_GENERAL; }
 
 	enum { IDD = IDD_SETTINGSMAIN };
 
 protected:
-	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
+	virtual void DoDataExchange(CDataExchange* pDX) override;    // DDX/DDV support
 
 	DECLARE_MESSAGE_MAP()
 
-	virtual BOOL OnInitDialog();
-	virtual BOOL OnApply();
+	virtual BOOL OnInitDialog() override;
+	virtual BOOL OnApply() override;
 	afx_msg void OnModified();
+	afx_msg void OnClickVersioncheck();
 	afx_msg void OnMsysGitPathModify();
 	afx_msg void OnBnClickedChecknewerbutton();
 	afx_msg void OnBrowseDir();
 	afx_msg void OnCheck();
 	afx_msg void OnBnClickedButtonShowEnv();
 	afx_msg void OnBnClickedCreatelib();
+	afx_msg void OnBnClickedRunfirststartwizard();
 
 private:
-	CRegString		m_regMsysGitPath;
-	CRegString		m_regMsysGitExtranPath;
 	CString			m_sMsysGitPath;
 	CString			m_sMsysGitExtranPath;
 	CComboBox		m_LanguageCombo;

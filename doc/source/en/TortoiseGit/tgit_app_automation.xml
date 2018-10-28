@@ -132,7 +132,7 @@ Don't touch these lines:
 							<entry>
 								Allows to control the <link linkend="tgit-dug-bisect">bisect logic</link> of TortoiseGit.
 								Use the <option>/start</option> parameter to start a bisect you can specify <option>/good:REF</option> and <option>/bad:REF</option> here).
-								When bisect is active, you can use <option>/good</option>, <option>/bad</option> and <option>/reset</option> to control the bisect process.
+								When bisect is active, you can use <option>/good</option>, <option>/bad</option>, <option>/skip</option> and <option>/reset</option> to control the bisect process.
 							</entry>
 						</row>
 						<row>
@@ -140,6 +140,12 @@ Don't touch these lines:
 							<entry>
 								Opens the <link linkend="tgit-dug-pull">fetch dialog</link>.
 								Use the <option>/remote</option> parameter to control the remote which should be pre-selected.
+							</entry>
+						</row>
+						<row>
+							<entry condition="pot">:firststart</entry>
+							<entry>
+								Shows the first start wizard.
 							</entry>
 						</row>
 						<row>
@@ -374,7 +380,7 @@ Don't touch these lines:
 								then the diff is done between the file in
 								<option>/path</option> and its BASE.
 								To explicitly set the revision use
-								<option>/startrev:xxx</option> and
+								<option>/startrev:xxx</option> (BASE revision) and
 								<option>/endrev:xxx</option>.
 								Add <option>/unified</option> to get a unified diff.
 								Add <option>/line:NN</option> to get scroll to the mentioned line.
@@ -394,7 +400,8 @@ Don't touch these lines:
 								a dialog with a list of files that have changed (filtered by a possibly entered subpath) or if 
 								the path point to a file starts the diff viewer for 
 								those the file in the different revisions.
-								Use <option>/revision1:xxx</option> and <option>/revision2:xxx</option> to specify the revisions to compare.
+								Use <option>/revision1:xxx</option> and <option>/revision2:xxx</option> to specify the revisions to compare,
+								whereas <option>/revision1:xxx</option> indicates the base revision to compare with.
 								</para>
 							</entry>
 						</row>

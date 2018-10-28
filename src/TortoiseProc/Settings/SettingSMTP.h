@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2009, 2013 - TortoiseGit
+// Copyright (C) 2009, 2013, 2016-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -28,19 +28,19 @@ class CSettingSMTP : public ISettingsPropPage
 public:
 	CSettingSMTP();
 	virtual ~CSettingSMTP();
-	UINT GetIconID() { return IDI_MENUSENDMAIL; }
+	UINT GetIconID() override { return IDI_MENUSENDMAIL; }
 
 // Dialog Data
 	enum { IDD = IDD_SETTINGSMTP };
 
-	BOOL OnInitDialog();
-	BOOL OnApply();
+	virtual BOOL OnInitDialog() override;
+	virtual BOOL OnApply() override;
 	afx_msg void OnModified();
 	afx_msg void OnModifiedEncryptionCombo();
 	afx_msg void OnModifiedDeliveryCombo();
 
 protected:
-	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
+	virtual void DoDataExchange(CDataExchange* pDX) override;    // DDX/DDV support
 
 	DECLARE_MESSAGE_MAP()
 
@@ -48,7 +48,6 @@ protected:
 	CComboBox		m_SMTPEncryptionCombo;
 
 	afx_msg void OnBnClickedSmtpAuth();
-	afx_msg void OnBnClickedSmtpUseconfiguredserver();
 
 private:
 	CRegDWORD		m_regDeliveryType;
@@ -56,8 +55,6 @@ private:
 	CRegDWORD		m_regPort;
 	CRegDWORD		m_regEncryption;
 	CRegDWORD		m_regAuthenticate;
-	CRegString		m_regUsername;
-	CRegString		m_regPassword;
 
 	DWORD m_dwDeliveryType;
 	DWORD m_dwSMTPEnrcyption;

@@ -18,7 +18,7 @@
 //
 #pragma once
 #include "afxcmn.h"
-#include "SimpleIni.h"
+#include "../../ext/SimpleIni/SimpleIni.h"
 
 // CRegexFiltersDlg dialog
 
@@ -27,7 +27,7 @@ class CRegexFiltersDlg : public CDialogEx
 	DECLARE_DYNAMIC(CRegexFiltersDlg)
 
 public:
-	CRegexFiltersDlg(CWnd* pParent = NULL);   // standard constructor
+	CRegexFiltersDlg(CWnd* pParent = nullptr);   // standard constructor
 	virtual ~CRegexFiltersDlg();
 
 // Dialog Data

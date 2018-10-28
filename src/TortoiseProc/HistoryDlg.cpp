@@ -24,10 +24,10 @@
 
 
 IMPLEMENT_DYNAMIC(CHistoryDlg, CResizableStandAloneDialog)
-CHistoryDlg::CHistoryDlg(CWnd* pParent /*=NULL*/)
+CHistoryDlg::CHistoryDlg(CWnd* pParent /*=nullptr*/)
 	: CResizableStandAloneDialog(CHistoryDlg::IDD, pParent)
+	, m_history(nullptr)
 {
-	m_history = NULL;
 }
 
 CHistoryDlg::~CHistoryDlg()
@@ -83,7 +83,7 @@ BOOL CHistoryDlg::OnInitDialog()
 	AddAnchor(IDC_HISTORYLIST, TOP_LEFT, BOTTOM_RIGHT);
 	AddAnchor(IDOK, BOTTOM_RIGHT);
 	AddAnchor(IDCANCEL, BOTTOM_RIGHT);
-	EnableSaveRestore(_T("HistoryDlg"));
+	EnableSaveRestore(L"HistoryDlg");
 	m_List.SetFocus();
 	return FALSE;
 }

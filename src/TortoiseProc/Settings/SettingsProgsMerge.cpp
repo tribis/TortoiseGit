@@ -1,5 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
+// Copyright (C) 2009, 2011, 2013-2016 - TortoiseGit
 // Copyright (C) 2003-2007 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -26,9 +27,9 @@ IMPLEMENT_DYNAMIC(CSettingsProgsMerge, ISettingsPropPage)
 CSettingsProgsMerge::CSettingsProgsMerge()
 	: ISettingsPropPage(CSettingsProgsMerge::IDD)
 	, m_iExtMerge(0)
-	, m_dlgAdvMerge(_T("Merge"))
+	, m_dlgAdvMerge(L"Merge")
 {
-	m_regMergePath = CRegString(_T("Software\\TortoiseGit\\Merge"));
+	m_regMergePath = CRegString(L"Software\\TortoiseGit\\Merge");
 }
 
 CSettingsProgsMerge::~CSettingsProgsMerge()
@@ -78,8 +79,8 @@ BOOL CSettingsProgsMerge::OnInitDialog()
 BOOL CSettingsProgsMerge::OnApply()
 {
 	UpdateData();
-	if (m_iExtMerge == 0 && !m_sMergePath.IsEmpty() && m_sMergePath.Left(1) != _T("#"))
-		m_sMergePath = _T("#") + m_sMergePath;
+	if (m_iExtMerge == 0 && !m_sMergePath.IsEmpty() && m_sMergePath.Left(1) != L"#")
+		m_sMergePath = L'#' + m_sMergePath;
 
 	m_regMergePath = m_sMergePath;
 
@@ -114,8 +115,13 @@ void CSettingsProgsMerge::OnEnChangeExtmerge()
 
 void CSettingsProgsMerge::OnBnClickedExtmergebrowse()
 {
-	if (CAppUtils::FileOpenSave(m_sMergePath, NULL, IDS_SETTINGS_SELECTMERGE, IDS_PROGRAMSFILEFILTER, true, m_hWnd))
+	UpdateData();
+	CString filename = m_sMergePath;
+	if (!PathFileExists(filename))
+		filename.Empty();
+	if (CAppUtils::FileOpenSave(filename, nullptr, IDS_SETTINGS_SELECTMERGE, IDS_PROGRAMSFILEFILTER, true, m_hWnd))
 	{
+		m_sMergePath = filename;
 		UpdateData(FALSE);
 		SetModified();
 	}
@@ -130,9 +136,9 @@ void CSettingsProgsMerge::OnBnClickedExtmergeadvanced()
 void CSettingsProgsMerge::CheckProgComment()
 {
 	UpdateData();
-	if (m_iExtMerge == 0 && !m_sMergePath.IsEmpty() && m_sMergePath.Left(1) != _T("#"))
-		m_sMergePath = _T("#") + m_sMergePath;
+	if (m_iExtMerge == 0 && !m_sMergePath.IsEmpty() && m_sMergePath.Left(1) != L"#")
+		m_sMergePath = L'#' + m_sMergePath;
 	else if (m_iExtMerge == 1)
-		m_sMergePath.TrimLeft('#');
+		m_sMergePath.TrimLeft(L'#');
 	UpdateData(FALSE);
 }

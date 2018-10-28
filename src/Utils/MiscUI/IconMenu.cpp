@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2010-2011, 2013 - TortoiseGit
+// Copyright (C) 2010-2011, 2013, 2016 - TortoiseGit
 // Copyright (C) 2008-2009, 2011 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -20,10 +20,11 @@
 #include "stdafx.h"
 #include "IconMenu.h"
 #include "registry.h"
+#include "LoadIconEx.h"
 
 CIconMenu::CIconMenu(void) : CMenu()
 {
-	bShowIcons = !!DWORD(CRegDWORD(_T("Software\\TortoiseGit\\ShowAppContextMenuIcons"), TRUE));
+	bShowIcons = !!DWORD(CRegDWORD(L"Software\\TortoiseGit\\ShowAppContextMenuIcons", TRUE));
 }
 
 CIconMenu::~CIconMenu(void)
@@ -54,9 +55,7 @@ BOOL CIconMenu::CreatePopupMenu()
 
 BOOL CIconMenu::SetMenuStyle(void)
 {
-	MENUINFO MenuInfo;
-
-	memset(&MenuInfo, 0, sizeof(MenuInfo));
+	MENUINFO MenuInfo = { 0 };
 
 	MenuInfo.cbSize  = sizeof(MenuInfo);
 	MenuInfo.fMask   = MIM_STYLE | MIM_APPLYTOSUBMENUS;
@@ -67,10 +66,10 @@ BOOL CIconMenu::SetMenuStyle(void)
 	return TRUE;
 }
 
-BOOL CIconMenu::AppendMenuIcon(UINT_PTR nIDNewItem, LPCTSTR lpszNewItem, UINT uIcon /* = 0 */, HMENU hsubmenu /* = 0 */)
+BOOL CIconMenu::AppendMenuIcon(UINT_PTR nIDNewItem, LPCTSTR lpszNewItem, UINT uIcon /* = 0 */, HMENU hsubmenu /* = nullptr */)
 {
 	TCHAR menutextbuffer[255] = {0};
-	_tcscpy_s(menutextbuffer, lpszNewItem);
+	wcscpy_s(menutextbuffer, lpszNewItem);
 
 	MENUITEMINFO info = {0};
 	info.cbSize = sizeof(info);
@@ -96,7 +95,7 @@ BOOL CIconMenu::AppendMenuIcon(UINT_PTR nIDNewItem, LPCTSTR lpszNewItem, UINT uI
 	return InsertMenuItem((UINT)nIDNewItem, &info);
 }
 
-BOOL CIconMenu::AppendMenuIcon(UINT_PTR nIDNewItem, UINT_PTR nNewItem, UINT uIcon /* = 0 */, HMENU hsubmenu /* = 0 */)
+BOOL CIconMenu::AppendMenuIcon(UINT_PTR nIDNewItem, UINT_PTR nNewItem, UINT uIcon /* = 0 */, HMENU hsubmenu /* = nullptr */)
 {
 	CString temp;
 	temp.LoadString((UINT)nNewItem);
@@ -106,31 +105,33 @@ BOOL CIconMenu::AppendMenuIcon(UINT_PTR nIDNewItem, UINT_PTR nNewItem, UINT uIco
 
 void CIconMenu::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
 {
-	if ((lpDrawItemStruct==NULL)||(lpDrawItemStruct->CtlType != ODT_MENU))
+	if (!lpDrawItemStruct || lpDrawItemStruct->CtlType != ODT_MENU)
 		return;		//not for a menu
-	HICON hIcon = NULL;
+	HICON hIcon = nullptr;
 	bool bDestroyIcon = true;
+	int iconWidth = GetSystemMetrics(SM_CXSMICON);
+	int iconHeight = GetSystemMetrics(SM_CYSMICON);
 	if (iconhandles.find(lpDrawItemStruct->itemID) != iconhandles.end())
 	{
 		hIcon = iconhandles[lpDrawItemStruct->itemID];
 		bDestroyIcon = false;
 	}
 	else
-		hIcon = (HICON)LoadImage(AfxGetResourceHandle(), MAKEINTRESOURCE(icons[lpDrawItemStruct->itemID]), IMAGE_ICON, 16, 16, LR_DEFAULTCOLOR);
-	if (hIcon == NULL)
+		hIcon = LoadIconEx(AfxGetResourceHandle(), MAKEINTRESOURCE(icons[lpDrawItemStruct->itemID]), iconWidth, iconHeight);
+	if (!hIcon)
 		return;
 	DrawIconEx(lpDrawItemStruct->hDC,
-		lpDrawItemStruct->rcItem.left - 16,
-		lpDrawItemStruct->rcItem.top + (lpDrawItemStruct->rcItem.bottom - lpDrawItemStruct->rcItem.top - 16) / 2,
-		hIcon, 16, 16,
-		0, NULL, DI_NORMAL);
+		lpDrawItemStruct->rcItem.left - iconWidth,
+		lpDrawItemStruct->rcItem.top + (lpDrawItemStruct->rcItem.bottom - lpDrawItemStruct->rcItem.top - iconHeight) / 2,
+		hIcon, iconWidth, iconHeight,
+		0, nullptr, DI_NORMAL);
 	if (bDestroyIcon)
 		DestroyIcon(hIcon);
 }
 
 void CIconMenu::MeasureItem(LPMEASUREITEMSTRUCT lpMeasureItemStruct)
 {
-	if (lpMeasureItemStruct==NULL)
+	if (!lpMeasureItemStruct)
 		return;
 	lpMeasureItemStruct->itemWidth += 2;
 	if (lpMeasureItemStruct->itemHeight < 16)
@@ -139,14 +140,12 @@ void CIconMenu::MeasureItem(LPMEASUREITEMSTRUCT lpMeasureItemStruct)
 
 BOOL CIconMenu::SetMenuItemData(UINT_PTR nIDNewItem, LONG_PTR data)
 {
-
 	MENUITEMINFO menuinfo ={0};
 	menuinfo.cbSize = sizeof(menuinfo);
 	GetMenuItemInfo((UINT)nIDNewItem, &menuinfo);
 	menuinfo.dwItemData =data;
 	menuinfo.fMask |= MIIM_DATA;
 	return SetMenuItemInfo((UINT)nIDNewItem ,&menuinfo);
-
 }
 
 LONG_PTR CIconMenu::GetMenuItemData(UINT_PTR nIDNewItem)

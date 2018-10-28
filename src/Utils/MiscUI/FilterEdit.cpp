@@ -1,7 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2012, 2014 - TortoiseGit
-// Copyright (C) 2007, 2012-2013 - TortoiseSVN
+// Copyright (C) 2012, 2014, 2016-2018 - TortoiseGit
+// Copyright (C) 2007, 2012-2014, 2018 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -19,19 +19,24 @@
 //
 #include "stdafx.h"
 #include "FilterEdit.h"
+#include "DPIAware.h"
+#include "LoadIconEx.h"
+
+const UINT CFilterEdit::WM_FILTEREDIT_INFOCLICKED = ::RegisterWindowMessage(L"TGITWM_FILTEREDIT_INFOCLICKED");
+const UINT CFilterEdit::WM_FILTEREDIT_CANCELCLICKED = ::RegisterWindowMessage(L"TGITWM_FILTEREDIT_CANCELCLICKED");
 
 IMPLEMENT_DYNAMIC(CFilterEdit, CEdit)
 
-CFilterEdit::CFilterEdit() : m_hIconCancelNormal(NULL)
-	, m_hIconCancelPressed(NULL)
-	, m_hIconInfo(NULL)
+CFilterEdit::CFilterEdit()
+	: m_hIconCancelNormal(nullptr)
+	, m_hIconCancelPressed(nullptr)
+	, m_hIconInfo(nullptr)
 	, m_bPressed(FALSE)
 	, m_bShowCancelButtonAlways(FALSE)
 	, m_iButtonClickedMessageId(WM_FILTEREDIT_INFOCLICKED)
 	, m_iCancelClickedMessageId(WM_FILTEREDIT_CANCELCLICKED)
-	, m_pValidator(NULL)
+	, m_pValidator(nullptr)
 	, m_backColor(GetSysColor(COLOR_WINDOW))
-	, m_brBack(NULL)
 {
 	m_rcEditArea.SetRect(0, 0, 0, 0);
 	m_rcButtonArea.SetRect(0, 0, 0, 0);
@@ -48,8 +53,6 @@ CFilterEdit::~CFilterEdit()
 		DestroyIcon(m_hIconCancelPressed);
 	if (m_hIconInfo)
 		DestroyIcon(m_hIconInfo);
-	if (m_brBack)
-		DeleteObject(m_brBack);
 }
 
 BEGIN_MESSAGE_MAP(CFilterEdit, CEdit)
@@ -68,6 +71,7 @@ BEGIN_MESSAGE_MAP(CFilterEdit, CEdit)
 	ON_CONTROL_REFLECT(EN_KILLFOCUS, &CFilterEdit::OnEnKillfocus)
 	ON_CONTROL_REFLECT(EN_SETFOCUS, &CFilterEdit::OnEnSetfocus)
 	ON_MESSAGE(WM_PASTE, &CFilterEdit::OnPaste)
+	ON_WM_SYSCOLORCHANGE()
 END_MESSAGE_MAP()
 
 
@@ -88,7 +92,7 @@ BOOL CFilterEdit::PreTranslateMessage( MSG* pMsg )
 	return CEdit::PreTranslateMessage(pMsg);
 }
 
-BOOL CFilterEdit::SetCancelBitmaps(UINT uCancelNormal, UINT uCancelPressed, BOOL bShowAlways)
+BOOL CFilterEdit::SetCancelBitmaps(UINT uCancelNormal, UINT uCancelPressed, int cx96dpi, int cy96dpi, BOOL bShowAlways)
 {
 	m_bShowCancelButtonAlways = bShowAlways;
 
@@ -97,10 +101,10 @@ BOOL CFilterEdit::SetCancelBitmaps(UINT uCancelNormal, UINT uCancelPressed, BOOL
 	if (m_hIconCancelPressed)
 		DestroyIcon(m_hIconCancelPressed);
 
-	m_hIconCancelNormal = (HICON)LoadImage(AfxGetResourceHandle(), MAKEINTRESOURCE(uCancelNormal), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
-	m_hIconCancelPressed = (HICON)LoadImage(AfxGetResourceHandle(), MAKEINTRESOURCE(uCancelPressed), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
+	m_hIconCancelNormal = LoadDpiScaledIcon(uCancelNormal, cx96dpi, cy96dpi);
+	m_hIconCancelPressed = LoadDpiScaledIcon(uCancelPressed, cx96dpi, cy96dpi);
 
-	if ((m_hIconCancelNormal == 0) || (m_hIconCancelPressed == 0))
+	if (!m_hIconCancelNormal || !m_hIconCancelPressed)
 		return FALSE;
 
 	m_sizeCancelIcon = GetIconSize(m_hIconCancelNormal);
@@ -109,14 +113,14 @@ BOOL CFilterEdit::SetCancelBitmaps(UINT uCancelNormal, UINT uCancelPressed, BOOL
 	return TRUE;
 }
 
-BOOL CFilterEdit::SetInfoIcon(UINT uInfo)
+BOOL CFilterEdit::SetInfoIcon(UINT uInfo, int cx96dpi, int cy96dpi)
 {
 	if (m_hIconInfo)
 		DestroyIcon(m_hIconInfo);
 
-	m_hIconInfo = (HICON)LoadImage(AfxGetResourceHandle(), MAKEINTRESOURCE(uInfo), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
+	m_hIconInfo = LoadDpiScaledIcon(uInfo, cx96dpi, cy96dpi);
 
-	if (m_hIconInfo == 0)
+	if (!m_hIconInfo)
 		return FALSE;
 
 	m_sizeInfoIcon = GetIconSize(m_hIconInfo);
@@ -129,12 +133,12 @@ BOOL CFilterEdit::SetCueBanner(LPCWSTR lpcwText)
 {
 	if (lpcwText)
 	{
-		size_t len = _tcslen(lpcwText);
-		m_pCueBanner.reset(new TCHAR[len + 1]);
-		_tcscpy_s(m_pCueBanner.get(), len + 1, lpcwText);
-		InvalidateRect(NULL, TRUE);
+		m_sCueBanner = lpcwText;
+		InvalidateRect(nullptr, TRUE);
 		return TRUE;
 	}
+	m_sCueBanner.Empty();
+	InvalidateRect(nullptr, TRUE);
 	return FALSE;
 }
 
@@ -143,7 +147,7 @@ void CFilterEdit::ResizeWindow()
 	if (!::IsWindow(m_hWnd))
 		return;
 
-	RECT editrc, rc;
+	CRect editrc, rc;
 	GetRect(&editrc);
 	GetClientRect(&rc);
 	editrc.left = rc.left + 4;
@@ -151,10 +155,16 @@ void CFilterEdit::ResizeWindow()
 	editrc.right = rc.right - 4;
 	editrc.bottom = rc.bottom - 4;
 
+	CWindowDC dc(this);
+	HGDIOBJ oldFont = dc.SelectObject(GetFont()->GetSafeHandle());
+	TEXTMETRIC tm = { 0 };
+	dc.GetTextMetrics(&tm);
+	dc.SelectObject(oldFont);
+
 	m_rcEditArea.left = editrc.left + m_sizeInfoIcon.cx;
 	m_rcEditArea.right = editrc.right - m_sizeCancelIcon.cx - 5;
-	m_rcEditArea.top = editrc.top;
-	m_rcEditArea.bottom = editrc.bottom;
+	m_rcEditArea.top = (rc.Height() - tm.tmHeight) / 2;
+	m_rcEditArea.bottom = m_rcEditArea.top + tm.tmHeight;
 
 	m_rcButtonArea.left = m_rcEditArea.right + 5;
 	m_rcButtonArea.right = rc.right;
@@ -202,18 +212,18 @@ BOOL CFilterEdit::OnEraseBkgnd(CDC* pDC)
 		if (!m_bPressed)
 		{
 			DrawIconEx(pDC->GetSafeHdc(), m_rcButtonArea.left, m_rcButtonArea.top, m_hIconCancelNormal,
-				m_sizeCancelIcon.cx, m_sizeCancelIcon.cy, 0, NULL, DI_NORMAL);
+				m_sizeCancelIcon.cx, m_sizeCancelIcon.cy, 0, nullptr, DI_NORMAL);
 		}
 		else
 		{
 			DrawIconEx(pDC->GetSafeHdc(), m_rcButtonArea.left, m_rcButtonArea.top, m_hIconCancelPressed,
-				m_sizeCancelIcon.cx, m_sizeCancelIcon.cy, 0, NULL, DI_NORMAL);
+				m_sizeCancelIcon.cx, m_sizeCancelIcon.cy, 0, nullptr, DI_NORMAL);
 		}
 	}
 	if (m_hIconInfo)
 	{
 		DrawIconEx(pDC->GetSafeHdc(), m_rcInfoArea.left, m_rcInfoArea.top, m_hIconInfo,
-			m_sizeInfoIcon.cx, m_sizeInfoIcon.cy, 0, NULL, DI_NORMAL);
+			m_sizeInfoIcon.cx, m_sizeInfoIcon.cy, 0, nullptr, DI_NORMAL);
 	}
 
 	return TRUE;
@@ -222,10 +232,10 @@ BOOL CFilterEdit::OnEraseBkgnd(CDC* pDC)
 void CFilterEdit::OnLButtonUp(UINT nFlags, CPoint point)
 {
 	m_bPressed = FALSE;
-	InvalidateRect(NULL);
+	InvalidateRect(nullptr);
 	if (m_rcButtonArea.PtInRect(point))
 	{
-		SetWindowText(_T(""));
+		SetWindowText(L"");
 		CWnd *pOwner = GetOwner();
 		if (pOwner)
 		{
@@ -250,7 +260,7 @@ void CFilterEdit::OnLButtonUp(UINT nFlags, CPoint point)
 void CFilterEdit::OnLButtonDown(UINT nFlags, CPoint point)
 {
 	m_bPressed = m_rcButtonArea.PtInRect(point);
-	//InvalidateRect(NULL);
+	//InvalidateRect(nullptr);
 	CEdit::OnLButtonDown(nFlags, point);
 }
 
@@ -298,7 +308,7 @@ BOOL CFilterEdit::OnEnChange()
 {
 	// check whether the entered text is valid
 	Validate();
-	InvalidateRect(NULL);
+	InvalidateRect(nullptr);
 	return FALSE;
 }
 
@@ -309,7 +319,7 @@ HBRUSH CFilterEdit::CtlColor(CDC* pDC, UINT /*nCtlColor*/)
 		pDC->SetBkColor(m_backColor);
 		return m_brBack;
 	}
-	return NULL;
+	return nullptr;
 }
 
 void CFilterEdit::ValidateAndRedraw()
@@ -321,11 +331,10 @@ void CFilterEdit::Validate()
 {
 	if (m_pValidator)
 	{
-		int len = GetWindowTextLength();
-		TCHAR * pBuf = new TCHAR[len+1];
-		GetWindowText(pBuf, len+1);
+		CString text;
+		GetWindowText(text);
 		m_backColor = GetSysColor(COLOR_WINDOW);
-		if (!m_pValidator->Validate(pBuf))
+		if (!m_pValidator->Validate(text))
 		{
 			// Use a background color slightly shifted to red.
 			// We do this by increasing red component and decreasing green and blue.
@@ -340,11 +349,9 @@ void CFilterEdit::Validate()
 			g = g * (100 - SHIFT_PRECENTAGE) / 100;
 			b = b * (100 - SHIFT_PRECENTAGE) / 100;
 			m_backColor = RGB(r, g, b);
-			if (m_brBack)
-				DeleteObject(m_brBack);
-			m_brBack = CreateSolidBrush(m_backColor);
+			m_brBack.DeleteObject();
+			m_brBack.CreateSolidBrush(m_backColor);
 		}
-		delete [] pBuf;
 	}
 }
 
@@ -369,38 +376,40 @@ void CFilterEdit::OnPaint()
 
 void CFilterEdit::DrawDimText()
 {
-	if (m_pCueBanner.get() == NULL)
+	if (m_sCueBanner.IsEmpty())
 		return;
 	if (GetWindowTextLength())
-		return;
-	if (m_pCueBanner.get()[0] == 0)
 		return;
 	if (GetFocus() == this)
 		return;
 
 	CClientDC	dcDraw(this);
-	CRect		rRect;
 	int			iState = dcDraw.SaveDC();
-
-	GetClientRect(&rRect);
-	rRect.OffsetRect(1, 1);
 
 	dcDraw.SelectObject((*GetFont()));
 	dcDraw.SetTextColor(GetSysColor(COLOR_GRAYTEXT));
 	dcDraw.SetBkColor(GetSysColor(COLOR_WINDOW));
-	dcDraw.DrawText(m_pCueBanner.get(), (int)_tcslen(m_pCueBanner.get()), &rRect, DT_CENTER | DT_VCENTER);
+	dcDraw.DrawText(m_sCueBanner, m_sCueBanner.GetLength(), &m_rcEditArea, DT_CENTER | DT_VCENTER);
 	dcDraw.RestoreDC(iState);
 	return;
 }
 
+HICON CFilterEdit::LoadDpiScaledIcon(UINT resourceId, int cx96dpi, int cy96dpi)
+{
+	CWindowDC dc(this); 
+	int cx = MulDiv(cx96dpi, dc.GetDeviceCaps(LOGPIXELSX), 96);
+	int cy = MulDiv(cy96dpi, dc.GetDeviceCaps(LOGPIXELSY), 96);
+	return LoadIconEx(AfxGetResourceHandle(), MAKEINTRESOURCE(resourceId), cx, cy);
+}
+
 void CFilterEdit::OnEnKillfocus()
 {
-	InvalidateRect(NULL);
+	InvalidateRect(nullptr);
 }
 
 void CFilterEdit::OnEnSetfocus()
 {
-	InvalidateRect(NULL);
+	InvalidateRect(nullptr);
 }
 
 LRESULT CFilterEdit::OnPaste(WPARAM, LPARAM)
@@ -413,12 +422,12 @@ LRESULT CFilterEdit::OnPaste(WPARAM, LPARAM)
 		CloseClipboard();
 
 		// elimate control chars, especially newlines
-		toInsert.Replace(_T('\t'), _T(' '));
+		toInsert.Replace(L'\t', L' ');
 
 		// only insert first line
-		toInsert.Replace(_T('\r'), _T('\n'));
+		toInsert.Replace(L'\r', L'\n');
 		int pos = 0;
-		toInsert = toInsert.Tokenize(_T("\n"), pos);
+		toInsert = toInsert.Tokenize(L"\n", pos);
 		toInsert.Trim();
 
 		// get the current text
@@ -439,5 +448,17 @@ LRESULT CFilterEdit::OnPaste(WPARAM, LPARAM)
 
 		GetParent()->SendMessage(WM_COMMAND, MAKEWPARAM(GetDlgCtrlID(), EN_CHANGE), (LPARAM)GetSafeHwnd());
 	}
+	return 0;
+}
+
+void CFilterEdit::OnSysColorChange()
+{
+	__super::OnSysColorChange();
+	m_backColor = GetSysColor(COLOR_WINDOW);
+	Invalidate();
+}
+
+ULONG CFilterEdit::GetGestureStatus(CPoint /*ptTouch*/)
+{
 	return 0;
 }

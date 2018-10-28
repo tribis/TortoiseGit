@@ -27,6 +27,9 @@
     <Filter Include="Header Files\ewah">
       <UniqueIdentifier>{50d6f856-35ed-4e73-a2d1-ef4c334be249}</UniqueIdentifier>
     </Filter>
+    <Filter Include="git\refs">
+      <UniqueIdentifier>{bb065187-02fc-455a-851f-1f7109cba5ec}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\tgit\compat\msvc.c">
@@ -84,9 +87,6 @@
       <Filter>compat</Filter>
     </ClCompile>
     <ClCompile Include="..\tgit\compat\win32mmap.c">
-      <Filter>compat</Filter>
-    </ClCompile>
-    <ClCompile Include="..\tgit\compat\winansi.c">
       <Filter>compat</Filter>
     </ClCompile>
     <ClCompile Include="..\tgit\abspath.c">
@@ -842,6 +842,72 @@
     <ClCompile Include="..\tgit\ewah\ewah_rlw.c">
       <Filter>git\ewah</Filter>
     </ClCompile>
+    <ClCompile Include="..\tgit\builtin\am.c">
+      <Filter>BuildIn</Filter>
+    </ClCompile>
+    <ClCompile Include="..\tgit\builtin\pull.c">
+      <Filter>BuildIn</Filter>
+    </ClCompile>
+    <ClCompile Include="..\tgit\ref-filter.c">
+      <Filter>git</Filter>
+    </ClCompile>
+    <ClCompile Include="..\tgit\submodule-config.c">
+      <Filter>git</Filter>
+    </ClCompile>
+    <ClCompile Include="..\tgit\tempfile.c">
+      <Filter>git</Filter>
+    </ClCompile>
+    <ClCompile Include="..\tgit\refs\files-backend.c">
+      <Filter>git\refs</Filter>
+    </ClCompile>
+    <ClCompile Include="..\tgit\worktree.c">
+      <Filter>git</Filter>
+    </ClCompile>
+    <ClCompile Include="..\tgit\dir-iterator.c">
+      <Filter>git</Filter>
+    </ClCompile>
+    <ClCompile Include="..\tgit\mru.c">
+      <Filter>git</Filter>
+    </ClCompile>
+    <ClCompile Include="..\tgit\refs\iterator.c">
+      <Filter>git\refs</Filter>
+    </ClCompile>
+    <ClCompile Include="..\tgit\apply.c">
+      <Filter>git</Filter>
+    </ClCompile>
+    <ClCompile Include="..\tgit\tmp-objdir.c">
+      <Filter>git</Filter>
+    </ClCompile>
+    <ClCompile Include="..\tgit\compat\qsort_s.c">
+      <Filter>compat</Filter>
+    </ClCompile>
+    <ClCompile Include="..\tgit\compat\winansi.c">
+      <Filter>compat</Filter>
+    </ClCompile>
+    <ClCompile Include="..\tgit\trailer.c">
+      <Filter>git</Filter>
+    </ClCompile>
+    <ClCompile Include="..\tgit\refs\ref-cache.c">
+      <Filter>git\refs</Filter>
+    </ClCompile>
+    <ClCompile Include="..\tgit\oidset.c">
+      <Filter>git</Filter>
+    </ClCompile>
+    <ClCompile Include="..\tgit\repository.c">
+      <Filter>git</Filter>
+    </ClCompile>
+    <ClCompile Include="..\tgit\sub-process.c">
+      <Filter>git</Filter>
+    </ClCompile>
+    <ClCompile Include="..\tgit\packfile.c">
+      <Filter>git</Filter>
+    </ClCompile>
+    <ClCompile Include="..\tgit\oidmap.c">
+      <Filter>git</Filter>
+    </ClCompile>
+    <ClCompile Include="..\tgit\refs\packed-backend.c">
+      <Filter>git\refs</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\tgit\compat\msvc.h">
@@ -1164,6 +1230,70 @@
     </ClInclude>
     <ClInclude Include="..\tgit\ewah\ewok_rlw.h">
       <Filter>Header Files\ewah</Filter>
+    </ClInclude>
+    <ClInclude Include="..\tgit\ref-filter.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\tgit\submodule-config.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\tgit\tempfile.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\tgit\refs\refs-internal.h">
+      <Filter>git\refs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\tgit\worktree.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\tgit\dir-iterator.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\tgit\iterator.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\tgit\list.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\tgit\mru.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="libgit-defines.h" />
+    <ClInclude Include="..\tgit\apply.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\tgit\tmp-objdir.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\tgit\hash.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\tgit\trailer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\tgit\refs\ref-cache.h">
+      <Filter>git\refs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\tgit\oidset.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\tgit\config.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\tgit\repository.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\tgit\sub-process.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\tgit\packfile.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\tgit\refs\packed-backend.h">
+      <Filter>git\refs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\tgit\oidmap.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

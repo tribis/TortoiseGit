@@ -1,7 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2013-2015 Sven Strickroth <email@cs-ware.de>
-// Copyright (C) 2014-2015 TortoiseGit
+// Copyright (C) 2013-2017 Sven Strickroth <email@cs-ware.de>
+// Copyright (C) 2014-2017 TortoiseGit
 // Copyright (C) VLC project (http://videolan.org)
 // - pgp parsing code was copied from src/misc/update(_crypto)?.c
 // Copyright (C) The Internet Society (1998).  All Rights Reserved.
@@ -26,7 +26,7 @@
 #include "FormatMessageWrapper.h"
 #include <atlenc.h>
 #define NEED_SIGNING_KEY
-#include "..\version.h"
+#include "../version.h"
 #include "TempFile.h"
 #include "SmartHandle.h"
 
@@ -246,7 +246,7 @@ static size_t parse_signature_v4_packet(signature_packet_t *p_sig, const uint8_t
 		{
 			if (p + 2 > max_pos)
 				return 0;
-			i_subpacket_len = (*p++ - 192) << 8;
+			i_subpacket_len = ((size_t)(*p++ - 192)) << 8;
 			i_subpacket_len += *p++ + 192;
 		}
 		else
@@ -254,8 +254,8 @@ static size_t parse_signature_v4_packet(signature_packet_t *p_sig, const uint8_t
 			if (p + 4 > max_pos)
 				return 0;
 			i_subpacket_len = size_t(*++p) << 24;
-			i_subpacket_len += *++p << 16;
-			i_subpacket_len += *++p << 8;
+			i_subpacket_len += ((size_t)*++p) << 16;
+			i_subpacket_len += ((size_t)++p) << 8;
 			i_subpacket_len += *++p;
 		}
 
@@ -575,7 +575,7 @@ error:
 
 static int LoadSignature(const CString &signatureFilename, signature_packet_t *p_sig)
 {
-	FILE* pFile = _tfsopen(signatureFilename, _T("rb"), SH_DENYWR);
+	FILE* pFile = _wfsopen(signatureFilename, L"rb", SH_DENYWR);
 	if (!pFile)
 		return -1;
 
@@ -741,7 +741,7 @@ static int hash_from_public_key(HCRYPTHASH hHash, public_key_t* p_pkey)
 
 static int hash_from_file(HCRYPTHASH hHash, CString filename, signature_packet_t* p_sig)
 {
-	CAutoFILE pFile = _tfsopen(filename, _T("rb"), SH_DENYWR);
+	CAutoFILE pFile = _wfsopen(filename, L"rb", SH_DENYWR);
 	if (!pFile)
 		return -1;
 
@@ -752,7 +752,7 @@ static int hash_from_file(HCRYPTHASH hHash, CString filename, signature_packet_t
 	{
 		if (p_sig->type == TEXT_SIGNATURE)
 		{
-			buf[read] = 0;
+			buf[read] = '\0';
 			char * psz_string = buf;
 			while (*psz_string)
 			{
@@ -823,7 +823,7 @@ static int check_hash(HCRYPTHASH hHash, signature_packet_t *p_sig)
 	auto pHash = std::make_unique<BYTE[]>(hashLen);
 	CryptGetHashParam(hHash, HP_HASHVAL, pHash.get(), &hashLen, 0);
 
-	if (pHash.get()[0] != p_sig->hash_verification[0] || pHash.get()[1] != p_sig->hash_verification[1])
+	if (pHash[0] != p_sig->hash_verification[0] || pHash[1] != p_sig->hash_verification[1])
 		return -1;
 
 	return 0;
@@ -954,7 +954,7 @@ static public_key_t *download_key(const uint8_t *p_longid, const uint8_t *p_sign
 
 	int size = 65536;
 	auto buffer = std::make_unique<char[]>(size);
-	FILE * pFile = _tfsopen(tempfile, _T("rb"), SH_DENYWR);
+	FILE * pFile = _wfsopen(tempfile, L"rb", SH_DENYWR);
 	if (pFile)
 	{
 		SCOPE_EXIT{ fclose(pFile); };
@@ -988,8 +988,7 @@ static public_key_t *download_key(const uint8_t *p_longid, const uint8_t *p_sign
 
 int VerifyIntegrity(const CString &filename, const CString &signatureFilename, CUpdateDownloader *updateDownloader)
 {
-	signature_packet_t p_sig;
-	memset(&p_sig, 0, sizeof(signature_packet_t));
+	signature_packet_t p_sig = { 0 };
 	if (LoadSignature(signatureFilename, &p_sig))
 		return -1;
 	SCOPE_EXIT
@@ -1001,8 +1000,7 @@ int VerifyIntegrity(const CString &filename, const CString &signatureFilename, C
 		}
 	};
 
-	public_key_t p_pkey;
-	memset(&p_pkey, 0, sizeof(public_key_t));
+	public_key_t p_pkey = { 0 };
 	if (parse_public_key(tortoisegit_public_key, sizeof(tortoisegit_public_key), &p_pkey, nullptr))
 		return -1;
 	SCOPE_EXIT { free(p_pkey.psz_username); };

@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2018 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -27,31 +27,28 @@
 #include "AppUtils.h"
 #include "SmartHandle.h"
 #include "LoglistCommonResource.h"
+#include "DPIAware.h"
 
 // CImportPatchDlg dialog
 
 IMPLEMENT_DYNAMIC(CImportPatchDlg, CResizableStandAloneDialog)
 
-CImportPatchDlg::CImportPatchDlg(CWnd* pParent /*=NULL*/)
+CImportPatchDlg::CImportPatchDlg(CWnd* pParent /*=nullptr*/)
 	: CResizableStandAloneDialog(CImportPatchDlg::IDD, pParent)
 	, m_LoadingThread(FALSE)
+	, m_CurrentItem(0)
+	, m_bExitThread(FALSE)
+	, m_bThreadRunning(FALSE)
+	, m_b3Way(BST_CHECKED)
+	, m_bIgnoreSpace(BST_CHECKED)
+	, m_bAddSignedOffBy(BST_UNCHECKED)
+	, m_bKeepCR(BST_CHECKED)
 {
 	m_cList.m_ContextMenuMask &=~ m_cList.GetMenuMask(CPatchListCtrl::MENU_APPLY);
-
-	m_CurrentItem =0;
-
-	m_bExitThread = false;
-	m_bThreadRunning =false;
-
-	m_b3Way = 1;
-	m_bIgnoreSpace = 1;
-	m_bAddSignedOffBy = FALSE;
-	m_bKeepCR = TRUE;
 }
 
 CImportPatchDlg::~CImportPatchDlg()
 {
-
 }
 
 void CImportPatchDlg::DoDataExchange(CDataExchange* pDX)
@@ -95,7 +92,7 @@ void CImportPatchDlg::SetSplitterRange()
 		m_ctrlTabCtrl.GetWindowRect(rcMiddle);
 		ScreenToClient(rcMiddle);
 		if (rcMiddle.Height() && rcMiddle.Width())
-			m_wndSplitter.SetRange(rcTop.top+160, rcMiddle.bottom-160);
+			m_wndSplitter.SetRange(rcTop.top + CDPIAware::Instance().ScaleY(160), rcMiddle.bottom - CDPIAware::Instance().ScaleY(160));
 	}
 }
 
@@ -110,13 +107,13 @@ BOOL CImportPatchDlg::OnInitDialog()
 	// not elevated, this is a no-op.
 	CHANGEFILTERSTRUCT cfs = { sizeof(CHANGEFILTERSTRUCT) };
 	typedef BOOL STDAPICALLTYPE ChangeWindowMessageFilterExDFN(HWND hWnd, UINT message, DWORD action, PCHANGEFILTERSTRUCT pChangeFilterStruct);
-	CAutoLibrary hUser = AtlLoadSystemLibraryUsingFullPath(_T("user32.dll"));
+	CAutoLibrary hUser = AtlLoadSystemLibraryUsingFullPath(L"user32.dll");
 	if (hUser)
 	{
 		ChangeWindowMessageFilterExDFN *pfnChangeWindowMessageFilterEx = (ChangeWindowMessageFilterExDFN*)GetProcAddress(hUser, "ChangeWindowMessageFilterEx");
 		if (pfnChangeWindowMessageFilterEx)
 		{
-			pfnChangeWindowMessageFilterEx(m_hWnd, WM_TASKBARBTNCREATED, MSGFLT_ALLOW, &cfs);
+			pfnChangeWindowMessageFilterEx(m_hWnd, TaskBarButtonCreated, MSGFLT_ALLOW, &cfs);
 		}
 	}
 	m_pTaskbarList.Release();
@@ -140,16 +137,16 @@ BOOL CImportPatchDlg::OnInitDialog()
 	m_ctrlTabCtrl.SetResizeMode(CMFCTabCtrl::RESIZE_NO);
 	// Create output panes:
 
-	if( ! this->m_PatchCtrl.Create(_T("Scintilla"),_T("source"),0,rectDummy,&m_ctrlTabCtrl,0,0) )
+	if (!m_PatchCtrl.Create(L"Scintilla", L"source", 0, rectDummy, &m_ctrlTabCtrl, 0, 0))
 	{
 		TRACE0("Failed to create log message control");
 		return FALSE;
 	}
-	m_PatchCtrl.Init(0);
+	m_PatchCtrl.Init(-1);
 	m_PatchCtrl.Call(SCI_SETREADONLY, TRUE);
 	m_PatchCtrl.SetUDiffStyle();
 
-	if (!m_wndOutput.Create(_T("Scintilla"),_T("source"),0,rectDummy, &m_ctrlTabCtrl, 0,0) )
+	if (!m_wndOutput.Create(L"Scintilla", L"source", 0, rectDummy, &m_ctrlTabCtrl, 0, 0))
 	{
 		TRACE0("Failed to create output windows\n");
 		return -1;      // fail to create
@@ -163,15 +160,17 @@ BOOL CImportPatchDlg::OnInitDialog()
 	m_ctrlTabCtrl.AddTab(&m_PatchCtrl, CString(MAKEINTRESOURCE(IDS_PATCH)), 0);
 	m_ctrlTabCtrl.AddTab(&m_wndOutput, CString(MAKEINTRESOURCE(IDS_LOG)), 1);
 
-	AddAmAnchor();
 	AdjustControlSize(IDC_CHECK_3WAY);
 	AdjustControlSize(IDC_CHECK_IGNORE_SPACE);
 	AdjustControlSize(IDC_SIGN_OFF);
 	AdjustControlSize(IDC_KEEP_CR);
 
+	AddAmAnchor();
+
 	m_PathList.SortByPathname(true);
-	m_cList.SetExtendedStyle( m_cList.GetExtendedStyle()| LVS_EX_CHECKBOXES );
+	m_cList.SetExtendedStyle(m_cList.GetExtendedStyle() | LVS_EX_CHECKBOXES | LVS_EX_DOUBLEBUFFER);
 	m_cList.InsertColumn(0, L"");
+	m_cList.SetExtendedStyle((CRegDWORD(L"Software\\TortoiseGit\\FullRowSelect", TRUE) ? LVS_EX_FULLROWSELECT : 0) | m_cList.GetExtendedStyle());
 
 	for (int i = 0; i < m_PathList.GetCount(); ++i)
 	{
@@ -180,7 +179,7 @@ BOOL CImportPatchDlg::OnInitDialog()
 	}
 	m_cList.SetColumnWidth(0, LVSCW_AUTOSIZE);
 
-	DWORD yPos = CRegDWORD(_T("Software\\TortoiseGit\\TortoiseProc\\ResizableState\\AMDlgSizer"));
+	DWORD yPos = CRegDWORD(L"Software\\TortoiseGit\\TortoiseProc\\ResizableState\\AMDlgSizer");
 	RECT rcDlg, rcLogMsg, rcFileList;
 	GetClientRect(&rcDlg);
 	m_cList.GetWindowRect(&rcLogMsg);
@@ -193,9 +192,9 @@ BOOL CImportPatchDlg::OnInitDialog()
 		m_wndSplitter.GetWindowRect(&rectSplitter);
 		ScreenToClient(&rectSplitter);
 		int delta = yPos - rectSplitter.top;
-		if ((rcLogMsg.bottom + delta > rcLogMsg.top)&&(rcLogMsg.bottom + delta < rcFileList.bottom - 30))
+		if ((rcLogMsg.bottom + delta > rcLogMsg.top) && (rcLogMsg.bottom + delta < rcFileList.bottom - CDPIAware::Instance().ScaleY(30)))
 		{
-			m_wndSplitter.SetWindowPos(NULL, 0, yPos, 0, 0, SWP_NOSIZE);
+			m_wndSplitter.SetWindowPos(nullptr, 0, yPos, 0, 0, SWP_NOSIZE);
 			DoSize(delta);
 		}
 	}
@@ -206,7 +205,7 @@ BOOL CImportPatchDlg::OnInitDialog()
 	GetWindowText(sWindowTitle);
 	CAppUtils::SetWindowTitle(m_hWnd, g_Git.m_CurrentDir, sWindowTitle);
 
-	EnableSaveRestore(_T("ImportDlg"));
+	EnableSaveRestore(L"ImportDlg");
 
 	SetSplitterRange();
 
@@ -221,9 +220,11 @@ BEGIN_MESSAGE_MAP(CImportPatchDlg, CResizableStandAloneDialog)
 	ON_BN_CLICKED(IDC_BUTTON_REMOVE, &CImportPatchDlg::OnBnClickedButtonRemove)
 	ON_BN_CLICKED(IDOK, &CImportPatchDlg::OnBnClickedOk)
 	ON_WM_SIZE()
+	ON_WM_SYSCOLORCHANGE()
+	ON_WM_THEMECHANGED()
 	ON_BN_CLICKED(IDCANCEL, &CImportPatchDlg::OnBnClickedCancel)
 	ON_NOTIFY(LVN_ITEMCHANGED, IDC_LIST_PATCH, &CImportPatchDlg::OnHdnItemchangedListPatch)
-	ON_REGISTERED_MESSAGE(WM_TASKBARBTNCREATED, OnTaskbarBtnCreated)
+	ON_REGISTERED_MESSAGE(TaskBarButtonCreated, OnTaskbarBtnCreated)
 END_MESSAGE_MAP()
 
 
@@ -247,14 +248,10 @@ void CImportPatchDlg::OnLbnSelchangeListPatch()
 
 void CImportPatchDlg::OnBnClickedButtonAdd()
 {
-	CFileDialog dlg(TRUE,NULL,
-					NULL,
-					OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT|OFN_ALLOWMULTISELECT,
-					CString(MAKEINTRESOURCE(IDS_PATCHFILEFILTER)));
+	CFileDialog dlg(TRUE, nullptr, nullptr, OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT | OFN_ALLOWMULTISELECT, CString(MAKEINTRESOURCE(IDS_PATCHFILEFILTER)));
 	dlg.m_ofn.nMaxFile = 65536;
-	auto path = std::make_unique<TCHAR[]>(dlg.m_ofn.nMaxFile);
-	SecureZeroMemory(path.get(), dlg.m_ofn.nMaxFile);
-	dlg.m_ofn.lpstrFile = path.get();
+	TCHAR path[65536] = { 0 };
+	dlg.m_ofn.lpstrFile = path;
 	INT_PTR ret = dlg.DoModal();
 	SetCurrentDirectory(g_Git.m_CurrentDir);
 	if (ret == IDOK)
@@ -301,7 +298,6 @@ void CImportPatchDlg::OnBnClickedButtonUp()
 			m_cList.SetItemState(index, 0, LVIS_SELECTED);
 		}
 	}
-
 }
 
 void CImportPatchDlg::OnBnClickedButtonDown()
@@ -315,9 +311,7 @@ void CImportPatchDlg::OnBnClickedButtonDown()
 	auto indexes = std::make_unique<int[]>(m_cList.GetSelectedCount());
 	int i = 0;
 	while(pos)
-	{
 		indexes[i++] = m_cList.GetNextSelectedItem(pos);
-	}
 
 	// don't move any item if the last selected item is the last item in the m_CommitList
 	// (that would change the order of the selected items)
@@ -387,21 +381,21 @@ UINT CImportPatchDlg::PatchThread()
 				if (m_pTaskbarList)
 					m_pTaskbarList->SetProgressState(m_hWnd, TBPF_ERROR);
 
-				int ret = CMessageBox::Show(NULL, IDS_PROC_APPLYPATCH_REBASEDIRFOUND,
+				int ret = CMessageBox::Show(GetSafeHwnd(), IDS_PROC_APPLYPATCH_REBASEDIRFOUND,
 												  IDS_APPNAME,
 												   1, IDI_ERROR, IDS_ABORTBUTTON, IDS_SKIPBUTTON, IDS_RESOLVEDBUTTON);
 
 				switch(ret)
 				{
 				case 1:
-					cmd = _T("git.exe am --abort");
+					cmd = L"git.exe am --abort";
 					break;
 				case 2:
-					cmd = _T("git.exe am --skip");
+					cmd = L"git.exe am --skip";
 					++i;
 					break;
 				case 3:
-					cmd = _T("git.exe am --resolved");
+					cmd = L"git.exe am --resolved";
 					break;
 				default:
 					cmd.Empty();
@@ -428,23 +422,23 @@ UINT CImportPatchDlg::PatchThread()
 			if(m_bExitThread)
 				break;
 
-			cmd = _T("git.exe am ");
+			cmd = L"git.exe am ";
 
 			if(this->m_bAddSignedOffBy)
-				cmd += _T("--signoff ");
+				cmd += L"--signoff ";
 
 			if(this->m_b3Way)
-				cmd += _T("--3way ");
+				cmd += L"--3way ";
 
 			if(this->m_bIgnoreSpace)
-				cmd += _T("--ignore-space-change ");
+				cmd += L"--ignore-space-change ";
 
 			if(this->m_bKeepCR)
-				cmd += _T("--keep-cr ");
+				cmd += L"--keep-cr ";
 
-			cmd += _T("\"");
+			cmd += L'"';
 			cmd += m_cList.GetItemText(i,0);
-			cmd += _T("\"");
+			cmd += L'"';
 
 			this->AddLogString(cmd);
 			CString output;
@@ -513,6 +507,9 @@ void CImportPatchDlg::OnBnClickedOk()
 
 	SaveSplitterPos();
 
+	if (!CAppUtils::CheckUserData(GetSafeHwnd()))
+		return;
+
 	if(IsFinish())
 	{
 		this->OnOK();
@@ -524,26 +521,25 @@ void CImportPatchDlg::OnBnClickedOk()
 	EnableInputCtrl(false);
 	InterlockedExchange(&m_bThreadRunning, TRUE);
 	InterlockedExchange(&this->m_bExitThread, FALSE);
-	if ( (m_LoadingThread=AfxBeginThread(ThreadEntry, this)) ==NULL)
+	if ((m_LoadingThread = AfxBeginThread(ThreadEntry, this)) == nullptr)
 	{
 		InterlockedExchange(&m_bThreadRunning, FALSE);
-		CMessageBox::Show(NULL, IDS_ERR_THREADSTARTFAILED, IDS_APPNAME, MB_OK | MB_ICONERROR);
+		CMessageBox::Show(GetSafeHwnd(), IDS_ERR_THREADSTARTFAILED, IDS_APPNAME, MB_OK | MB_ICONERROR);
 	}
-
 }
 
 void CImportPatchDlg::DoSize(int delta)
 {
 	this->RemoveAllAnchors();
 
-	CSplitterControl::ChangeHeight(GetDlgItem(IDC_LIST_PATCH), delta, CW_TOPALIGN);
-	//CSplitterControl::ChangeHeight(GetDlgItem(), delta, CW_TOPALIGN);
-	CSplitterControl::ChangeHeight(GetDlgItem(IDC_AM_TAB), -delta, CW_BOTTOMALIGN);
-	//CSplitterControl::ChangeHeight(GetDlgItem(), -delta, CW_BOTTOMALIGN);
-	CSplitterControl::ChangePos(GetDlgItem(IDC_CHECK_3WAY), 0, delta);
-	CSplitterControl::ChangePos(GetDlgItem(IDC_CHECK_IGNORE_SPACE), 0, delta);
-	CSplitterControl::ChangePos(GetDlgItem(IDC_SIGN_OFF), 0, delta);
-	CSplitterControl::ChangePos(GetDlgItem(IDC_KEEP_CR), 0, delta);
+	auto hdwp = BeginDeferWindowPos(6);
+	hdwp = CSplitterControl::ChangeRect(hdwp, GetDlgItem(IDC_LIST_PATCH), 0, 0, 0, delta);
+	hdwp = CSplitterControl::ChangeRect(hdwp, GetDlgItem(IDC_AM_TAB), 0, delta, 0, 0);
+	hdwp = CSplitterControl::ChangeRect(hdwp, GetDlgItem(IDC_CHECK_3WAY), 0, delta, 0, delta);
+	hdwp = CSplitterControl::ChangeRect(hdwp, GetDlgItem(IDC_CHECK_IGNORE_SPACE), 0, delta, 0, delta);
+	hdwp = CSplitterControl::ChangeRect(hdwp, GetDlgItem(IDC_SIGN_OFF), 0, delta, 0, delta);
+	hdwp = CSplitterControl::ChangeRect(hdwp, GetDlgItem(IDC_KEEP_CR), 0, delta, 0, delta);
+	EndDeferWindowPos(hdwp);
 
 	this->AddAmAnchor();
 	// adjust the minimum size of the dialog to prevent the resizing from
@@ -586,15 +582,13 @@ void CImportPatchDlg::SaveSplitterPos()
 {
 	if (!IsIconic())
 	{
-		CRegDWORD regPos = CRegDWORD(_T("Software\\TortoiseGit\\TortoiseProc\\ResizableState\\AMDlgSizer"));
+		CRegDWORD regPos(L"Software\\TortoiseGit\\TortoiseProc\\ResizableState\\AMDlgSizer");
 		RECT rectSplitter;
 		m_wndSplitter.GetWindowRect(&rectSplitter);
 		ScreenToClient(&rectSplitter);
 		regPos = rectSplitter.top;
 	}
-
 }
-
 
 void CImportPatchDlg::EnableInputCtrl(BOOL b)
 {
@@ -633,11 +627,11 @@ void CImportPatchDlg::OnBnClickedCancel()
 		CTGitPath path;
 		path.SetFromWin(g_Git.m_CurrentDir);
 		if(path.HasRebaseApply())
-			if(CMessageBox::Show(NULL, IDS_PROC_APPLYPATCH_GITAMACTIVE, IDS_APPNAME, MB_YESNO | MB_ICONQUESTION) == IDYES)
+			if (CMessageBox::Show(GetSafeHwnd(), IDS_PROC_APPLYPATCH_GITAMACTIVE, IDS_APPNAME, MB_YESNO | MB_ICONQUESTION) == IDYES)
 			{
 				CString output;
-				if (g_Git.Run(_T("git.exe am --abort"), &output, CP_UTF8))
-					MessageBox(output, _T("TortoiseGit"), MB_OK | MB_ICONERROR);
+				if (g_Git.Run(L"git.exe am --abort", &output, CP_UTF8))
+					MessageBox(output, L"TortoiseGit", MB_OK | MB_ICONERROR);
 			}
 		OnCancel();
 	}
@@ -658,20 +652,19 @@ BOOL CImportPatchDlg::PreTranslateMessage(MSG* pMsg)
 	{
 		switch (pMsg->wParam)
 		{
-
 		/* Avoid TAB control destroy but dialog exist*/
 		case VK_ESCAPE:
 		case VK_CANCEL:
 			{
-				TCHAR buff[128] = { 0 };
-				::GetClassName(pMsg->hwnd,buff,128);
+				TCHAR buff[129];
+				::GetClassName(pMsg->hwnd, buff, _countof(buff) - 1);
 
 				/* Use MSFTEDIT_CLASS http://msdn.microsoft.com/en-us/library/bb531344.aspx */
-				if (_tcsnicmp(buff, MSFTEDIT_CLASS, 128) == 0 ||	//Unicode and MFC 2012 and later
-					_tcsnicmp(buff, RICHEDIT_CLASS, 128) == 0 ||	//ANSI or MFC 2010
-				   _tcsnicmp(buff,_T("Scintilla"),128)==0 ||
-				   _tcsnicmp(buff,_T("SysListView32"),128)==0||
-				   ::GetParent(pMsg->hwnd) == this->m_ctrlTabCtrl.m_hWnd)
+				if (_wcsnicmp(buff, MSFTEDIT_CLASS, _countof(buff) - 1) == 0 ||	//Unicode and MFC 2012 and later
+					_wcsnicmp(buff, RICHEDIT_CLASS, _countof(buff) - 1) == 0 ||	//ANSI or MFC 2010
+					_wcsnicmp(buff, L"Scintilla", _countof(buff) - 1) == 0 ||
+					_wcsnicmp(buff, L"SysListView32", _countof(buff) - 1) == 0 ||
+					::GetParent(pMsg->hwnd) == this->m_ctrlTabCtrl.m_hWnd)
 				{
 					this->PostMessage(WM_KEYDOWN,VK_ESCAPE,0);
 					return TRUE;
@@ -718,10 +711,23 @@ void CImportPatchDlg::OnHdnItemchangedListPatch(NMHDR * /*pNMHDR*/, LRESULT *pRe
 	}
 }
 
-LRESULT CImportPatchDlg::OnTaskbarBtnCreated(WPARAM /*wParam*/, LPARAM /*lParam*/)
+LRESULT CImportPatchDlg::OnTaskbarBtnCreated(WPARAM wParam, LPARAM lParam)
 {
 	m_pTaskbarList.Release();
 	m_pTaskbarList.CoCreateInstance(CLSID_TaskbarList);
-	SetUUIDOverlayIcon(m_hWnd);
+	return __super::OnTaskbarButtonCreated(wParam, lParam);
+}
+
+void CImportPatchDlg::OnSysColorChange()
+{
+	__super::OnSysColorChange();
+	m_PatchCtrl.SetUDiffStyle();
+	m_wndOutput.SetColors(true);
+	CAppUtils::SetListCtrlBackgroundImage(m_cList.GetSafeHwnd(), IDI_IMPORTPATHCES_BKG);
+}
+
+LRESULT CImportPatchDlg::OnThemeChanged()
+{
+	CMFCVisualManager::GetInstance()->DestroyInstance();
 	return 0;
 }

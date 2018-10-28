@@ -1,7 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
 // External Cache Copyright (C) 2005 - 2006,2010 - Will Dean, Stefan Kueng
-// Copyright (C) 2008-2014 - TortoiseGit
+// Copyright (C) 2008-2014, 2016-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -30,11 +30,11 @@
 #include <Dbt.h>
 #include <InitGuid.h>
 #include <Ioevent.h>
-#include "..\version.h"
+#include "../version.h"
 #include "SmartHandle.h"
-#include "DllVersion.h"
 #include "CreateProcessHelper.h"
 #include "gitindex.h"
+#include "LoadIconEx.h"
 
 #ifndef GET_X_LPARAM
 #define GET_X_LPARAM(lp)                        ((int)(short)LOWORD(lp))
@@ -77,8 +77,6 @@ public:
 	}
 } git2init;
 
-CGitIndexFileMap g_IndexFileMap;
-
 volatile LONG		nThreadCount = 0;
 
 #define PACKVERSION(major,minor) MAKELONG(minor,major)
@@ -90,12 +88,12 @@ void DebugOutputLastError()
 		FORMAT_MESSAGE_ALLOCATE_BUFFER |
 		FORMAT_MESSAGE_FROM_SYSTEM |
 		FORMAT_MESSAGE_IGNORE_INSERTS,
-		NULL,
+		nullptr,
 		GetLastError(),
 		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), // Default language
 		(LPTSTR) &lpMsgBuf,
 		0,
-		NULL ))
+		nullptr))
 	{
 		return;
 	}
@@ -145,18 +143,43 @@ void HandleRestart()
 		TCHAR exeName[MAX_PATH] = { 0 };
 		::GetModuleFileName(nullptr, exeName, _countof(exeName));
 		TCHAR cmdLine[20] = { 0 };
-		_stprintf_s(cmdLine, _T(" /kill:%d"), GetCurrentProcessId());
+		swprintf_s(cmdLine, L" /kill:%d", GetCurrentProcessId());
 		if (!CCreateProcessHelper::CreateProcessDetached(exeName, cmdLine))
 			CTraceToOutputDebugString::Instance()(__FUNCTION__ ": Failed to start cache\n");
 	}
+}
+
+static void AddSystrayIcon()
+{
+	if (CRegStdDWORD(L"Software\\TortoiseGit\\CacheTrayIcon", FALSE) != TRUE)
+		return;
+
+	SecureZeroMemory(&niData, sizeof(NOTIFYICONDATA));
+	niData.cbSize = sizeof(NOTIFYICONDATA);
+	niData.uID = TRAY_ID;		// own tray icon ID
+	niData.hWnd = hWndHidden;
+	niData.uFlags = NIF_ICON | NIF_MESSAGE;
+
+	// load the icon
+	niData.hIcon = LoadIconEx(GetModuleHandle(nullptr), MAKEINTRESOURCE(IDI_TGITCACHE));
+
+	// set the message to send
+	// note: the message value should be in the
+	// range of WM_APP through 0xBFFF
+	niData.uCallbackMessage = TRAY_CALLBACK;
+	Shell_NotifyIcon(NIM_ADD, &niData);
+	// free icon handle
+	if (niData.hIcon && DestroyIcon(niData.hIcon))
+		niData.hIcon = nullptr;
 }
 
 int __stdcall WinMain(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR lpCmdLine, int /*cmdShow*/)
 {
 	SetDllDirectory(L"");
 	git_libgit2_init();
+	git_libgit2_opts(GIT_OPT_SET_WINDOWS_SHAREMODE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE);
 	HandleCommandLine(lpCmdLine);
-	CAutoGeneralHandle hReloadProtection = ::CreateMutex(NULL, FALSE, GetCacheMutexName());
+	CAutoGeneralHandle hReloadProtection = ::CreateMutex(nullptr, FALSE, GetCacheMutexName());
 
 	if ((!hReloadProtection) || (GetLastError() == ERROR_ALREADY_EXISTS))
 	{
@@ -175,67 +198,21 @@ int __stdcall WinMain(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR lp
 	TCHAR szWindowClass[] = {TGIT_CACHE_WINDOW_NAME};
 
 	// create a hidden window to receive window messages.
-	WNDCLASSEX wcex;
+	WNDCLASSEX wcex = { 0 };
 	wcex.cbSize = sizeof(WNDCLASSEX);
 	wcex.style			= CS_HREDRAW | CS_VREDRAW;
 	wcex.lpfnWndProc	= (WNDPROC)WndProc;
-	wcex.cbClsExtra		= 0;
-	wcex.cbWndExtra		= 0;
 	wcex.hInstance		= hInstance;
-	wcex.hIcon			= 0;
-	wcex.hCursor		= 0;
-	wcex.hbrBackground	= 0;
-	wcex.lpszMenuName	= NULL;
 	wcex.lpszClassName	= szWindowClass;
-	wcex.hIconSm		= 0;
 	RegisterClassEx(&wcex);
-	hWndHidden = CreateWindow(TGIT_CACHE_WINDOW_NAME, TGIT_CACHE_WINDOW_NAME, WS_CAPTION, 0, 0, 800, 300, NULL, 0, hInstance, 0);
+	hWndHidden = CreateWindow(TGIT_CACHE_WINDOW_NAME, TGIT_CACHE_WINDOW_NAME, WS_CAPTION, 0, 0, 800, 300, nullptr, 0, hInstance, 0);
 	hTrayWnd = hWndHidden;
-	if (hWndHidden == NULL)
-	{
+	if (!hWndHidden)
 		return 0;
-	}
-	if (CRegStdDWORD(_T("Software\\TortoiseGit\\CacheTrayIcon"), FALSE)==TRUE)
-	{
-		SecureZeroMemory(&niData,sizeof(NOTIFYICONDATA));
-
-		DWORD dwMajor = 0;
-		DWORD dwMinor = 0;
-		GetShellVersion(&dwMajor, &dwMinor);
-		DWORD dwVersion = PACKVERSION(dwMajor, dwMinor);
-		if (dwVersion >= PACKVERSION(6,0))
-			niData.cbSize = sizeof(NOTIFYICONDATA);
-		else if (dwVersion >= PACKVERSION(5,0))
-			niData.cbSize = NOTIFYICONDATA_V2_SIZE;
-		else
-			niData.cbSize = NOTIFYICONDATA_V1_SIZE;
-
-		niData.uID = TRAY_ID;		// own tray icon ID
-		niData.hWnd	 = hWndHidden;
-		niData.uFlags = NIF_ICON|NIF_MESSAGE;
-
-		// load the icon
-		niData.hIcon =
-			(HICON)LoadImage(hInstance,
-			MAKEINTRESOURCE(IDI_TGITCACHE),
-			IMAGE_ICON,
-			GetSystemMetrics(SM_CXSMICON),
-			GetSystemMetrics(SM_CYSMICON),
-			LR_DEFAULTCOLOR);
-
-		// set the message to send
-		// note: the message value should be in the
-		// range of WM_APP through 0xBFFF
-		niData.uCallbackMessage = TRAY_CALLBACK;
-		Shell_NotifyIcon(NIM_ADD,&niData);
-		// free icon handle
-		if(niData.hIcon && DestroyIcon(niData.hIcon))
-			niData.hIcon = NULL;
-	}
 
 	// Create a thread which waits for incoming pipe connections
 	CAutoGeneralHandle hPipeThread = CreateThread(
-		NULL,              // no security attribute
+		nullptr,           // no security attribute
 		0,                 // default stack size
 		PipeThread,
 		(LPVOID) &bRun,    // thread parameter
@@ -243,14 +220,12 @@ int __stdcall WinMain(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR lp
 		&dwThreadId);      // returns thread ID
 
 	if (!hPipeThread)
-	{
 		return 0;
-	}
 	else hPipeThread.CloseHandle();
 
 	// Create a thread which waits for incoming pipe connections
 	CAutoGeneralHandle hCommandWaitThread = CreateThread(
-		NULL,              // no security attribute
+		nullptr,           // no security attribute
 		0,                 // default stack size
 		CommandWaitThread,
 		(LPVOID) &bRun,    // thread parameter
@@ -258,19 +233,16 @@ int __stdcall WinMain(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR lp
 		&dwThreadId);      // returns thread ID
 
 	if (!hCommandWaitThread)
-	{
 		return 0;
-	}
 
+	AddSystrayIcon();
 
 	// loop to handle window messages.
 	while (bRun)
 	{
-		BOOL bLoopRet = GetMessage(&msg, NULL, 0, 0);
+		BOOL bLoopRet = GetMessage(&msg, nullptr, 0, 0);
 		if ((bLoopRet != -1)&&(bLoopRet != 0))
-		{
 			DispatchMessage(&msg);
-		}
 	}
 
 	bRun = false;
@@ -282,6 +254,7 @@ int __stdcall WinMain(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR lp
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
+	static UINT s_uTaskbarRestart = RegisterWindowMessage(L"TaskbarCreated");
 	switch (message)
 	{
 	case TRAY_CALLBACK:
@@ -298,7 +271,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			{
 				CString sInfoTip;
 				NOTIFYICONDATA SystemTray;
-				sInfoTip.Format(_T("TortoiseGit Overlay Icon Server\nCached Directories: %Id\nWatched paths: %d"),
+				sInfoTip.Format(L"TortoiseGit Overlay Icon Server\nCached Directories: %Id\nWatched paths: %d",
 					CGitStatusCache::Instance().GetCacheSize(),
 					CGitStatusCache::Instance().GetNumberOfWatchedPaths());
 
@@ -306,7 +279,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				SystemTray.hWnd   = hTrayWnd;
 				SystemTray.uID    = TRAY_ID;
 				SystemTray.uFlags = NIF_TIP;
-				_tcscpy_s(SystemTray.szTip, sInfoTip);
+				wcscpy_s(SystemTray.szTip, sInfoTip);
 				Shell_NotifyIcon(NIM_MODIFY, &SystemTray);
 			}
 			break;
@@ -318,11 +291,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				HMENU hMenu = CreatePopupMenu();
 				if(hMenu)
 				{
-					bool enabled = (DWORD)CRegStdDWORD(_T("Software\\TortoiseGit\\CacheType"), GetSystemMetrics(SM_REMOTESESSION) ? ShellCache::dll : ShellCache::exe) != ShellCache::none;
-					InsertMenu(hMenu, (UINT)-1, MF_BYPOSITION, TRAYPOP_ENABLE, enabled ? _T("Disable Status Cache") : _T("Enable Status Cache"));
-					InsertMenu(hMenu, (UINT)-1, MF_BYPOSITION, TRAYPOP_EXIT, _T("Exit"));
+					bool enabled = (DWORD)CRegStdDWORD(L"Software\\TortoiseGit\\CacheType", GetSystemMetrics(SM_REMOTESESSION) ? ShellCache::dll : ShellCache::exe) != ShellCache::none;
+					InsertMenu(hMenu, (UINT)-1, MF_BYPOSITION, TRAYPOP_ENABLE, enabled ? L"Disable Status Cache" : L"Enable Status Cache");
+					InsertMenu(hMenu, (UINT)-1, MF_BYPOSITION, TRAYPOP_EXIT, L"Exit");
 					SetForegroundWindow(hWnd);
-					TrackPopupMenu(hMenu, TPM_BOTTOMALIGN, pt.x, pt.y, 0, hWnd, NULL);
+					TrackPopupMenu(hMenu, TPM_BOTTOMALIGN, pt.x, pt.y, 0, hWnd, nullptr);
 					DestroyMenu(hMenu);
 				}
 			}
@@ -344,15 +317,15 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			int line = 0;
 			SIZE fontsize = {0};
 			AutoLocker print(critSec);
-			GetTextExtentPoint32( hdc, szCurrentCrawledPath[0], (int)_tcslen(szCurrentCrawledPath[0]), &fontsize );
+			GetTextExtentPoint32(hdc, szCurrentCrawledPath[0], (int)wcslen(szCurrentCrawledPath[0]), &fontsize);
 			for (int i=nCurrentCrawledpathIndex; i<MAX_CRAWLEDPATHS; ++i)
 			{
-				TextOut(hdc, 0, line*fontsize.cy, szCurrentCrawledPath[i], (int)_tcslen(szCurrentCrawledPath[i]));
+				TextOut(hdc, 0, line*fontsize.cy, szCurrentCrawledPath[i], (int)wcslen(szCurrentCrawledPath[i]));
 				++line;
 			}
 			for (int i=0; i<nCurrentCrawledpathIndex; ++i)
 			{
-				TextOut(hdc, 0, line*fontsize.cy, szCurrentCrawledPath[i], (int)_tcslen(szCurrentCrawledPath[i]));
+				TextOut(hdc, 0, line*fontsize.cy, szCurrentCrawledPath[i], (int)wcslen(szCurrentCrawledPath[i]));
 				++line;
 			}
 
@@ -370,7 +343,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			{
 			case TRAYPOP_ENABLE:
 				{
-					CRegStdDWORD reg = CRegStdDWORD(_T("Software\\TortoiseGit\\CacheType"), GetSystemMetrics(SM_REMOTESESSION) ? ShellCache::dll : ShellCache::exe);
+					CRegStdDWORD reg = CRegStdDWORD(L"Software\\TortoiseGit\\CacheType", GetSystemMetrics(SM_REMOTESESSION) ? ShellCache::dll : ShellCache::exe);
 					bool enabled = (DWORD)reg != ShellCache::none;
 					reg = enabled ? ShellCache::none : ShellCache::exe;
 					if (enabled)
@@ -402,12 +375,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			CTraceToOutputDebugString::Instance()(__FUNCTION__ ": WM_CLOSE/DESTROY/ENDSESSION/QUIT\n");
 			if (niData.hWnd)
 			{
-				niData.hIcon = (HICON)LoadImage(GetModuleHandle(NULL),
-					MAKEINTRESOURCE(IDI_TGITCACHE_STOPPING),
-					IMAGE_ICON,
-					GetSystemMetrics(SM_CXSMICON),
-					GetSystemMetrics(SM_CYSMICON),
-					LR_DEFAULTCOLOR);
+				niData.hIcon = LoadIconEx(GetModuleHandle(nullptr), MAKEINTRESOURCE(IDI_TGITCACHE_STOPPING));
 				Shell_NotifyIcon(NIM_MODIFY, &niData);
 			}
 			CAutoWriteLock writeLock(CGitStatusCache::Instance().GetGuard());
@@ -480,6 +448,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		}
 		break;
 	default:
+		if (message == s_uTaskbarRestart)
+			AddSystrayIcon();
 		break;
 	}
 	return DefWindowProc(hWnd, message, wParam, lParam);
@@ -492,21 +462,26 @@ VOID GetAnswerToRequest(const TGITCacheRequest* pRequest, TGITCacheResponse* pRe
 	CTGitPath path;
 	*pResponseLength = 0;
 	if(pRequest->flags & TGITCACHE_FLAGS_FOLDERISKNOWN)
-	{
 		path.SetFromWin(pRequest->path, !!(pRequest->flags & TGITCACHE_FLAGS_ISFOLDER));
-	}
 	else
-	{
 		path.SetFromWin(pRequest->path);
+
+	if (!bRun)
+	{
+		CStatusCacheEntry entry;
+		entry.BuildCacheResponse(*pReply, *pResponseLength);
+		return;
 	}
 
 	CAutoReadWeakLock readLock(CGitStatusCache::Instance().GetGuard(), 2000);
 	if (readLock.IsAcquired())
 	{
-		CGitStatusCache::Instance().GetStatusForPath(path, pRequest->flags, false).BuildCacheResponse(*pReply, *pResponseLength);
+		CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) L": app asked for status of %s\n", pRequest->path);
+		CGitStatusCache::Instance().GetStatusForPath(path, pRequest->flags).BuildCacheResponse(*pReply, *pResponseLength);
 	}
 	else
 	{
+		CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) L": timeout for asked status of %s\n", pRequest->path);
 		CStatusCacheEntry entry;
 		entry.BuildCacheResponse(*pReply, *pResponseLength);
 	}
@@ -536,7 +511,7 @@ DWORD WINAPI PipeThread(LPVOID lpvParam)
 			BUFSIZE,                  // output buffer size
 			BUFSIZE,                  // input buffer size
 			NMPWAIT_USE_DEFAULT_WAIT, // client time-out
-			NULL);					  // NULL DACL
+			nullptr);				  // nullptr DACL
 
 		if (!hPipe)
 		{
@@ -548,12 +523,12 @@ DWORD WINAPI PipeThread(LPVOID lpvParam)
 		// Wait for the client to connect; if it succeeds,
 		// the function returns a nonzero value. If the function returns
 		// zero, GetLastError returns ERROR_PIPE_CONNECTED.
-		fConnected = ConnectNamedPipe(hPipe, NULL) ? TRUE : (GetLastError() == ERROR_PIPE_CONNECTED);
+		fConnected = ConnectNamedPipe(hPipe, nullptr) ? TRUE : (GetLastError() == ERROR_PIPE_CONNECTED);
 		if (fConnected)
 		{
 			// Create a thread for this client.
 			CAutoGeneralHandle hInstanceThread = CreateThread(
-				NULL,              // no security attribute
+				nullptr,           // no security attribute
 				0,                 // default stack size
 				InstanceThread,
 				(HANDLE) hPipe,    // thread parameter
@@ -609,7 +584,7 @@ DWORD WINAPI CommandWaitThread(LPVOID lpvParam)
 			BUFSIZE,                  // output buffer size
 			BUFSIZE,                  // input buffer size
 			NMPWAIT_USE_DEFAULT_WAIT, // client time-out
-			NULL);                // NULL DACL
+			nullptr);                 // nullptr DACL
 
 		if (!hPipe)
 		{
@@ -621,12 +596,12 @@ DWORD WINAPI CommandWaitThread(LPVOID lpvParam)
 		// Wait for the client to connect; if it succeeds,
 		// the function returns a nonzero value. If the function returns
 		// zero, GetLastError returns ERROR_PIPE_CONNECTED.
-		fConnected = ConnectNamedPipe(hPipe, NULL) ? TRUE : (GetLastError() == ERROR_PIPE_CONNECTED);
+		fConnected = ConnectNamedPipe(hPipe, nullptr) ? TRUE : (GetLastError() == ERROR_PIPE_CONNECTED);
 		if (fConnected)
 		{
 			// Create a thread for this client.
 			CAutoGeneralHandle hCommandThread = CreateThread(
-				NULL,              // no security attribute
+				nullptr,           // no security attribute
 				0,                 // default stack size
 				CommandThread,
 				(HANDLE) hPipe,    // thread parameter
@@ -664,11 +639,10 @@ DWORD WINAPI InstanceThread(LPVOID lpvParam)
 	CTraceToOutputDebugString::Instance()(__FUNCTION__ ": InstanceThread started\n");
 	TGITCacheResponse response;
 	DWORD cbBytesRead, cbWritten;
-	CAutoFile hPipe;
 
 	// The thread's parameter is a handle to a pipe instance.
+	CAutoFile hPipe(std::move(lpvParam));
 
-	hPipe = lpvParam;
 	InterlockedIncrement(&nThreadCount);
 	while (bRun)
 	{
@@ -679,14 +653,13 @@ DWORD WINAPI InstanceThread(LPVOID lpvParam)
 			&request,    // buffer to receive data
 			sizeof(request), // size of buffer
 			&cbBytesRead, // number of bytes read
-			NULL);        // not overlapped I/O
+			nullptr);        // not overlapped I/O
 
 		if (! fSuccess || cbBytesRead == 0)
 		{
 			DisconnectNamedPipe(hPipe);
 			CTraceToOutputDebugString::Instance()(__FUNCTION__ ": Instance thread exited\n");
-			InterlockedDecrement(&nThreadCount);
-			if (nThreadCount == 0)
+			if (InterlockedDecrement(&nThreadCount) == 0)
 				PostMessage(hWndHidden, WM_CLOSE, 0, 0);
 			return 1;
 		}
@@ -700,14 +673,13 @@ DWORD WINAPI InstanceThread(LPVOID lpvParam)
 			&response,      // buffer to write from
 			responseLength, // number of bytes to write
 			&cbWritten,   // number of bytes written
-			NULL);        // not overlapped I/O
+			nullptr);        // not overlapped I/O
 
 		if (! fSuccess || responseLength != cbWritten)
 		{
 			DisconnectNamedPipe(hPipe);
 			CTraceToOutputDebugString::Instance()(__FUNCTION__ ": Instance thread exited\n");
-			InterlockedDecrement(&nThreadCount);
-			if (nThreadCount == 0)
+			if (InterlockedDecrement(&nThreadCount) == 0)
 				PostMessage(hWndHidden, WM_CLOSE, 0, 0);
 			return 1;
 		}
@@ -720,8 +692,7 @@ DWORD WINAPI InstanceThread(LPVOID lpvParam)
 	FlushFileBuffers(hPipe);
 	DisconnectNamedPipe(hPipe);
 	CTraceToOutputDebugString::Instance()(__FUNCTION__ ": Instance thread exited\n");
-	InterlockedDecrement(&nThreadCount);
-	if (nThreadCount == 0)
+	if (InterlockedDecrement(&nThreadCount) == 0)
 		PostMessage(hWndHidden, WM_CLOSE, 0, 0);
 	return 0;
 }
@@ -730,11 +701,9 @@ DWORD WINAPI CommandThread(LPVOID lpvParam)
 {
 	CTraceToOutputDebugString::Instance()(__FUNCTION__ ": CommandThread started\n");
 	DWORD cbBytesRead;
-	CAutoFile hPipe;
 
 	// The thread's parameter is a handle to a pipe instance.
-
-	hPipe = lpvParam;
+	CAutoFile hPipe(std::move(lpvParam));
 
 	while (bRun)
 	{
@@ -745,7 +714,7 @@ DWORD WINAPI CommandThread(LPVOID lpvParam)
 			&command,			// buffer to receive data
 			sizeof(command),	// size of buffer
 			&cbBytesRead,		// number of bytes read
-			NULL);				// not overlapped I/O
+			nullptr);			// not overlapped I/O
 
 		if (! fSuccess || cbBytesRead == 0)
 		{
@@ -776,7 +745,7 @@ DWORD WINAPI CommandThread(LPVOID lpvParam)
 			case TGITCACHECOMMAND_REFRESHALL:
 				{
 					CAutoWriteLock writeLock(CGitStatusCache::Instance().GetGuard());
-					CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": refresh all\n"));
+					CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) L": refresh all\n");
 					CGitStatusCache::Instance().Refresh();
 				}
 				break;
@@ -784,17 +753,20 @@ DWORD WINAPI CommandThread(LPVOID lpvParam)
 				{
 					CTGitPath changedpath;
 					changedpath.SetFromWin(command.path, true);
-					CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": release handle for path %s\n"), changedpath.GetWinPath());
+					CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) L": release handle for path %s\n", changedpath.GetWinPath());
 					CAutoWriteLock writeLock(CGitStatusCache::Instance().GetGuard());
 					CGitStatusCache::Instance().CloseWatcherHandles(changedpath);
 					CGitStatusCache::Instance().RemoveCacheForPath(changedpath);
+					auto cachedDir = CGitStatusCache::Instance().GetDirectoryCacheEntryNoCreate(changedpath.GetContainingDirectory());
+					if (cachedDir)
+						cachedDir->Invalidate();
 				}
 				break;
 			case TGITCACHECOMMAND_BLOCK:
 				{
 					CTGitPath changedpath;
 					changedpath.SetFromWin(command.path);
-					CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": block path %s\n"), changedpath.GetWinPath());
+					CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) L": block path %s\n", changedpath.GetWinPath());
 					CGitStatusCache::Instance().BlockPath(changedpath);
 				}
 				break;
@@ -802,7 +774,7 @@ DWORD WINAPI CommandThread(LPVOID lpvParam)
 				{
 					CTGitPath changedpath;
 					changedpath.SetFromWin(command.path);
-					CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": unblock path %s\n"), changedpath.GetWinPath());
+					CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) L": unblock path %s\n", changedpath.GetWinPath());
 					CGitStatusCache::Instance().UnBlockPath(changedpath);
 				}
 				break;

@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2009,2012-2015 - TortoiseGit
+// Copyright (C) 2009, 2012-2016 - TortoiseGit
 // Copyright (C) 2008,2014 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -26,7 +26,7 @@
 DEFINE_GUID(CATID_BugTraqProvider,
 			0x3494fa92, 0xb139, 0x4730, 0x95, 0x91, 0x1, 0x13, 0x5d, 0x5e, 0x78, 0x31);
 
-#define BUGTRAQ_ASSOCIATIONS_REGPATH _T("Software\\TortoiseGit\\BugTraq Associations")
+#define BUGTRAQ_ASSOCIATIONS_REGPATH L"Software\\TortoiseGit\\BugTraq Associations"
 
 CBugTraqAssociations::CBugTraqAssociations()
 : pProjectProvider(nullptr)
@@ -57,7 +57,7 @@ void CBugTraqAssociations::Load(LPCTSTR uuid /* = nullptr */, LPCTSTR params /* 
 	{
 		TCHAR szSubKey[MAX_PATH] = {0};
 		DWORD cchSubKey = MAX_PATH;
-		LSTATUS status = RegEnumKeyEx(hk, dwIndex, szSubKey, &cchSubKey, NULL, NULL, NULL, NULL);
+		LSTATUS status = RegEnumKeyEx(hk, dwIndex, szSubKey, &cchSubKey, nullptr, nullptr, nullptr, nullptr);
 		if (status != ERROR_SUCCESS)
 			break;
 
@@ -66,21 +66,26 @@ void CBugTraqAssociations::Load(LPCTSTR uuid /* = nullptr */, LPCTSTR params /* 
 		{
 			TCHAR szWorkingCopy[MAX_PATH] = {0};
 			DWORD cbWorkingCopy = sizeof(szWorkingCopy);
-			RegQueryValueEx(hk2, _T("WorkingCopy"), NULL, NULL, (LPBYTE)szWorkingCopy, &cbWorkingCopy);
+			RegQueryValueEx(hk2, L"WorkingCopy", nullptr, nullptr, (LPBYTE)szWorkingCopy, &cbWorkingCopy);
 
 			TCHAR szClsid[MAX_PATH] = {0};
 			DWORD cbClsid = sizeof(szClsid);
-			RegQueryValueEx(hk2, _T("Provider"), NULL, NULL, (LPBYTE)szClsid, &cbClsid);
+			RegQueryValueEx(hk2, L"Provider", nullptr, nullptr, (LPBYTE)szClsid, &cbClsid);
 
 			CLSID provider_clsid;
 			CLSIDFromString(szClsid, &provider_clsid);
 
 			DWORD cbParameters = 0;
-			RegQueryValueEx(hk2, _T("Parameters"), NULL, NULL, (LPBYTE)NULL, &cbParameters);
+			RegQueryValueEx(hk2, L"Parameters", nullptr, nullptr, nullptr, &cbParameters);
 			auto szParameters = std::make_unique<TCHAR[]>(cbParameters + 1);
-			RegQueryValueEx(hk2, _T("Parameters"), NULL, NULL, (LPBYTE)szParameters.get(), &cbParameters);
-			szParameters.get()[cbParameters] = 0;
-			m_inner.push_back(new CBugTraqAssociation(szWorkingCopy, provider_clsid, LookupProviderName(provider_clsid), szParameters.get()));
+			RegQueryValueEx(hk2, L"Parameters", nullptr, nullptr, (LPBYTE)szParameters.get(), &cbParameters);
+			szParameters[cbParameters] = 0;
+
+			DWORD enabled = TRUE;
+			DWORD size = sizeof(enabled);
+			RegQueryValueEx(hk2, L"Enabled", nullptr, nullptr, (BYTE*)&enabled, &size);
+
+			m_inner.push_back(new CBugTraqAssociation(szWorkingCopy, provider_clsid, LookupProviderName(provider_clsid), szParameters.get(), enabled != FALSE));
 
 			RegCloseKey(hk2);
 		}
@@ -117,7 +122,7 @@ bool CBugTraqAssociations::FindProvider(const CString &path, CBugTraqAssociation
 	{
 		CLSID provider_clsid;
 		CLSIDFromString((LPOLESTR)(LPCWSTR)providerUUID, &provider_clsid);
-		pProjectProvider = new CBugTraqAssociation(_T(""), provider_clsid, _T("bugtraq:provider"), (LPCWSTR)providerParams);
+		pProjectProvider = new CBugTraqAssociation(L"", provider_clsid, L"bugtraq:provider", (LPCWSTR)providerParams, true);
 		if (pProjectProvider)
 		{
 			if (assoc)
@@ -130,7 +135,7 @@ bool CBugTraqAssociations::FindProvider(const CString &path, CBugTraqAssociation
 
 bool CBugTraqAssociations::FindProviderForPath(const CTGitPath& path, CBugTraqAssociation *assoc) const
 {
-		inner_t::const_iterator it = std::find_if(m_inner.cbegin(), m_inner.cend(), FindByPathPred(path));
+	const auto it = std::find_if(m_inner.cbegin(), m_inner.cend(), [&path](const CBugTraqAssociation* assoc) { return assoc->IsEnabled() && assoc->GetPath().IsEquivalentToWithoutCase(path); });
 		if (it != m_inner.end())
 		{
 			*assoc = *(*it);
@@ -147,7 +152,7 @@ CString CBugTraqAssociations::LookupProviderName(const CLSID &provider_clsid)
 	StringFromGUID2(provider_clsid, szClsid, ARRAYSIZE(szClsid));
 
 	TCHAR szSubKey[MAX_PATH] = {0};
-	_stprintf_s(szSubKey, _T("CLSID\\%ls"), szClsid);
+	swprintf_s(szSubKey, L"CLSID\\%ls", szClsid);
 
 	CString provider_name = CString(szClsid);
 
@@ -157,7 +162,7 @@ CString CBugTraqAssociations::LookupProviderName(const CLSID &provider_clsid)
 		TCHAR szClassName[MAX_PATH] = {0};
 		DWORD cbClassName = sizeof(szClassName);
 
-		if (RegQueryValueEx(hk, NULL, NULL, NULL, (LPBYTE)szClassName, &cbClassName) == ERROR_SUCCESS)
+		if (RegQueryValueEx(hk, nullptr, nullptr, nullptr, (LPBYTE)szClassName, &cbClassName) == ERROR_SUCCESS)
 			provider_name = CString(szClassName);
 
 		RegCloseKey(hk);
@@ -178,21 +183,23 @@ void CBugTraqAssociations::Save() const
 	SHDeleteKey(HKEY_CURRENT_USER, BUGTRAQ_ASSOCIATIONS_REGPATH);
 
 	HKEY hk;
-	if (RegCreateKeyEx(HKEY_CURRENT_USER, BUGTRAQ_ASSOCIATIONS_REGPATH, 0, NULL, 0, KEY_READ | KEY_WRITE, NULL, &hk, NULL) != ERROR_SUCCESS)
+	if (RegCreateKeyEx(HKEY_CURRENT_USER, BUGTRAQ_ASSOCIATIONS_REGPATH, 0, nullptr, 0, KEY_READ | KEY_WRITE, nullptr, &hk, nullptr) != ERROR_SUCCESS)
 		return;
 
 	DWORD dwIndex = 0;
 	for (const_iterator it = begin(); it != end(); ++it)
 	{
 		TCHAR szSubKey[MAX_PATH] = {0};
-		_stprintf_s(szSubKey, _T("%lu"), dwIndex);
+		swprintf_s(szSubKey, L"%lu", dwIndex);
 
 		HKEY hk2;
-		if (RegCreateKeyEx(hk, szSubKey, 0, NULL, 0, KEY_WRITE, NULL, &hk2, NULL) == ERROR_SUCCESS)
+		if (RegCreateKeyEx(hk, szSubKey, 0, nullptr, 0, KEY_WRITE, nullptr, &hk2, nullptr) == ERROR_SUCCESS)
 		{
-			RegSetValueFromCString(hk2, _T("Provider"), (*it)->GetProviderClassAsString());
-			RegSetValueFromCString(hk2, _T("WorkingCopy"), (*it)->GetPath().GetWinPath());
-			RegSetValueFromCString(hk2, _T("Parameters"), (*it)->GetParameters());
+			RegSetValueFromCString(hk2, L"Provider", (*it)->GetProviderClassAsString());
+			RegSetValueFromCString(hk2, L"WorkingCopy", (*it)->GetPath().GetWinPath());
+			RegSetValueFromCString(hk2, L"Parameters", (*it)->GetParameters());
+			DWORD enabled = (*it)->IsEnabled() ? 1 : 0;
+			RegSetValueEx(hk2, L"Enabled", 0, REG_DWORD, (BYTE*)&enabled, sizeof(enabled));
 
 			RegCloseKey(hk2);
 		}
@@ -203,9 +210,9 @@ void CBugTraqAssociations::Save() const
 	RegCloseKey(hk);
 }
 
-void CBugTraqAssociations::RemoveByPath(const CTGitPath &path)
+void CBugTraqAssociations::Remove(CBugTraqAssociation* assoc)
 {
-	inner_t::iterator it = std::find_if(m_inner.begin(), m_inner.end(), FindByPathPred(path));
+	inner_t::iterator it = std::find(m_inner.begin(), m_inner.end(), assoc);
 	if (it != m_inner.end())
 	{
 		delete *it;
@@ -226,13 +233,13 @@ std::vector<CBugTraqProvider> CBugTraqAssociations::GetAvailableProviders()
 {
 	std::vector<CBugTraqProvider> results;
 
-	ICatInformation *pCatInformation = NULL;
+	ICatInformation* pCatInformation = nullptr;
 
 	HRESULT hr;
-	if (SUCCEEDED(hr = CoCreateInstance(CLSID_StdComponentCategoriesMgr, NULL, CLSCTX_ALL, IID_ICatInformation, (void **)&pCatInformation)))
+	if (SUCCEEDED(hr = CoCreateInstance(CLSID_StdComponentCategoriesMgr, nullptr, CLSCTX_ALL, IID_ICatInformation, (void**)&pCatInformation)))
 	{
-		IEnumGUID *pEnum = NULL;
-		if (SUCCEEDED(hr = pCatInformation->EnumClassesOfCategories(1, &CATID_BugTraqProvider, 0, NULL, &pEnum)))
+		IEnumGUID* pEnum = nullptr;
+		if (SUCCEEDED(hr = pCatInformation->EnumClassesOfCategories(1, &CATID_BugTraqProvider, 0, nullptr, &pEnum)))
 		{
 			HRESULT hrEnum;
 			do
@@ -256,12 +263,12 @@ std::vector<CBugTraqProvider> CBugTraqAssociations::GetAvailableProviders()
 
 		if (pEnum)
 			pEnum->Release();
-		pEnum = NULL;
+		pEnum = nullptr;
 	}
 
 	if (pCatInformation)
 		pCatInformation->Release();
-	pCatInformation = NULL;
+	pCatInformation = nullptr;
 
 	return results;
 }

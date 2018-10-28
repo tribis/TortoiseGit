@@ -1,6 +1,6 @@
 ﻿// TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2013, 2015-2016 - TortoiseGit
+// Copyright (C) 2008-2013, 2015-2018 - TortoiseGit
 // Copyright (C) 2003-2008,2010 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -18,14 +18,15 @@
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 //
 #include "stdafx.h"
-#include "..\Resources\LoglistCommonResource.h"
+#include "../Resources/LoglistCommonResource.h"
 #include "CommonAppUtils.h"
 #include "PathUtils.h"
 #include "StringUtils.h"
-#include "CreateProcessHelper.h"
 #include "FormatMessageWrapper.h"
 #include "registry.h"
 #include "SelectFileFilter.h"
+#include "DPIAware.h"
+#include "LoadIconEx.h"
 
 extern CString sOrigCWD;
 extern CString g_sGroupingUUID;
@@ -33,7 +34,7 @@ extern CString g_sGroupingUUID;
 bool CCommonAppUtils::LaunchApplication(const CString& sCommandLine, UINT idErrMessageFormat, bool bWaitForStartup, CString *cwd, bool uac)
 {
 	CString theCWD = sOrigCWD;
-	if (cwd != NULL)
+	if (cwd)
 		theCWD = *cwd;
 
 	if (uac)
@@ -41,7 +42,7 @@ bool CCommonAppUtils::LaunchApplication(const CString& sCommandLine, UINT idErrM
 		CString file, param;
 		SHELLEXECUTEINFO shellinfo = { 0 };
 		shellinfo.cbSize = sizeof(shellinfo);
-		shellinfo.lpVerb = _T("runas");
+		shellinfo.lpVerb = L"runas";
 		shellinfo.nShow = SW_SHOWNORMAL;
 		shellinfo.fMask = SEE_MASK_NOCLOSEPROCESS;
 		shellinfo.lpDirectory = theCWD;
@@ -61,7 +62,7 @@ bool CCommonAppUtils::LaunchApplication(const CString& sCommandLine, UINT idErrM
 				{
 					CString temp;
 					temp.Format(idErrMessageFormat, (LPCTSTR)CFormatMessageWrapper());
-					MessageBox(NULL, temp, _T("TortoiseGit"), MB_OK | MB_ICONINFORMATION);
+					MessageBox(nullptr, temp, L"TortoiseGit", MB_OK | MB_ICONINFORMATION);
 				}
 				return false;
 			}
@@ -87,15 +88,18 @@ bool CCommonAppUtils::LaunchApplication(const CString& sCommandLine, UINT idErrM
 			{
 				CString temp;
 				temp.Format(idErrMessageFormat, (LPCTSTR)CFormatMessageWrapper());
-				MessageBox(NULL, temp, _T("TortoiseGit"), MB_OK | MB_ICONINFORMATION);
+				MessageBox(nullptr, temp, L"TortoiseGit", MB_OK | MB_ICONINFORMATION);
 			}
 			return false;
 		}
 
-		if (bWaitForStartup)
-			WaitForInputIdle(shellinfo.hProcess, 10000);
+		if (shellinfo.hProcess)
+		{
+			if (bWaitForStartup)
+				WaitForInputIdle(shellinfo.hProcess, 10000);
 
-		CloseHandle(shellinfo.hProcess);
+			CloseHandle(shellinfo.hProcess);
+		}
 
 		return true;
 	}
@@ -105,13 +109,13 @@ bool CCommonAppUtils::LaunchApplication(const CString& sCommandLine, UINT idErrM
 	startup.cb = sizeof(startup);
 
 	CString cleanCommandLine(sCommandLine);
-	if (CreateProcess(nullptr, const_cast<TCHAR*>((LPCTSTR)cleanCommandLine), nullptr, nullptr, FALSE, 0, nullptr, theCWD, &startup, &process) == 0)
+	if (CreateProcess(nullptr, cleanCommandLine.GetBuffer(), nullptr, nullptr, FALSE, CREATE_UNICODE_ENVIRONMENT, nullptr, theCWD, &startup, &process) == 0)
 	{
 		if (idErrMessageFormat)
 		{
 			CString temp;
 			temp.Format(idErrMessageFormat, (LPCTSTR)CFormatMessageWrapper());
-			MessageBox(nullptr, temp, _T("TortoiseGit"), MB_OK | MB_ICONINFORMATION);
+			MessageBox(nullptr, temp, L"TortoiseGit", MB_OK | MB_ICONINFORMATION);
 		}
 		return false;
 	}
@@ -129,23 +133,19 @@ bool CCommonAppUtils::LaunchApplication(const CString& sCommandLine, UINT idErrM
 
 bool CCommonAppUtils::RunTortoiseGitProc(const CString& sCommandLine, bool uac, bool includeGroupingUUID)
 {
-	CString pathToExecutable = CPathUtils::GetAppDirectory() + _T("TortoiseGitProc.exe");
+	CString pathToExecutable = CPathUtils::GetAppDirectory() + L"TortoiseGitProc.exe";
 	CString sCmd;
-	sCmd.Format(_T("\"%s\" %s"), (LPCTSTR)pathToExecutable, (LPCTSTR)sCommandLine);
+	sCmd.Format(L"\"%s\" %s", (LPCTSTR)pathToExecutable, (LPCTSTR)sCommandLine);
 	if (AfxGetMainWnd()->GetSafeHwnd() && (sCommandLine.Find(L"/hwnd:") < 0))
-	{
-		CString sCmdLine;
-		sCmdLine.Format(L"%s /hwnd:%p", (LPCTSTR)sCommandLine, (void*)AfxGetMainWnd()->GetSafeHwnd());
-		sCmd.Format(_T("\"%s\" %s"), (LPCTSTR)pathToExecutable, (LPCTSTR)sCmdLine);
-	}
+		sCmd.AppendFormat(L" /hwnd:%p", (void*)AfxGetMainWnd()->GetSafeHwnd());
 	if (!g_sGroupingUUID.IsEmpty() && includeGroupingUUID)
 	{
 		sCmd += L" /groupuuid:\"";
 		sCmd += g_sGroupingUUID;
-		sCmd += L"\"";
+		sCmd += L'"';
 	}
 
-	return LaunchApplication(sCmd, NULL, false, NULL, uac);
+	return LaunchApplication(sCmd, NULL, false, nullptr, uac);
 }
 
 bool CCommonAppUtils::IsAdminLogin()
@@ -159,20 +159,25 @@ bool CCommonAppUtils::IsAdminLogin()
 
 	// Check whether the token is present in admin group.
 	BOOL isInAdminGroup = FALSE;
-	if (!CheckTokenMembership(NULL, administratorsGroup, &isInAdminGroup))
+	if (!CheckTokenMembership(nullptr, administratorsGroup, &isInAdminGroup))
 		return false;
 
 	return !!isInAdminGroup;
 }
 
-bool CCommonAppUtils::SetListCtrlBackgroundImage(HWND hListCtrl, UINT nID, int width /* = 128 */, int height /* = 128 */)
+bool CCommonAppUtils::SetListCtrlBackgroundImage(HWND hListCtrl, UINT nID)
 {
-	if ((((DWORD)CRegStdDWORD(_T("Software\\TortoiseGit\\ShowListBackgroundImage"), TRUE)) == FALSE))
+	return SetListCtrlBackgroundImage(hListCtrl, nID, CDPIAware::Instance().ScaleX(128), CDPIAware::Instance().ScaleY(128));
+}
+
+bool CCommonAppUtils::SetListCtrlBackgroundImage(HWND hListCtrl, UINT nID, int width, int height)
+{
+	if ((((DWORD)CRegStdDWORD(L"Software\\TortoiseGit\\ShowListBackgroundImage", TRUE)) == FALSE))
 		return false;
 	ListView_SetTextBkColor(hListCtrl, CLR_NONE);
 	COLORREF bkColor = ListView_GetBkColor(hListCtrl);
 	// create a bitmap from the icon
-	HICON hIcon = (HICON)LoadImage(AfxGetResourceHandle(), MAKEINTRESOURCE(nID), IMAGE_ICON, width, height, LR_DEFAULTCOLOR);
+	auto hIcon = ::LoadIconEx(AfxGetResourceHandle(), MAKEINTRESOURCE(nID), width, height);
 	if (!hIcon)
 		return false;
 	SCOPE_EXIT { DestroyIcon(hIcon); };
@@ -205,10 +210,10 @@ bool CCommonAppUtils::SetListCtrlBackgroundImage(HWND hListCtrl, UINT nID, int w
 	HBITMAP old_dst_bmp = (HBITMAP)::SelectObject(dst_hdc, bmp);
 	// Fill the background of the compatible DC with the given color
 	::SetBkColor(dst_hdc, bkColor);
-	::ExtTextOut(dst_hdc, 0, 0, ETO_OPAQUE, &rect, NULL, 0, NULL);
+	::ExtTextOut(dst_hdc, 0, 0, ETO_OPAQUE, &rect, nullptr, 0, nullptr);
 
 	// Draw the icon into the compatible DC
-	::DrawIconEx(dst_hdc, 0, 0, hIcon, rect.right, rect.bottom, 0, NULL, DI_NORMAL);
+	::DrawIconEx(dst_hdc, 0, 0, hIcon, rect.right, rect.bottom, 0, nullptr, DI_NORMAL);
 	::SelectObject(dst_hdc, old_dst_bmp);
 
 	LVBKIMAGE lv;
@@ -220,78 +225,110 @@ bool CCommonAppUtils::SetListCtrlBackgroundImage(HWND hListCtrl, UINT nID, int w
 	return true;
 }
 
-bool CCommonAppUtils::FileOpenSave(CString& path, int * filterindex, UINT title, UINT filter, bool bOpen, HWND hwndOwner, LPCTSTR defaultExt)
+bool CCommonAppUtils::FileOpenSave(CString& path, int* filterindex, UINT title, UINT filterId, bool bOpen, HWND hwndOwner, LPCTSTR defaultExt, bool handleAsFile)
 {
-	OPENFILENAME ofn = {0};				// common dialog box structure
-	TCHAR szFile[MAX_PATH] = {0};		// buffer for file name. Explorer can't handle paths longer than MAX_PATH.
-	ofn.lStructSize = sizeof(OPENFILENAME);
-	ofn.hwndOwner = hwndOwner;
-	if (path.GetLength() >= MAX_PATH)
+	// Create a new common save file dialog
+	CComPtr<IFileDialog> pfd;
+
+	if (!SUCCEEDED(pfd.CoCreateInstance(bOpen ? CLSID_FileOpenDialog : CLSID_FileSaveDialog, nullptr, CLSCTX_INPROC_SERVER)))
+		return false;
+
+	// Set the dialog options
+	DWORD dwOptions;
+	if (!SUCCEEDED(pfd->GetOptions(&dwOptions)))
+		return false;
+
+	if (bOpen)
 	{
-		CString dir = path;
-		while (true)
-		{
-			int index = dir.ReverseFind(_T('\\'));
-			if (index < 0)
-				break;
-			dir = dir.Left(index);
-			if (PathFileExists(dir))
-				break;
-		}
-		GetShortPathName(dir, szFile, MAX_PATH);
-		CString remain = path.Right(path.GetLength() - dir.GetLength());
-		_tcscat_s(szFile, MAX_PATH, remain);
+		if (!SUCCEEDED(pfd->SetOptions(dwOptions | FOS_FILEMUSTEXIST | FOS_FORCEFILESYSTEM | FOS_PATHMUSTEXIST)))
+			return false;
 	}
 	else
-		_tcscpy_s(szFile, MAX_PATH, (LPCTSTR)path);
-	ofn.lpstrFile = szFile;
-	ofn.nMaxFile = _countof(szFile);
-
-	CSelectFileFilter fileFilter;
-	if (filter)
 	{
-		fileFilter.Load(filter);
-		ofn.lpstrFilter = fileFilter;
+		if (!SUCCEEDED(pfd->SetOptions(dwOptions | FOS_OVERWRITEPROMPT | FOS_FORCEFILESYSTEM | FOS_PATHMUSTEXIST)))
+			return false;
 	}
-	ofn.nFilterIndex = 1;
+	if ((!PathIsDirectory(path) || handleAsFile) && !SUCCEEDED(pfd->SetFileName(CPathUtils::GetFileNameFromPath(path))))
+		return false;
 
-	ofn.lpstrFileTitle = NULL;
-	ofn.nMaxFileTitle = 0;
-	ofn.lpstrInitialDir = NULL;
-	ofn.lpstrDefExt = defaultExt;
-	CString temp;
+	// Set a title
 	if (title)
 	{
+		CString temp;
 		temp.LoadString(title);
 		CStringUtils::RemoveAccelerators(temp);
+		pfd->SetTitle(temp);
 	}
-	ofn.lpstrTitle = temp;
-	if (bOpen)
-		ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY | OFN_EXPLORER;
-	else
-		ofn.Flags = OFN_OVERWRITEPROMPT | OFN_EXPLORER;
-
-	// Display the Open dialog box.
-	bool bRet = false;
-	if (bOpen)
-		bRet = !!GetOpenFileName(&ofn);
-	else
-		bRet = !!GetSaveFileName(&ofn);
-	SetCurrentDirectory(sOrigCWD);
-	if (bRet)
+	CComPtr<IShellItem> psiDefaultFolder;
+	if (filterId)
 	{
-		path = CString(ofn.lpstrFile);
-		if (filterindex)
-			*filterindex = ofn.nFilterIndex;
-		return true;
+		CSelectFileFilter fileFilter(filterId);
+		if (!SUCCEEDED(pfd->SetFileTypes(fileFilter.GetCount(), fileFilter)))
+			return false;
+		if (filterId == 1602 || filterId == 2501) // IDS_GITEXEFILEFILTER || IDS_PROGRAMSFILEFILTER
+		{
+			pfd->SetClientGuid({ 0x323ca4b0, 0x62df, 0x4a08, { 0xa5, 0x5, 0x58, 0xde, 0xa2, 0xb9, 0x2d, 0xcd } });
+			if (SUCCEEDED(SHCreateItemFromParsingName(CPathUtils::GetProgramsDirectory(), nullptr, IID_PPV_ARGS(&psiDefaultFolder))))
+				pfd->SetDefaultFolder(psiDefaultFolder);
+		}
+		else if (filterId == 1120) // IDS_PUTTYKEYFILEFILTER
+		{
+			pfd->SetClientGuid({ 0x271dbd3b, 0x50da, 0x4148, { 0x95, 0xfd, 0x64, 0x73, 0x69, 0xd1, 0x74, 0x2 } });
+			if (SUCCEEDED(SHCreateItemFromParsingName(CPathUtils::GetDocumentsDirectory(), nullptr, IID_PPV_ARGS(&psiDefaultFolder))))
+				pfd->SetDefaultFolder(psiDefaultFolder);
+		}
 	}
-	return false;
+
+	if (defaultExt && !SUCCEEDED(pfd->SetDefaultExtension(defaultExt)))
+			return false;
+
+	// set the default folder
+	CComPtr<IShellItem> psiFolder;
+	if (CStringUtils::StartsWith(path, L"\\") || path.Mid(1, 2) == L":\\")
+	{
+		CString dir = path;
+		if (!PathIsDirectory(dir) || handleAsFile)
+		{
+			if (PathRemoveFileSpec(dir.GetBuffer()))
+				dir.ReleaseBuffer();
+			else	
+				dir.Empty();
+		}
+		if (!dir.IsEmpty() && SUCCEEDED(SHCreateItemFromParsingName(dir, nullptr, IID_PPV_ARGS(&psiFolder))))
+			pfd->SetFolder(psiFolder);
+	}
+
+	// Show the save/open file dialog
+	if (!SUCCEEDED(pfd->Show(hwndOwner)))
+		return false;
+
+	// Get the selection from the user
+	CComPtr<IShellItem> psiResult;
+	if (!SUCCEEDED(pfd->GetResult(&psiResult)))
+		return false;
+
+	PWSTR pszPath = nullptr;
+	if (!SUCCEEDED(psiResult->GetDisplayName(SIGDN_FILESYSPATH, &pszPath)))
+		return false;
+
+	path = CString(pszPath);
+	if (filterindex)
+	{
+		UINT fi = 0;
+		pfd->GetFileTypeIndex(&fi);
+		*filterindex = fi;
+	}
+	return true;
+}
+
+HICON CCommonAppUtils::LoadIconEx(UINT resourceId, UINT cx, UINT cy)
+{
+	return ::LoadIconEx(AfxGetResourceHandle(), MAKEINTRESOURCE(resourceId), cx, cy);
 }
 
 void CCommonAppUtils::SetCharFormat(CWnd* window, DWORD mask , DWORD effects, const std::vector<CHARRANGE>& positions)
 {
-	CHARFORMAT2 format;
-	SecureZeroMemory(&format, sizeof(CHARFORMAT2));
+	CHARFORMAT2 format = {};
 	format.cbSize = sizeof(CHARFORMAT2);
 	format.dwMask = mask;
 	format.dwEffects = effects;
@@ -306,8 +343,7 @@ void CCommonAppUtils::SetCharFormat(CWnd* window, DWORD mask , DWORD effects, co
 
 void CCommonAppUtils::SetCharFormat(CWnd* window, DWORD mask, DWORD effects )
 {
-	CHARFORMAT2 format;
-	SecureZeroMemory(&format, sizeof(CHARFORMAT2));
+	CHARFORMAT2 format = {};
 	format.cbSize = sizeof(CHARFORMAT2);
 	format.dwMask = mask;
 	format.dwEffects = effects;

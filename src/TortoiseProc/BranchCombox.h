@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2009-2015 - TortoiseGit
+// Copyright (C) 2009-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -28,11 +28,11 @@ class CBranchCombox
 {
 public:
 	CBranchCombox()
+		: m_LocalBranchFilter(gPickRef_Head)
+		, m_RemoteBranchFilter(gPickRef_Remote)
+		, m_DialogName(L"sync")
+		, m_pTooltip(nullptr)
 	{
-		m_LocalBranchFilter = gPickRef_Head;
-		m_RemoteBranchFilter = gPickRef_Remote;
-		m_DialogName=_T("sync");
-		m_pTooltip=NULL;
 	}
 protected:
 	CHistoryCombo m_ctrlLocalBranch;
@@ -58,9 +58,7 @@ protected:
 		defaultUpstream.Format(L"remotes/%s/%s", (LPCTSTR)pullRemote, (LPCTSTR)pullBranch);
 		int found = m_ctrlRemoteBranch.FindStringExact(0, defaultUpstream);
 		if(found >= 0)
-		{
 			m_ctrlRemoteBranch.SetCurSel(found);
-		}
 		else if(!pullBranch.IsEmpty())
 		{
 			int index=m_ctrlRemoteBranch.FindStringExact(0,pullBranch);
@@ -70,9 +68,7 @@ protected:
 				m_ctrlRemoteBranch.SetCurSel(index);
 		}
 		else
-		{
 			m_ctrlRemoteBranch.SetCurSel(-1);
-		}
 
 		this->AddBranchToolTips(&this->m_ctrlLocalBranch,this->m_pTooltip);
 
@@ -87,7 +83,7 @@ protected:
 	}
 	void  BnClickedButtonBrowseLocalBranch()
 	{
-		if(CBrowseRefsDlg::PickRefForCombo(&m_ctrlLocalBranch, m_LocalBranchFilter))
+		if (CBrowseRefsDlg::PickRefForCombo(m_ctrlLocalBranch, m_LocalBranchFilter))
 			CbnSelchangeLocalBranch();
 	}
 	void  BnClickedButtonBrowseRemoteBranch()
@@ -121,7 +117,7 @@ protected:
 		}
 		else
 		{
-			if(CBrowseRefsDlg::PickRefForCombo(&m_ctrlRemoteBranch, m_RemoteBranchFilter))
+			if (CBrowseRefsDlg::PickRefForCombo(m_ctrlRemoteBranch, m_RemoteBranchFilter))
 				CbnSelchangeRemoteBranch();
 		}
 	}
@@ -147,11 +143,11 @@ protected:
 			if (rev.GetCommit(text))
 			{
 				pBranch->DisableTooltip();
-				MessageBox(nullptr, rev.GetLastErr(), _T("TortoiseGit"), MB_ICONERROR);
+				MessageBox(nullptr, rev.GetLastErr(), L"TortoiseGit", MB_ICONERROR);
 				return;
 			}
 
-			tooltip.Format(_T("%s: %s\n%s: %s <%s>\n%s: %s\n%s:\n%s\n%s"),
+			tooltip.Format(L"%s: %s\n%s: %s <%s>\n%s: %s\n%s:\n%s\n%s",
 				(LPCTSTR)CString(MAKEINTRESOURCE(IDS_LOG_REVISION)), // TODOTODO
 				(LPCTSTR)rev.m_CommitHash.ToString(),
 				(LPCTSTR)CString(MAKEINTRESOURCE(IDS_LOG_AUTHOR)),
@@ -185,25 +181,20 @@ protected:
 		if(this->m_RegKeyRemoteBranch.IsEmpty())
 		{
 			list.clear();
-			g_Git.GetBranchList(list, NULL, CGit::BRANCH_REMOTE);
+			g_Git.GetBranchList(list, nullptr, CGit::BRANCH_REMOTE);
 
 			m_ctrlRemoteBranch.SetList(list);
-
 		}
 		else
 		{
 			m_ctrlRemoteBranch.Reset();
-			m_ctrlRemoteBranch.LoadHistory(m_RegKeyRemoteBranch,_T("sync"));
+			m_ctrlRemoteBranch.LoadHistory(m_RegKeyRemoteBranch, L"sync");
 		}
 
 		if(!this->m_strLocalBranch.IsEmpty())
-		{
 			m_ctrlLocalBranch.AddString(m_strLocalBranch);
-		}
 		else
-		{
 			m_ctrlLocalBranch.SetCurSel(current);
-		}
 
 		if(!m_strRemoteBranch.IsEmpty())
 		{
@@ -211,9 +202,7 @@ protected:
 			m_ctrlRemoteBranch.SetCurSel(m_ctrlRemoteBranch.GetCount()-1);
 		}
 		else
-		{
 			CbnSelchangeLocalBranch();
-		}
 
 		this->LocalBranchChange();
 		this->RemoteBranchChange();

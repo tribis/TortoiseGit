@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2013-2015 - TortoiseGit
+// Copyright (C) 2013-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -19,6 +19,7 @@
 #pragma once
 #include "SettingsPropPage.h"
 #include "registry.h"
+#include "Git.h"
 
 // CSettingGitCredential dialog
 class CSettingGitCredential : public ISettingsPropPage
@@ -35,12 +36,96 @@ public:
 	};
 	CSettingGitCredential();
 	virtual ~CSettingGitCredential();
-	UINT GetIconID() { return IDI_GITCREDENTIAL; }
+	UINT GetIconID() override { return IDI_GITCREDENTIAL; }
 // Dialog Data
 	enum { IDD = IDD_SETTINGSCREDENTIAL };
 
+	static int GetCredentialDefaultUrlCallback(const git_config_entry *entry, void *payload)
+	{
+		((STRING_VECTOR*)payload)->push_back(ConfigLevelToKey(entry->level));
+		return 0;
+	}
+
+	static int GetCredentialUrlCallback(const git_config_entry *entry, void *payload)
+	{
+		CString name = CUnicodeUtils::GetUnicode(entry->name);
+		int pos1 = name.Find(L'.');
+		int pos2 = name.ReverseFind(L'.');
+		CString url = name.Mid(pos1 + 1, pos2 - pos1 - 1);
+		CString display;
+		display.Format(L"%s:%s", (LPCTSTR)ConfigLevelToKey(entry->level), (LPCTSTR)url);
+		((STRING_VECTOR*)payload)->push_back(display);
+		return 0;
+	}
+
+	static int GetCredentialEntryCallback(const git_config_entry *entry, void *payload)
+	{
+		CString name = CUnicodeUtils::GetUnicode(entry->name);
+		((STRING_VECTOR*)payload)->push_back(name);
+		return 0;
+	}
+
+	static int GetCredentialAnyEntryCallback(const git_config_entry *entry, void *payload)
+	{
+		CString name = CUnicodeUtils::GetUnicode(entry->name);
+		CString value = CUnicodeUtils::GetUnicode(entry->value);
+		CString text;
+		text.Format(L"%s\n%s\n%s", (LPCTSTR)ConfigLevelToKey(entry->level), (LPCTSTR)name, (LPCTSTR)value);
+		((STRING_VECTOR*)payload)->push_back(text);
+		return 0;
+	}
+
+	static CString GetWinstorePath()
+	{
+		TCHAR winstorebuf[MAX_PATH] = { 0 };
+		ExpandEnvironmentStrings(L"%AppData%\\GitCredStore\\git-credential-winstore.exe", winstorebuf, _countof(winstorebuf));
+		CString winstore;
+		winstore.Format(L"!'%s'", winstorebuf);
+		return winstore;
+	}
+
+	static bool WincredExists()
+	{
+		CString path = CGit::ms_MsysGitRootDir;
+		path.Append(L"libexec\\git-core\\git-credential-wincred.exe");
+		return !!PathFileExists(path);
+	}
+
+	static bool WinstoreExists()
+	{
+		return !!PathFileExists(GetWinstorePath());
+	}
+
+	static bool GCMExists()
+	{
+		CString path = CGit::ms_MsysGitRootDir;
+		path.Append(L"libexec\\git-core\\git-credential-manager.exe");
+		if (!PathFileExists(path))
+			return false;
+		// CCM requires .NET 4.5.1 or later
+		// try to detect it (only works for >=4.5): https://msdn.microsoft.com/en-us/library/hh925568
+		return CRegDWORD(L"SOFTWARE\\Microsoft\\NET Framework Setup\\NDP\\v4\\Full\\Release", 0, false, HKEY_LOCAL_MACHINE) >= 378675;
+	}
+
 protected:
-	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
+	static CString ConfigLevelToKey(git_config_level_t level)
+	{
+		switch (level)
+		{
+		case GIT_CONFIG_LEVEL_PROGRAMDATA:
+			return L"P";
+		case GIT_CONFIG_LEVEL_SYSTEM:
+			return L"S";
+		case GIT_CONFIG_LEVEL_XDG:
+			return L"X";
+		case GIT_CONFIG_LEVEL_GLOBAL:
+			return L"G";
+		default:
+			return L"L";
+		}
+	}
+
+	virtual void DoDataExchange(CDataExchange* pDX) override;    // DDX/DDV support
 
 	DECLARE_MESSAGE_MAP()
 
@@ -54,8 +139,8 @@ protected:
 	afx_msg void OnBnClickedCheckUsehttppath();
 	afx_msg void OnBnClickedButtonRemove();
 
-	BOOL OnInitDialog();
-	BOOL OnApply();
+	virtual BOOL OnInitDialog() override;
+	virtual BOOL OnApply() override;
 
 	void EnableAdvancedOptions();
 	BOOL IsUrlExist(CString &text);
@@ -65,6 +150,8 @@ protected:
 	void LoadList();
 	CString Load(CString key);
 	void Save(CString key, CString value);
+	int DeleteOtherKeys(int type);
+	bool SaveSimpleCredential(int type);
 
 	int			m_ChangedMask;
 

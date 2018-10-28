@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2013-2014, 2016 - TortoiseGit
+// Copyright (C) 2013-2014, 2016-2018 - TortoiseGit
 // Copyright (C) 2011-2012, 2016 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -22,7 +22,7 @@
 #include "TaskbarUUID.h"
 #include "registry.h"
 #include "CmdLineParser.h"
-
+#include "LoadIconEx.h"
 #include <Shobjidl.h>
 #include "SmartHandle.h"
 #include <atlbase.h>
@@ -30,13 +30,14 @@
 #pragma warning(disable: 4458)
 #include <GdiPlus.h>
 #pragma warning(pop)
+#pragma comment(lib, "gdiplus.lib")
 
-#define APPID (_T("TGIT.TGIT.1"))
+#define APPID (L"TGIT.TGIT.1")
 
 void SetTaskIDPerUUID()
 {
     typedef HRESULT STDAPICALLTYPE SetCurrentProcessExplicitAppUserModelIDFN(PCWSTR AppID);
-    CAutoLibrary hShell = AtlLoadSystemLibraryUsingFullPath(_T("shell32.dll"));
+    CAutoLibrary hShell = AtlLoadSystemLibraryUsingFullPath(L"shell32.dll");
     if (hShell)
     {
         SetCurrentProcessExplicitAppUserModelIDFN *pfnSetCurrentProcessExplicitAppUserModelID = (SetCurrentProcessExplicitAppUserModelIDFN*)GetProcAddress(hShell, "SetCurrentProcessExplicitAppUserModelID");
@@ -48,14 +49,14 @@ void SetTaskIDPerUUID()
     }
 }
 
-std::wstring GetTaskIDPerUUID(LPCTSTR uuid /*= NULL */)
+std::wstring GetTaskIDPerUUID(LPCTSTR uuid /*= nullptr */)
 {
-    CRegStdDWORD r = CRegStdDWORD(_T("Software\\TortoiseGit\\GroupTaskbarIconsPerRepo"), 3);
+    CRegStdDWORD r = CRegStdDWORD(L"Software\\TortoiseGit\\GroupTaskbarIconsPerRepo", 3);
     std::wstring id = APPID;
     if ((r < 2)||(r == 3))
     {
         wchar_t buf[MAX_PATH] = {0};
-        GetModuleFileName(NULL, buf, MAX_PATH);
+        GetModuleFileName(nullptr, buf, _countof(buf));
         std::wstring n = buf;
         n = n.substr(n.find_last_of('\\'));
         id += n;
@@ -87,10 +88,10 @@ extern bool g_bGroupingRemoveIcon;
 
 void SetUUIDOverlayIcon( HWND hWnd )
 {
-    if (!CRegStdDWORD(_T("Software\\TortoiseGit\\GroupTaskbarIconsPerRepo"), 3))
+    if (!CRegStdDWORD(L"Software\\TortoiseGit\\GroupTaskbarIconsPerRepo", 3))
         return;
 
-    if (!CRegStdDWORD(_T("Software\\TortoiseGit\\GroupTaskbarIconsPerRepoOverlay"), TRUE))
+    if (!CRegStdDWORD(L"Software\\TortoiseGit\\GroupTaskbarIconsPerRepoOverlay", TRUE))
         return;
 
     std::wstring uuid;
@@ -109,14 +110,14 @@ void SetUUIDOverlayIcon( HWND hWnd )
         return;
 
     CComPtr<ITaskbarList3> pTaskbarInterface;
-    if (FAILED(pTaskbarInterface.CoCreateInstance(CLSID_TaskbarList, NULL, CLSCTX_INPROC_SERVER)))
+    if (FAILED(pTaskbarInterface.CoCreateInstance(CLSID_TaskbarList, nullptr, CLSCTX_INPROC_SERVER)))
         return;
 
     int foundUUIDIndex = 0;
     do
     {
         wchar_t buf[MAX_PATH] = { 0 };
-        swprintf_s(buf, _countof(buf), L"%s%d", L"Software\\TortoiseGit\\LastUsedUUIDsForGrouping\\", foundUUIDIndex);
+        swprintf_s(buf, L"%s%d", L"Software\\TortoiseGit\\LastUsedUUIDsForGrouping\\", foundUUIDIndex);
         CRegStdString r = CRegStdString(buf);
         std::wstring sr = r;
         if (sr.empty())
@@ -144,11 +145,14 @@ void SetUUIDOverlayIcon( HWND hWnd )
         r.removeKey();
     }
 
+    int iconWidth = GetSystemMetrics(SM_CXSMICON);
+    int iconHeight = GetSystemMetrics(SM_CYSMICON);
+
     HICON icon = nullptr;
     if (!sicon.empty())
     {
         if (sicon.size() >= 4 && !_wcsicmp(sicon.substr(sicon.size() - 4).c_str(), L".ico"))
-            icon = (HICON)::LoadImage(NULL, sicon.c_str(), IMAGE_ICON, 16, 16, LR_LOADFROMFILE | LR_SHARED);
+            icon = LoadIconEx(nullptr, sicon.c_str(), iconWidth, iconHeight);
         else
         {
             ULONG_PTR gdiplusToken = 0;
@@ -156,10 +160,11 @@ void SetUUIDOverlayIcon( HWND hWnd )
             GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, nullptr);
             if (gdiplusToken)
             {
-                Gdiplus::Bitmap* pBitmap = new Gdiplus::Bitmap(sicon.c_str(), FALSE);
+                {
+                auto pBitmap = std::make_unique<Gdiplus::Bitmap>(sicon.c_str(), FALSE);
                 if (pBitmap->GetLastStatus() == Gdiplus::Status::Ok)
                     pBitmap->GetHICON(&icon);
-                delete pBitmap;
+                }
                 Gdiplus::GdiplusShutdown(gdiplusToken);
             }
         }
@@ -170,20 +175,16 @@ void SetUUIDOverlayIcon( HWND hWnd )
         DWORD colors[6] = { 0x80FF0000, 0x80FFFF00, 0x8000FF00, 0x800000FF, 0x80000000, 0x8000FFFF };
 
         // AND mask - monochrome - determines which pixels get drawn
-        BYTE AND[32];
-        for (int i = 0; i<32; i++)
-        {
-            AND[i] = 0xFF;
-        }
+        auto AND = std::make_unique<BYTE[]>(iconWidth * iconWidth);
+        for (int i = 0; i < iconWidth * iconWidth; ++i)
+            AND[i] = 0xff;
 
         // XOR mask - 32bpp ARGB - determines the pixel values
-        DWORD XOR[256];
-        for (int i = 0; i<256; i++)
-        {
+        auto XOR = std::make_unique<DWORD[]>(iconWidth * iconWidth);
+        for (int i = 0; i < iconWidth * iconWidth; ++i)
             XOR[i] = colors[foundUUIDIndex % 6];
-        }
 
-        icon = ::CreateIcon(nullptr, 16, 16, 1, 32, AND, (BYTE*)XOR);
+        icon = ::CreateIcon(nullptr, iconWidth, iconHeight, 1, 32, AND.get(), (BYTE*)XOR.get());
     }
     pTaskbarInterface->SetOverlayIcon(hWnd, icon, uuid.c_str());
     DestroyIcon(icon);

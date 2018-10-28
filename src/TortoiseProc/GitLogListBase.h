@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2016 - TortoiseGit
+// Copyright (C) 2008-2018 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -20,7 +20,8 @@
 //
 #pragma once
 
-#include "HintListCtrl.h"
+#include "HintCtrl.h"
+#include "ResizableColumnsListCtrl.h"
 #include "Git.h"
 #include "ProjectProperties.h"
 #include "TGitPath.h"
@@ -33,6 +34,19 @@
 #include <regex>
 #include "GitStatusListCtrl.h"
 #include "FindDlg.h"
+#include <unordered_set>
+
+template < typename Cont, typename Pred>
+void for_each(Cont& c, Pred&& p)
+{
+	std::for_each(cbegin(c), cend(c), p);
+}
+
+template <typename Cont, typename Pred>
+auto find_if(Cont& c, Pred&& p)
+{
+	return std::find_if(cbegin(c), cend(c), p);
+}
 
 // CGitLogList
 #define ICONITEMBORDER 5
@@ -62,6 +76,7 @@
 #define LOGLIST_SHOWTAGS				0x0004
 #define LOGLIST_SHOWSTASH				0x0008
 #define LOGLIST_SHOWBISECT				0x0010
+#define LOGLIST_SHOWOTHERREFS			0x0020
 #define LOGLIST_SHOWALLREFS				0xFFFF
 
 //typedef void CALLBACK_PROCESS(void * data, int progress);
@@ -69,6 +84,7 @@
 #define MSG_LOAD_PERCENTAGE		(WM_USER+111)
 #define MSG_REFLOG_CHANGED		(WM_USER+112)
 #define MSG_FETCHED_DIFF		(WM_USER+113)
+#define MSG_COMMITS_REORDERED	(WM_USER+114)
 
 class SelectionHistory
 {
@@ -143,20 +159,17 @@ private:
 
 class CThreadSafePtrArray : public std::vector<GitRevLoglist*>
 {
+	typedef CComCritSecLock<CComCriticalSection> Locker;
 	CComCriticalSection *m_critSec;
 public:
-	CThreadSafePtrArray(CComCriticalSection *section){ m_critSec = section ;}
+	CThreadSafePtrArray(CComCriticalSection* section) : m_critSec(section)
+	{
+		ATLASSERT(m_critSec);
+	}
+
 	GitRevLoglist* SafeGetAt(size_t i)
 	{
-		if(m_critSec)
-			m_critSec->Lock();
-
-		SCOPE_EXIT
-		{
-			if (m_critSec)
-				m_critSec->Unlock();
-		};
-
+		Locker lock(*m_critSec);
 		if (i >= size())
 			return nullptr;
 
@@ -165,42 +178,37 @@ public:
 
 	void SafeAdd(GitRevLoglist* newElement)
 	{
-		if(m_critSec)
-			m_critSec->Lock();
+		Locker lock(*m_critSec);
 		push_back(newElement);
-		if(m_critSec)
-			m_critSec->Unlock();
 	}
 
 	void SafeRemoveAt(size_t i)
 	{
-		if (m_critSec)
-			m_critSec->Lock();
-
-		SCOPE_EXIT
-		{
-			if (m_critSec)
-			m_critSec->Unlock();
-		};
-
+		Locker lock(*m_critSec);
 		if (i >= size())
 			return;
 
 		erase(begin() + i);
 	}
 
-	void  SafeRemoveAll()
+	void SafeAddFront(GitRevLoglist* newElement)
 	{
-		if(m_critSec)
-			m_critSec->Lock();
-		clear();
-		if(m_critSec)
-			m_critSec->Unlock();
+		Locker lock(*m_critSec);
+		insert(cbegin(), newElement);
 	}
 
+	void  SafeRemoveAll()
+	{
+		Locker lock(*m_critSec);
+		clear();
+	}
 };
 
-class CGitLogListBase : public CHintListCtrl
+class IAsyncDiffCB
+{
+};
+
+class CGitLogListBase : public CHintCtrl<CResizableColumnsListCtrl<CListCtrl>>, public IAsyncDiffCB
 {
 	DECLARE_DYNAMIC(CGitLogListBase)
 
@@ -221,10 +229,17 @@ public:
 
 	void ResetWcRev(bool refresh = false)
 	{
+		if (GetSafeHwnd())
+		{
+			CWnd* pParent = GetParent();
+			if (pParent && pParent->GetSafeHwnd())
+				pParent->SendMessage(LOGLIST_RESET_WCREV);
+		}
 		m_wcRev.Clear();
 		m_wcRev.GetSubject().LoadString(IDS_LOG_WORKINGDIRCHANGES);
-		m_wcRev.m_Mark = _T('-');
+		m_wcRev.m_Mark = L'-';
 		m_wcRev.GetBody().LoadString(IDS_LOG_FETCHINGSTATUS);
+		m_wcRev.GetBody() = L'\n' + m_wcRev.GetBody();
 		m_wcRev.m_CallDiffAsync = DiffAsync;
 		InterlockedExchange(&m_wcRev.m_IsDiffFiles, FALSE);
 		if (refresh && m_bShowWC)
@@ -234,25 +249,34 @@ public:
 	volatile LONG		m_bNoDispUpdates;
 	BOOL m_IsIDReplaceAction;
 	BOOL m_IsOldFirst;
+protected:
 	void hideFromContextMenu(unsigned __int64 hideMask, bool exclusivelyShow);
+public:
 	BOOL m_IsRebaseReplaceGraph;
 	BOOL m_bNoHightlightHead;
 
+protected:
 	void MeasureItem(LPMEASUREITEMSTRUCT lpMeasureItemStruct);
 
 	BOOL m_bStrictStopped;
+public:
 	BOOL m_bShowBugtraqColumn;
+protected:
 	BOOL m_bSearchIndex;
-	BOOL m_bCancelled;
+public:
 	bool m_bIsCherryPick;
 	unsigned __int64 m_ContextMenuMask;
 
 	bool				m_hasWC;
 	bool				m_bShowWC;
+protected:
 	GitRevLoglist		m_wcRev;
+public:
 	volatile LONG 		m_bThreadRunning;
+protected:
 	CLogCache			m_LogCache;
 
+public:
 	CString	m_sRange;
 	// don't forget to bump BLAME_COLUMN_VERSION in GitStatusListCtrlHelpers.cpp if you change columns
 	enum
@@ -296,7 +320,6 @@ public:
 	ID_COMPARE = 1, // compare revision with WC
 	ID_SAVEAS,
 	ID_COMPARETWO, // compare two revisions
-	ID_COPY,
 	ID_REVERTREV,
 	ID_MERGEREV,
 	ID_GNUDIFF1, // compare with WC, unified
@@ -310,7 +333,6 @@ public:
 	ID_DIFF,
 	ID_OPENWITH,
 	ID_COPYCLIPBOARD,
-	ID_COPYHASH,
 	ID_REVERTTOREV,
 	ID_BLAMECOMPARE,
 	ID_BLAMEDIFF,
@@ -343,7 +365,6 @@ public:
 	ID_PULL,
 	ID_FETCH,
 	ID_SHOWBRANCHES,
-	ID_COPYCLIPBOARDMESSAGES,
 	ID_BISECTSTART,
 	ID_LOG_VIEWRANGE,
 	ID_LOG_VIEWRANGE_REACHABLEFROMONLYONE,
@@ -353,13 +374,19 @@ public:
 	ID_BISECTGOOD,
 	ID_BISECTBAD,
 	ID_BISECTRESET,
-	};
-	enum
-	{
-	ID_COPY_ALL,
-	ID_COPY_MESSAGE,
-	ID_COPY_SUBJECT,
-	ID_COPY_HASH,
+	ID_BISECTSKIP,
+	ID_SVNDCOMMIT,
+	ID_COMPARETWOCOMMITCHANGES,
+	// the following can be >= 64 as those are not used for GetContextMenuBit(), all others must be < 64 in order to fit into __int64
+	ID_COPYCLIPBOARDFULL,
+	ID_COPYCLIPBOARDFULLNOPATHS,
+	ID_COPYCLIPBOARDHASH,
+	ID_COPYCLIPBOARDAUTHORSFULL,
+	ID_COPYCLIPBOARDAUTHORSNAME,
+	ID_COPYCLIPBOARDAUTHORSEMAIL,
+	ID_COPYCLIPBOARDSUBJECTS,
+	ID_COPYCLIPBOARDMESSAGES,
+	ID_COPYCLIPBOARDBRANCHTAG,
 	};
 	enum FilterShow
 	{
@@ -380,19 +407,24 @@ public:
 		LOGACTIONS_REBASE_MASK		= 0x0FC00000,
 		LOGACTIONS_REBASE_MODE_MASK	= 0x07C00000,
 	};
-	inline unsigned __int64 GetContextMenuBit(int i){ return ((unsigned __int64 )0x1)<<i ;}
+	static_assert(ID_COMPARETWOCOMMITCHANGES < 64 && ID_COPYCLIPBOARDFULL <= 64, "IDs must be <64 in order to be usable in a bitfield");
+	static inline unsigned __int64 GetContextMenuBit(int i){ return ((unsigned __int64 )0x1)<<i ;}
 	static CString GetRebaseActionName(int action);
 	void InsertGitColumn();
-	void ResizeAllListCtrlCols();
-	void CopySelectionToClipBoard(int toCopy = ID_COPY_ALL);
+	void CopySelectionToClipBoard(int toCopy = ID_COPYCLIPBOARDFULL);
 	void DiffSelectedRevWithPrevious();
 	bool IsSelectionContinuous();
+protected:
 	int  BeginFetchLog();
-	int  FillGitLog(CTGitPath *path, CString *range = NULL, int infomask = CGit::LOG_INFO_STAT| CGit::LOG_INFO_FILESTATE | CGit::LOG_INFO_SHOW_MERGEDFILE);
-	int  FillGitLog(std::set<CGitHash>& hashes);
+	HWND GetParentHWND();
+public:
+	int  FillGitLog(CTGitPath* path, CString* range = nullptr, int infomask = CGit::LOG_INFO_STAT | CGit::LOG_INFO_FILESTATE | CGit::LOG_INFO_SHOW_MERGEDFILE);
+	int  FillGitLog(std::unordered_set<CGitHash>& hashes);
+protected:
 	CString MessageDisplayStr(GitRev* pLogEntry);
-	BOOL IsMatchFilter(bool bRegex, GitRevLoglist* pRev, std::tr1::wregex& pat);
-	bool ShouldShowFilter(GitRevLoglist* pRev, const std::map<CGitHash, std::set<CGitHash>>& commitChildren);
+	BOOL IsMatchFilter(bool bRegex, GitRevLoglist* pRev, std::wregex& pat);
+	bool ShouldShowFilter(GitRevLoglist* pRev, const std::unordered_map<CGitHash, std::unordered_set<CGitHash>>& commitChildren);
+public:
 	void ShowGraphColumn(bool bShow);
 	CString	GetTagInfo(GitRev* pLogEntry);
 
@@ -400,8 +432,12 @@ public:
 	static const UINT	m_FindDialogMessage;
 	void OnFind();
 
+protected:
 	static const UINT	m_ScrollToMessage;
+public:
+	static const UINT	m_ScrollToRef;
 	static const UINT	m_RebaseActionMessage;
+	static const UINT	LOGLIST_RESET_WCREV;
 
 	inline int ShownCountWithStopped() const { return (int)m_arShownList.size() + (m_bStrictStopped ? 1 : 0); }
 	void FetchLogAsync(void* data = nullptr);
@@ -417,7 +453,7 @@ public:
 	CLogDataVector		m_logEntries;
 	void RemoveFilter();
 	void StartFilter();
-	bool ValidateRegexp(LPCTSTR regexp_str, std::tr1::wregex& pat, bool bMatchCase = false );
+	bool ValidateRegexp(LPCTSTR regexp_str, std::wregex& pat, bool bMatchCase = false );
 	CString				m_sFilterText;
 
 	CFilterData			m_Filter;
@@ -429,22 +465,58 @@ public:
 	CGitHash			m_highlight;
 	int					m_ShowRefMask;
 
+protected:
+	CGitHash			m_superProjectHash;
+
+public:
 	void				GetTimeRange(CTime &oldest,CTime &latest);
+protected:
 	virtual void GetParentHashes(GitRev* pRev, GIT_REV_LIST& parentHash);
 	virtual void ContextMenuAction(int cmd,int FirstSelect, int LastSelect, CMenu * menu)=0;
+	void UpdateSubmodulePointer()
+	{
+		m_superProjectHash.Empty();
+		if (CRegDWORD(L"Software\\TortoiseGit\\LogShowSuperProjectSubmodulePointer", TRUE) != TRUE)
+			return;
+		if (GitAdminDir::IsBareRepo(g_Git.m_CurrentDir))
+			return;
+		CString superprojectRoot;
+		GitAdminDir::HasAdminDir(g_Git.m_CurrentDir, false, &superprojectRoot);
+		if (superprojectRoot.IsEmpty())
+			return;
+
+		CAutoRepository repo(superprojectRoot);
+		if (!repo)
+			return;
+		CAutoIndex index;
+		if (git_repository_index(index.GetPointer(), repo))
+			return;
+
+		CString submodulePath;
+		if (superprojectRoot[superprojectRoot.GetLength() - 1] == L'\\')
+			submodulePath = g_Git.m_CurrentDir.Right(g_Git.m_CurrentDir.GetLength() - superprojectRoot.GetLength());
+		else
+			submodulePath = g_Git.m_CurrentDir.Right(g_Git.m_CurrentDir.GetLength() - superprojectRoot.GetLength() - 1);
+		submodulePath.Replace(L'\\', L'/');
+		const git_index_entry* entry = git_index_get_bypath(index, CUnicodeUtils::GetUTF8(submodulePath), 0);
+		if (!entry)
+			return;
+
+		m_superProjectHash = entry->id.id;
+	}
 	void ReloadHashMap()
 	{
 		m_RefLabelPosMap.clear();
 		m_HashMap.clear();
 
 		if (g_Git.GetMapHashToFriendName(m_HashMap))
-			MessageBox(g_Git.GetGitLastErr(_T("Could not get all refs.")), _T("TortoiseGit"), MB_ICONERROR);
+			MessageBox(g_Git.GetGitLastErr(L"Could not get all refs."), L"TortoiseGit", MB_ICONERROR);
 
 		m_CurrentBranch=g_Git.GetCurrentBranch();
 
-		if (g_Git.GetHash(m_HeadHash, _T("HEAD")))
+		if (g_Git.GetHash(m_HeadHash, L"HEAD"))
 		{
-			MessageBox(g_Git.GetGitLastErr(_T("Could not get HEAD hash. Quitting...")), _T("TortoiseGit"), MB_ICONERROR);
+			MessageBox(g_Git.GetGitLastErr(L"Could not get HEAD hash. Quitting..."), L"TortoiseGit", MB_ICONERROR);
 			ExitProcess(1);
 		}
 
@@ -453,27 +525,30 @@ public:
 
 		FetchRemoteList();
 		FetchTrackingBranchList();
+
+		UpdateSubmodulePointer();
 	}
 	void StartAsyncDiffThread();
 	void StartLoadingThread();
+public:
 	void SafeTerminateThread()
 	{
-		if (m_LoadingThread!=NULL && InterlockedExchange(&m_bExitThread, TRUE) == FALSE)
+		if (m_LoadingThread && InterlockedExchange(&m_bExitThread, TRUE) == FALSE)
 		{
 			DWORD ret = WAIT_TIMEOUT;
 			for (int i = 0; i < 200 && m_bThreadRunning; ++i)
 				ret =::WaitForSingleObject(m_LoadingThread->m_hThread, 100);
 			if (ret == WAIT_TIMEOUT && m_bThreadRunning)
 				::TerminateThread(m_LoadingThread, 0);
-			m_LoadingThread = NULL;
+			m_LoadingThread = nullptr;
 		}
 	};
-
+protected:
 	bool IsInWorkingThread()
 	{
 		return (AfxGetThread() == m_LoadingThread);
 	}
-
+public:
 	void SetRange(const CString& range)
 	{
 		m_sRange = range;
@@ -481,16 +556,20 @@ public:
 
 	CString GetRange() const { return m_sRange; }
 
-	bool HasFilterText() const { return !m_sFilterText.IsEmpty() && m_sFilterText != _T("!"); }
+	bool HasFilterText() const { return !m_sFilterText.IsEmpty() && m_sFilterText != L"!"; }
 
 	int					m_nSearchIndex;
-
+protected:
 	volatile LONG		m_bExitThread;
 	CWinThread*			m_LoadingThread;
+public:
 	MAP_HASH_NAME		m_HashMap;
+protected:
 	std::map<CString, std::pair<CString, CString>>	m_TrackingMap;
 
 public:
+	void				SetStyle();
+
 	CString				m_ColumnRegKey;
 
 protected:
@@ -507,21 +586,19 @@ protected:
 
 	DECLARE_MESSAGE_MAP()
 	afx_msg void OnDestroy();
-	virtual afx_msg void OnNMCustomdrawLoglist(NMHDR *pNMHDR, LRESULT *pResult);
-	virtual afx_msg void OnLvnGetdispinfoLoglist(NMHDR *pNMHDR, LRESULT *pResult);
+	virtual afx_msg void OnNMCustomdrawLoglist(NMHDR* pNMHDR, LRESULT* pResult);
+	virtual afx_msg void OnLvnGetdispinfoLoglist(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg LRESULT OnFindDialogMessage(WPARAM wParam, LPARAM lParam);
 	afx_msg LRESULT OnScrollToMessage(WPARAM wParam, LPARAM lParam);
+	afx_msg LRESULT OnScrollToRef(WPARAM wParam, LPARAM lParam);
 	afx_msg int OnCreate(LPCREATESTRUCT lpCreateStruct);
 	afx_msg void OnContextMenu(CWnd* pWnd, CPoint point);
 	afx_msg LRESULT OnLoad(WPARAM wParam, LPARAM lParam);
-	afx_msg void OnHdnBegintrack(NMHDR *pNMHDR, LRESULT *pResult);
-	afx_msg void OnHdnItemchanging(NMHDR *pNMHDR, LRESULT *pResult);
-	afx_msg void OnColumnResized(NMHDR *pNMHDR, LRESULT *pResult);
-	afx_msg void OnColumnMoved(NMHDR *pNMHDR, LRESULT *pResult);
 	void OnNMDblclkLoglist(NMHDR * /*pNMHDR*/, LRESULT *pResult);
 	afx_msg void OnLvnOdfinditemLoglist(NMHDR *pNMHDR, LRESULT *pResult);
-	void PreSubclassWindow();
-	virtual BOOL PreTranslateMessage(MSG* pMsg);
+	void PreSubclassWindow() override;
+	virtual BOOL PreTranslateMessage(MSG* pMsg) override;
+	virtual ULONG GetGestureStatus(CPoint ptTouch) override;
 	static UINT LogThreadEntry(LPVOID pVoid);
 	UINT LogThread();
 	bool IsOnStash(int index);
@@ -529,11 +606,9 @@ protected:
 	bool IsBisect(const GitRev * pSelLogEntry);
 	void FetchRemoteList();
 	void FetchTrackingBranchList();
-	void FetchLastLogInfo();
-	void FetchFullLogInfo(CString &from, CString &to);
 
-	virtual afx_msg BOOL OnToolTipText(UINT id, NMHDR * pNMHDR, LRESULT * pResult);
-	virtual INT_PTR OnToolHitTest(CPoint point, TOOLINFO * pTI) const;
+	virtual afx_msg BOOL OnToolTipText(UINT id, NMHDR* pNMHDR, LRESULT* pResult);
+	virtual INT_PTR OnToolHitTest(CPoint point, TOOLINFO* pTI) const override;
 	CString GetToolTipText(int nItem, int nSubItem);
 
 	/** Checks whether a referenfe label is under pt and returns the index/type
@@ -554,7 +629,7 @@ protected:
 
 	void paintGraphLane(HDC hdc,int laneHeight, int type, int x1, int x2,
 									  const COLORREF& col,const COLORREF& activeColor, int top) ;
-	void DrawLine(HDC hdc, int x1, int y1, int x2, int y2){::MoveToEx(hdc,x1,y1,NULL);::LineTo(hdc,x2,y2);}
+	void DrawLine(HDC hdc, int x1, int y1, int x2, int y2){ ::MoveToEx(hdc, x1, y1, nullptr); ::LineTo(hdc, x2, y2); }
 	/**
 	* Save column widths to the registry
 	*/
@@ -571,15 +646,16 @@ protected:
 	CWinThread*			m_DiffingThread;
 	volatile LONG m_AsyncThreadRunning;
 
-	static int DiffAsync(GitRevLoglist* rev, void* data)
+	static int DiffAsync(GitRevLoglist* rev, IAsyncDiffCB* pdata)
 	{
-		ULONGLONG offset=((CGitLogListBase*)data)->m_LogCache.GetOffset(rev->m_CommitHash);
-		if (!offset || ((CGitLogListBase*)data)->m_LogCache.LoadOneItem(*rev, offset))
+		auto data = static_cast<CGitLogListBase*>(pdata);
+		ULONGLONG offset = data->m_LogCache.GetOffset(rev->m_CommitHash);
+		if (!offset || data->m_LogCache.LoadOneItem(*rev, offset))
 		{
-			((CGitLogListBase*)data)->m_AsynDiffListLock.Lock();
-			((CGitLogListBase*)data)->m_AsynDiffList.push_back(rev);
-			((CGitLogListBase*)data)->m_AsynDiffListLock.Unlock();
-			::SetEvent(((CGitLogListBase*)data)->m_AsyncDiffEvent);
+			data->m_AsynDiffListLock.Lock();
+			data->m_AsynDiffList.push_back(rev);
+			data->m_AsynDiffListLock.Unlock();
+			::SetEvent(data->m_AsyncDiffEvent);
 			return 0;
 		}
 
@@ -588,15 +664,15 @@ protected:
 			return 0;
 		InterlockedExchange(&rev->m_IsFull, TRUE);
 		// we might need to signal that the changed files are now available
-		if (((CGitLogListBase*)data)->GetSelectedCount() == 1)
+		if (data->GetSelectedCount() == 1)
 		{
-			POSITION pos = ((CGitLogListBase*)data)->GetFirstSelectedItemPosition();
-			int nItem = ((CGitLogListBase*)data)->GetNextSelectedItem(pos);
+			POSITION pos = data->GetFirstSelectedItemPosition();
+			int nItem = data->GetNextSelectedItem(pos);
 			if (nItem >= 0)
 			{
-				GitRevLoglist* data2 = (GitRevLoglist*)((CGitLogListBase*)data)->m_arShownList.SafeGetAt(nItem);
+				GitRevLoglist* data2 = data->m_arShownList.SafeGetAt(nItem);
 				if (data2 && data2->m_CommitHash == rev->m_CommitHash)
-					((CGitLogListBase*)data)->GetParent()->PostMessage(WM_COMMAND, MSG_FETCHED_DIFF, 0);
+					data->GetParent()->PostMessage(WM_COMMAND, MSG_FETCHED_DIFF, 0);
 			}
 		}
 		return 0;
@@ -604,7 +680,7 @@ protected:
 
 	static UINT AsyncThread(LPVOID data)
 	{
-		return ((CGitLogListBase*)data)->AsyncDiffThread();
+		return reinterpret_cast<CGitLogListBase*>(data)->AsyncDiffThread();
 	}
 
 	int AsyncDiffThread();
@@ -620,11 +696,11 @@ public:
 			while (ret == WAIT_TIMEOUT && m_AsyncThreadRunning)
 			{
 				MSG msg;
-				if (::PeekMessage(&msg, NULL, 0,0, PM_NOREMOVE))
+				if (::PeekMessage(&msg, nullptr, 0,0, PM_NOREMOVE))
 					AfxGetThread()->PumpMessage(); // process messages, so that GetTopIndex and so on in the thread work
 				ret = ::WaitForSingleObject(m_DiffingThread->m_hThread, 100);
 			}
-			m_DiffingThread = NULL;
+			m_DiffingThread = nullptr;
 			InterlockedExchange(&m_AsyncThreadExit, FALSE);
 		}
 	};
@@ -664,10 +740,25 @@ protected:
 	bool				m_bSymbolizeRefNames;
 	bool				m_bIncludeBoundaryCommits;
 
-	ColumnManager		m_ColumnManager;
 	DWORD				m_dwDefaultColumns;
 	TCHAR               m_wszTip[8192];
 	char                m_szTip[8192];
 	std::map<CString, CRect> m_RefLabelPosMap; // ref name vs. label position
 	int					m_OldTopIndex;
+
+	GIT_MAILMAP			m_pMailmap;
+
+	bool				m_bDragndropEnabled;
+	BOOL				m_bDragging;
+	int					m_nDropIndex;
+	int					m_nDropMarkerLast;
+	int					m_nDropMarkerLastHot;
+	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
+	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
+	afx_msg void OnBeginDrag(NMHDR* pNMHDR, LRESULT* pResult);
+	void				DrawDropInsertMarker(int nIndex);
+	void				DrawDropInsertMarkerLine(int nIndex);
+
+public:
+	void				EnableDragnDrop(bool enable) { m_bDragndropEnabled = enable; }
 };

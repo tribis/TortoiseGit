@@ -1,7 +1,7 @@
-// TortoiseGit - a Windows shell extension for easy version control
+﻿// TortoiseGit - a Windows shell extension for easy version control
 
 // Copyright (C) 2003-2008, 2014 - TortoiseSVN
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2018 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -26,6 +26,9 @@
 #include "UnicodeUtils.h"
 #include "CreateProcessHelper.h"
 #include "FormatMessageWrapper.h"
+#include "StringUtils.h"
+#include "Git.h"
+#include "GitAdminDir.h"
 
 #define MAX_STRING_LENGTH	4096	//should be big enough
 
@@ -47,11 +50,9 @@ BOOL CALLBACK PageProc (HWND hwnd, UINT uMessage, WPARAM wParam, LPARAM lParam)
 		sheetpage->SetHwnd(hwnd);
 	}
 	else
-	{
-		sheetpage = (CGitPropertyPage*) GetWindowLongPtr (hwnd, GWLP_USERDATA);
-	}
+		sheetpage = reinterpret_cast<CGitPropertyPage*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
 
-	if (sheetpage != 0L)
+	if (sheetpage)
 		return sheetpage->PageProc(hwnd, uMessage, wParam, lParam);
 	else
 		return FALSE;
@@ -62,21 +63,24 @@ UINT CALLBACK PropPageCallbackProc ( HWND /*hwnd*/, UINT uMsg, LPPROPSHEETPAGE p
 	// Delete the page before closing.
 	if (PSPCB_RELEASE == uMsg)
 	{
-		CGitPropertyPage* sheetpage = (CGitPropertyPage*) ppsp->lParam;
-		if (sheetpage != NULL)
-			delete sheetpage;
+		delete reinterpret_cast<CGitPropertyPage*>(ppsp->lParam);
 	}
 	return 1;
 }
 
 // *********************** CGitPropertyPage *************************
-const UINT CGitPropertyPage::m_UpdateLastCommit = RegisterWindowMessage(_T("TORTOISEGIT_PROP_UPDATELASTCOMMIT"));
+const UINT CGitPropertyPage::m_UpdateLastCommit = RegisterWindowMessage(L"TORTOISEGIT_PROP_UPDATELASTCOMMIT");
 
-CGitPropertyPage::CGitPropertyPage(const std::vector<stdstring> &newFilenames)
-	:filenames(newFilenames)
+CGitPropertyPage::CGitPropertyPage(const std::vector<std::wstring>& newFilenames, CString projectTopDir, bool bIsSubmodule)
+	: filenames(newFilenames)
+	, m_ProjectTopDir(projectTopDir)
 	,m_bChanged(false)
-	, m_hwnd(NULL)
+	, m_hwnd(nullptr)
+	, m_bIsSubmodule(bIsSubmodule)
 {
+	m_iStripLength = m_ProjectTopDir.GetLength();
+	if (m_ProjectTopDir[m_iStripLength - 1] != L'\\')
+		++m_iStripLength;
 }
 
 CGitPropertyPage::~CGitPropertyPage(void)
@@ -108,16 +112,7 @@ BOOL CGitPropertyPage::PageProc (HWND /*hwnd*/, UINT uMessage, WPARAM wParam, LP
 			{
 				do
 				{
-					CTGitPath path(filenames.front().c_str());
-					CString projectTopDir;
-					if(!path.HasAdminDir(&projectTopDir) || path.IsDirectory())
-						break;
-
-					int stripLength = projectTopDir.GetLength();
-					if (projectTopDir[stripLength - 1] != _T('\\'))
-						++stripLength;
-
-					CAutoRepository repository(CUnicodeUtils::GetUTF8(projectTopDir));
+					CAutoRepository repository(CUnicodeUtils::GetUTF8(m_ProjectTopDir));
 					if (!repository)
 						break;
 
@@ -129,13 +124,15 @@ BOOL CGitPropertyPage::PageProc (HWND /*hwnd*/, UINT uMessage, WPARAM wParam, LP
 					BOOL skipWorktree = (BOOL)SendMessage(GetDlgItem(m_hwnd, IDC_SKIPWORKTREE), BM_GETCHECK, 0, 0);
 					BOOL executable = (BOOL)SendMessage(GetDlgItem(m_hwnd, IDC_EXECUTABLE), BM_GETCHECK, 0, 0);
 					BOOL symlink = (BOOL)SendMessage(GetDlgItem(m_hwnd, IDC_SYMLINK), BM_GETCHECK, 0, 0);
+					if (m_fileStats.submodule != 0)
+						executable = symlink = BST_INDETERMINATE; // don't update executable or symlink state if we have at least one submodule
 
 					bool changed = false;
 
 					for (const auto& filename : filenames)
 					{
 						CTGitPath file;
-						file.SetFromWin(CString(filename.c_str()).Mid(stripLength));
+						file.SetFromWin(CString(filename.c_str()).Mid(m_iStripLength));
 						CStringA pathA = CUnicodeUtils::GetMulti(file.GetGitPathString(), CP_UTF8);
 						size_t idx;
 						if (!git_index_find(&idx, index, pathA))
@@ -246,24 +243,21 @@ void CGitPropertyPage::PageProcOnCommand(WPARAM wParam)
 	{
 	case IDC_SHOWLOG:
 		{
-			tstring gitCmd = _T(" /command:");
-			gitCmd += _T("log /path:\"");
+			tstring gitCmd = L" /command:";
+			gitCmd += L"log /path:\"";
 			gitCmd += filenames.front().c_str();
-			gitCmd += _T("\"");
+			gitCmd += L'"';
+			if (m_bIsSubmodule)
+				gitCmd += L" /submodule";
 			RunCommand(gitCmd);
 		}
 		break;
 	case IDC_SHOWSETTINGS:
 		{
-			CTGitPath path(filenames.front().c_str());
-			CString projectTopDir;
-			if(!path.HasAdminDir(&projectTopDir))
-				return;
-
-			tstring gitCmd = _T(" /command:");
-			gitCmd += _T("settings /path:\"");
-			gitCmd += projectTopDir;
-			gitCmd += _T("\"");
+			tstring gitCmd = L" /command:";
+			gitCmd += L"settings /path:\"";
+			gitCmd += m_ProjectTopDir;
+			gitCmd += L'"';
 			RunCommand(gitCmd);
 		}
 		break;
@@ -295,14 +289,14 @@ void CGitPropertyPage::PageProcOnCommand(WPARAM wParam)
 
 void CGitPropertyPage::RunCommand(const tstring& command)
 {
-	tstring tortoiseProcPath = CPathUtils::GetAppDirectory(g_hmodThisDll) + _T("TortoiseGitProc.exe");
-	if (CCreateProcessHelper::CreateProcessDetached(tortoiseProcPath.c_str(), const_cast<TCHAR*>(command.c_str())))
+	tstring tortoiseProcPath = CPathUtils::GetAppDirectory(g_hmodThisDll) + L"TortoiseGitProc.exe";
+	if (CCreateProcessHelper::CreateProcessDetached(tortoiseProcPath.c_str(), command.c_str()))
 	{
 		// process started - exit
 		return;
 	}
 
-	MessageBox(NULL, CFormatMessageWrapper(), _T("TortoiseGitProc launch failed"), MB_OK | MB_ICONINFORMATION);
+	MessageBox(nullptr, CFormatMessageWrapper(), L"TortoiseGitProc launch failed", MB_OK | MB_ICONERROR);
 }
 
 void CGitPropertyPage::Time64ToTimeString(__time64_t time, TCHAR * buf, size_t buflen) const
@@ -311,8 +305,8 @@ void CGitPropertyPage::Time64ToTimeString(__time64_t time, TCHAR * buf, size_t b
 	SYSTEMTIME systime;
 
 	LCID locale = LOCALE_USER_DEFAULT;
-	if (!CRegDWORD(_T("Software\\TortoiseGit\\UseSystemLocaleForDates"), TRUE))
-		locale = MAKELCID((WORD)CRegStdDWORD(_T("Software\\TortoiseGit\\LanguageID"), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT)), SORT_DEFAULT);
+	if (!CRegDWORD(L"Software\\TortoiseGit\\UseSystemLocaleForDates", TRUE, false, HKEY_CURRENT_USER, KEY_WOW64_64KEY))
+		locale = MAKELCID((WORD)CRegStdDWORD(L"Software\\TortoiseGit\\LanguageID", MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), false, HKEY_CURRENT_USER, KEY_WOW64_64KEY), SORT_DEFAULT);
 
 	*buf = '\0';
 	if (time)
@@ -329,15 +323,15 @@ void CGitPropertyPage::Time64ToTimeString(__time64_t time, TCHAR * buf, size_t b
 		systime.wMonth = (WORD)newtime.tm_mon+1;
 		systime.wSecond = (WORD)newtime.tm_sec;
 		systime.wYear = (WORD)newtime.tm_year+1900;
-		if (CRegStdDWORD(_T("Software\\TortoiseGit\\LogDateFormat")) == 1)
-			GetDateFormat(locale, DATE_SHORTDATE, &systime, NULL, datebuf, MAX_STRING_LENGTH);
+		if (CRegStdDWORD(L"Software\\TortoiseGit\\LogDateFormat", 0, false, HKEY_CURRENT_USER, KEY_WOW64_64KEY) == 1)
+			GetDateFormat(locale, DATE_SHORTDATE, &systime, nullptr, datebuf, MAX_STRING_LENGTH);
 		else
-			GetDateFormat(locale, DATE_LONGDATE, &systime, NULL, datebuf, MAX_STRING_LENGTH);
-		GetTimeFormat(locale, 0, &systime, NULL, timebuf, MAX_STRING_LENGTH);
+			GetDateFormat(locale, DATE_LONGDATE, &systime, nullptr, datebuf, MAX_STRING_LENGTH);
+		GetTimeFormat(locale, 0, &systime, nullptr, timebuf, MAX_STRING_LENGTH);
 		*buf = '\0';
-		_tcsncat_s(buf, buflen, datebuf, MAX_STRING_LENGTH-1);
-		_tcsncat_s(buf, buflen, _T(" "), MAX_STRING_LENGTH-1);
-		_tcsncat_s(buf, buflen, timebuf, MAX_STRING_LENGTH-1);
+		wcsncat_s(buf, buflen, datebuf, MAX_STRING_LENGTH - 1);
+		wcsncat_s(buf, buflen, L" ", MAX_STRING_LENGTH - 1);
+		wcsncat_s(buf, buflen, timebuf, MAX_STRING_LENGTH - 1);
 	}
 }
 
@@ -350,7 +344,7 @@ struct TreewalkStruct
 
 static int TreewalkCB_FindFileRecentCommit(const char *root, const git_tree_entry *entry, void *payload)
 {
-	TreewalkStruct *treewalkstruct = (TreewalkStruct *)payload;
+	auto treewalkstruct = reinterpret_cast<TreewalkStruct*>(payload);
 	char folder[MAX_PATH] = {0};
 	strcpy_s(folder, root);
 	strcat_s(folder, git_tree_entry_name(entry));
@@ -457,18 +451,18 @@ static git_commit* FindFileRecentCommit(git_repository* repository, const CStrin
 
 void CGitPropertyPage::DisplayCommit(const git_commit* commit, UINT hashLabel, UINT subjectLabel, UINT authorLabel, UINT dateLabel)
 {
-	if (commit == NULL)
+	if (!commit)
 	{
-		SetDlgItemText(m_hwnd, hashLabel, _T(""));
-		SetDlgItemText(m_hwnd, subjectLabel, _T(""));
-		SetDlgItemText(m_hwnd, authorLabel, _T(""));
-		SetDlgItemText(m_hwnd, dateLabel, _T(""));
+		SetDlgItemText(m_hwnd, hashLabel, L"");
+		SetDlgItemText(m_hwnd, subjectLabel, L"");
+		SetDlgItemText(m_hwnd, authorLabel, L"");
+		SetDlgItemText(m_hwnd, dateLabel, L"");
 		return;
 	}
 
 	int encode = CP_UTF8;
 	const char * encodingString = git_commit_message_encoding(commit);
-	if (encodingString != NULL)
+	if (encodingString)
 		encode = CUnicodeUtils::GetCPCode(CUnicodeUtils::GetUnicode(encodingString));
 
 	const git_signature * author = git_commit_author(commit);
@@ -479,7 +473,7 @@ void CGitPropertyPage::DisplayCommit(const git_commit* commit, UINT hashLabel, U
 	int start = 0;
 	message = message.Tokenize(L"\n", start);
 
-	SetDlgItemText(m_hwnd, hashLabel, CGitHash((char*)(git_commit_id(commit)->id)).ToString());
+	SetDlgItemText(m_hwnd, hashLabel, CGitHash(git_commit_id(commit)->id).ToString());
 	SetDlgItemText(m_hwnd, subjectLabel, message);
 	SetDlgItemText(m_hwnd, authorLabel, authorName);
 
@@ -492,25 +486,17 @@ int CGitPropertyPage::LogThread()
 {
 	CTGitPath path(filenames.front().c_str());
 
-	CString ProjectTopDir;
-	if(!path.HasAdminDir(&ProjectTopDir))
-		return 0;
-
-	CAutoRepository repository(CUnicodeUtils::GetUTF8(ProjectTopDir));
+	CAutoRepository repository(CUnicodeUtils::GetUTF8(m_ProjectTopDir));
 	if (!repository)
 		return 0;
 
-	int stripLength = ProjectTopDir.GetLength();
-	if (ProjectTopDir[stripLength - 1] != _T('\\'))
-		++stripLength;
-
 	CTGitPath relatepath;
-	relatepath.SetFromWin(path.GetWinPathString().Mid(stripLength));
+	relatepath.SetFromWin(path.GetWinPathString().Mid(m_iStripLength));
 
 	CAutoCommit commit(FindFileRecentCommit(repository, relatepath.GetGitPathString()));
 	if (commit)
 	{
-		SendMessage(m_hwnd, m_UpdateLastCommit, NULL, (LPARAM)(git_commit*)commit);
+		SendMessage(m_hwnd, m_UpdateLastCommit, NULL, reinterpret_cast<LPARAM>(static_cast<git_commit*>(commit)));
 	}
 	else
 	{
@@ -522,7 +508,7 @@ int CGitPropertyPage::LogThread()
 
 void CGitPropertyPage::LogThreadEntry(void *param)
 {
-	((CGitPropertyPage*)param)->LogThread();
+	reinterpret_cast<CGitPropertyPage*>(param)->LogThread();
 }
 
 void CGitPropertyPage::InitWorkfileView()
@@ -532,11 +518,7 @@ void CGitPropertyPage::InitWorkfileView()
 
 	CTGitPath path(filenames.front().c_str());
 
-	CString ProjectTopDir;
-	if(!path.HasAdminDir(&ProjectTopDir))
-		return;
-
-	CAutoRepository repository(CUnicodeUtils::GetUTF8(ProjectTopDir));
+	CAutoRepository repository(CUnicodeUtils::GetUTF8(m_ProjectTopDir));
 	if (!repository)
 		return;
 
@@ -564,8 +546,8 @@ void CGitPropertyPage::InitWorkfileView()
 		{
 			git_reference_lookup(head.GetPointer(), repository, "HEAD");
 			branch = CUnicodeUtils::GetUnicode(git_reference_symbolic_target(head));
-			if (branch.Find(_T("refs/heads/")) == 0)
-				branch = branch.Mid(11); // 11 = len("refs/heads/")
+			if (CStringUtils::StartsWith(branch, L"refs/heads/"))
+				branch = branch.Mid((int)wcslen(L"refs/heads/"));
 		}
 		else if (!git_repository_head(head.GetPointer(), repository))
 		{
@@ -577,7 +559,7 @@ void CGitPropertyPage::InitWorkfileView()
 			if (!git_branch_upstream_name(upstreambranchname, repository, branchFullChar))
 			{
 				remotebranch = CUnicodeUtils::GetUnicode(CStringA(upstreambranchname->ptr, (int)upstreambranchname->size));
-				remotebranch = remotebranch.Mid(13); // 13=len("refs/remotes/")
+				remotebranch = remotebranch.Mid((int)wcslen(L"refs/remotes/"));
 				int pos = remotebranch.Find(L'/');
 				if (pos > 0)
 				{
@@ -589,12 +571,12 @@ void CGitPropertyPage::InitWorkfileView()
 		}
 	}
 	else
-		branch = _T("detached HEAD");
+		branch = L"detached HEAD";
 
 	if (autocrlf.Trim().IsEmpty())
-		autocrlf = _T("false");
+		autocrlf = L"false";
 	if (safecrlf.Trim().IsEmpty())
-		safecrlf = _T("false");
+		safecrlf = L"false";
 
 	SetDlgItemText(m_hwnd,IDC_CONFIG_USERNAME,username.Trim());
 	SetDlgItemText(m_hwnd,IDC_CONFIG_USEREMAIL,useremail.Trim());
@@ -610,116 +592,106 @@ void CGitPropertyPage::InitWorkfileView()
 	if (!git_reference_name_to_id(&oid, repository, "HEAD") && !git_commit_lookup(HEADcommit.GetPointer(), repository, &oid) && HEADcommit)
 		DisplayCommit(HEADcommit, IDC_HEAD_HASH, IDC_HEAD_SUBJECT, IDC_HEAD_AUTHOR, IDC_HEAD_DATE);
 
+	m_fileStats.allAreVersionedItems = false;
+	do
 	{
-		int stripLength = ProjectTopDir.GetLength();
-		if (ProjectTopDir[stripLength - 1] != _T('\\'))
-			++stripLength;
+		CAutoIndex index;
+		if (git_repository_index(index.GetPointer(), repository))
+			break;
 
-		bool allAreFiles = true;
+		m_fileStats.allAreVersionedItems = true;
 		for (const auto& filename : filenames)
 		{
-			if (PathIsDirectory(filename.c_str()))
+			CTGitPath file;
+			file.SetFromWin(CString(filename.c_str()).Mid(m_iStripLength));
+			CStringA pathA = CUnicodeUtils::GetMulti(file.GetGitPathString(), CP_UTF8);
+			size_t idx;
+			if (!git_index_find(&idx, index, pathA))
 			{
-				allAreFiles = false;
+				const git_index_entry *e = git_index_get_byindex(index, idx);
+
+				if (e->flags & GIT_IDXENTRY_VALID)
+					++m_fileStats.assumevalid;
+
+				if (e->flags_extended & GIT_IDXENTRY_SKIP_WORKTREE)
+					++m_fileStats.skipworktree;
+
+				if (e->mode & 0111)
+					++m_fileStats.executable;
+
+				if ((e->mode & GIT_FILEMODE_COMMIT) == GIT_FILEMODE_COMMIT)
+					++m_fileStats.submodule;
+
+				if ((e->mode & GIT_FILEMODE_LINK) == GIT_FILEMODE_LINK)
+					++m_fileStats.symlink;
+			}
+			else
+			{
+				m_fileStats.allAreVersionedItems = false;
 				break;
 			}
 		}
-		if (allAreFiles)
+	} while (0);
+
+	if (m_fileStats.allAreVersionedItems)
+	{
+		if (m_fileStats.assumevalid != 0 && m_fileStats.assumevalid != filenames.size())
 		{
-			size_t assumevalid = 0;
-			size_t skipworktree = 0;
-			size_t executable = 0;
-			size_t symlink = 0;
-			do
-			{
-				CAutoIndex index;
-				if (git_repository_index(index.GetPointer(), repository))
-					break;
+			SendMessage(GetDlgItem(m_hwnd, IDC_ASSUMEVALID), BM_SETSTYLE, (DWORD)GetWindowLong(GetDlgItem(m_hwnd, IDC_ASSUMEVALID), GWL_STYLE) & ~BS_AUTOCHECKBOX | BS_AUTO3STATE, 0);
+			SendMessage(GetDlgItem(m_hwnd, IDC_ASSUMEVALID), BM_SETCHECK, BST_INDETERMINATE, 0);
+		}
+		else
+			SendMessage(GetDlgItem(m_hwnd, IDC_ASSUMEVALID), BM_SETCHECK, (m_fileStats.assumevalid == 0) ? BST_UNCHECKED : BST_CHECKED, 0);
 
-				for (const auto& filename : filenames)
-				{
-					CTGitPath file;
-					file.SetFromWin(CString(filename.c_str()).Mid(stripLength));
-					CStringA pathA = CUnicodeUtils::GetMulti(file.GetGitPathString(), CP_UTF8);
-					size_t idx;
-					if (!git_index_find(&idx, index, pathA))
-					{
-						const git_index_entry *e = git_index_get_byindex(index, idx);
+		if (m_fileStats.skipworktree != 0 && m_fileStats.skipworktree != filenames.size())
+		{
+			SendMessage(GetDlgItem(m_hwnd, IDC_SKIPWORKTREE), BM_SETSTYLE, (DWORD)GetWindowLong(GetDlgItem(m_hwnd, IDC_SKIPWORKTREE), GWL_STYLE) & ~BS_AUTOCHECKBOX | BS_AUTO3STATE, 0);
+			SendMessage(GetDlgItem(m_hwnd, IDC_SKIPWORKTREE), BM_SETCHECK, BST_INDETERMINATE, 0);
+		}
+		else
+			SendMessage(GetDlgItem(m_hwnd, IDC_SKIPWORKTREE), BM_SETCHECK, (m_fileStats.skipworktree == 0) ? BST_UNCHECKED : BST_CHECKED, 0);
 
-						if (e->flags & GIT_IDXENTRY_VALID)
-							++assumevalid;
-
-						if (e->flags_extended & GIT_IDXENTRY_SKIP_WORKTREE)
-							++skipworktree;
-
-						if (e->mode & 0111)
-							++executable;
-
-						if ((e->mode & GIT_FILEMODE_LINK) == GIT_FILEMODE_LINK)
-							++symlink;
-					}
-					else
-					{
-						// do not show checkboxes for unversioned files
-						ShowWindow(GetDlgItem(m_hwnd, IDC_ASSUMEVALID), SW_HIDE);
-						ShowWindow(GetDlgItem(m_hwnd, IDC_SKIPWORKTREE), SW_HIDE);
-						ShowWindow(GetDlgItem(m_hwnd, IDC_EXECUTABLE), SW_HIDE);
-						ShowWindow(GetDlgItem(m_hwnd, IDC_SYMLINK), SW_HIDE);
-						break;
-					}
-				}
-			} while (0);
-
-			if (assumevalid != 0 && assumevalid != filenames.size())
-			{
-				SendMessage(GetDlgItem(m_hwnd, IDC_ASSUMEVALID), BM_SETSTYLE, (DWORD)GetWindowLong(GetDlgItem(m_hwnd, IDC_ASSUMEVALID), GWL_STYLE) & ~BS_AUTOCHECKBOX | BS_AUTO3STATE, 0);
-				SendMessage(GetDlgItem(m_hwnd, IDC_ASSUMEVALID), BM_SETCHECK, BST_INDETERMINATE, 0);
-			}
-			else
-				SendMessage(GetDlgItem(m_hwnd, IDC_ASSUMEVALID), BM_SETCHECK, (assumevalid == 0) ? BST_UNCHECKED : BST_CHECKED, 0);
-
-			if (skipworktree != 0 && skipworktree != filenames.size())
-			{
-				SendMessage(GetDlgItem(m_hwnd, IDC_SKIPWORKTREE), BM_SETSTYLE, (DWORD)GetWindowLong(GetDlgItem(m_hwnd, IDC_SKIPWORKTREE), GWL_STYLE) & ~BS_AUTOCHECKBOX | BS_AUTO3STATE, 0);
-				SendMessage(GetDlgItem(m_hwnd, IDC_SKIPWORKTREE), BM_SETCHECK, BST_INDETERMINATE, 0);
-			}
-			else
-				SendMessage(GetDlgItem(m_hwnd, IDC_SKIPWORKTREE), BM_SETCHECK, (skipworktree == 0) ? BST_UNCHECKED : BST_CHECKED, 0);
-
-			if (executable != 0 && executable != filenames.size())
-			{
-				SendMessage(GetDlgItem(m_hwnd, IDC_EXECUTABLE), BM_SETSTYLE, (DWORD)GetWindowLong(GetDlgItem(m_hwnd, IDC_EXECUTABLE), GWL_STYLE) & ~BS_AUTOCHECKBOX | BS_AUTO3STATE, 0);
-				SendMessage(GetDlgItem(m_hwnd, IDC_EXECUTABLE), BM_SETCHECK, BST_INDETERMINATE, 0);
-				EnableWindow(GetDlgItem(m_hwnd, IDC_SYMLINK), TRUE);
-			}
-			else
-			{
-				SendMessage(GetDlgItem(m_hwnd, IDC_EXECUTABLE), BM_SETCHECK, (executable == 0) ? BST_UNCHECKED : BST_CHECKED, 0);
-				EnableWindow(GetDlgItem(m_hwnd, IDC_SYMLINK), (executable == 0) ? TRUE : FALSE);
-			}
-
-			if (symlink != 0 && symlink != filenames.size())
-			{
-				SendMessage(GetDlgItem(m_hwnd, IDC_SYMLINK), BM_SETSTYLE, (DWORD)GetWindowLong(GetDlgItem(m_hwnd, IDC_SYMLINK), GWL_STYLE) & ~BS_AUTOCHECKBOX | BS_AUTO3STATE, 0);
-				SendMessage(GetDlgItem(m_hwnd, IDC_SYMLINK), BM_SETCHECK, BST_INDETERMINATE, 0);
-				EnableWindow(GetDlgItem(m_hwnd, IDC_EXECUTABLE), TRUE);
-			}
-			else
-			{
-				SendMessage(GetDlgItem(m_hwnd, IDC_SYMLINK), BM_SETCHECK, (symlink == 0) ? BST_UNCHECKED : BST_CHECKED, 0);
-				EnableWindow(GetDlgItem(m_hwnd, IDC_EXECUTABLE), (symlink == 0) ? TRUE : FALSE);
-			}
+		if (m_fileStats.executable != 0 && m_fileStats.executable != filenames.size())
+		{
+			SendMessage(GetDlgItem(m_hwnd, IDC_EXECUTABLE), BM_SETSTYLE, (DWORD)GetWindowLong(GetDlgItem(m_hwnd, IDC_EXECUTABLE), GWL_STYLE) & ~BS_AUTOCHECKBOX | BS_AUTO3STATE, 0);
+			SendMessage(GetDlgItem(m_hwnd, IDC_EXECUTABLE), BM_SETCHECK, BST_INDETERMINATE, 0);
+			EnableWindow(GetDlgItem(m_hwnd, IDC_SYMLINK), TRUE);
 		}
 		else
 		{
-			ShowWindow(GetDlgItem(m_hwnd, IDC_ASSUMEVALID), SW_HIDE);
-			ShowWindow(GetDlgItem(m_hwnd, IDC_SKIPWORKTREE), SW_HIDE);
+			SendMessage(GetDlgItem(m_hwnd, IDC_EXECUTABLE), BM_SETCHECK, (m_fileStats.executable == 0) ? BST_UNCHECKED : BST_CHECKED, 0);
+			EnableWindow(GetDlgItem(m_hwnd, IDC_SYMLINK), (m_fileStats.executable == 0) ? TRUE : FALSE);
+		}
+
+		if (m_fileStats.symlink != 0 && m_fileStats.symlink != filenames.size())
+		{
+			SendMessage(GetDlgItem(m_hwnd, IDC_SYMLINK), BM_SETSTYLE, (DWORD)GetWindowLong(GetDlgItem(m_hwnd, IDC_SYMLINK), GWL_STYLE) & ~BS_AUTOCHECKBOX | BS_AUTO3STATE, 0);
+			SendMessage(GetDlgItem(m_hwnd, IDC_SYMLINK), BM_SETCHECK, BST_INDETERMINATE, 0);
+			EnableWindow(GetDlgItem(m_hwnd, IDC_EXECUTABLE), TRUE);
+		}
+		else
+		{
+			SendMessage(GetDlgItem(m_hwnd, IDC_SYMLINK), BM_SETCHECK, (m_fileStats.symlink == 0) ? BST_UNCHECKED : BST_CHECKED, 0);
+			EnableWindow(GetDlgItem(m_hwnd, IDC_EXECUTABLE), (m_fileStats.symlink == 0) ? TRUE : FALSE);
+		}
+
+		// check this last, so that we hide executable and symlink checkboxes in any case if we have at least one submodule
+		if (m_fileStats.submodule != 0)
+		{
 			ShowWindow(GetDlgItem(m_hwnd, IDC_EXECUTABLE), SW_HIDE);
 			ShowWindow(GetDlgItem(m_hwnd, IDC_SYMLINK), SW_HIDE);
 		}
 	}
+	else
+	{
+		// do not show checkboxes for unversioned files
+		ShowWindow(GetDlgItem(m_hwnd, IDC_ASSUMEVALID), SW_HIDE);
+		ShowWindow(GetDlgItem(m_hwnd, IDC_SKIPWORKTREE), SW_HIDE);
+		ShowWindow(GetDlgItem(m_hwnd, IDC_EXECUTABLE), SW_HIDE);
+		ShowWindow(GetDlgItem(m_hwnd, IDC_SYMLINK), SW_HIDE);
+	}
 
-	if (filenames.size() == 1 && !PathIsDirectory(filenames[0].c_str()))
+	if (filenames.size() == 1 && m_fileStats.allAreVersionedItems)
 	{
 		SetDlgItemText(m_hwnd, IDC_LAST_SUBJECT, CString(MAKEINTRESOURCE(IDS_LOADING)));
 		_beginthread(LogThreadEntry, 0, this);
@@ -732,50 +704,70 @@ void CGitPropertyPage::InitWorkfileView()
 // CShellExt member functions (needed for IShellPropSheetExt)
 STDMETHODIMP CShellExt::AddPages(LPFNADDPROPSHEETPAGE lpfnAddPage, LPARAM lParam)
 {
-	__try
-	{
-		return AddPages_Wrap(lpfnAddPage, lParam);
-	}
-	__except(CCrashReport::Instance().SendReport(GetExceptionInformation()))
-	{
-	}
-	return E_FAIL;
-}
-
-STDMETHODIMP CShellExt::AddPages_Wrap(LPFNADDPROPSHEETPAGE lpfnAddPage, LPARAM lParam)
-{
-	CString ProjectTopDir;
-
 	if (files_.empty())
 		return S_OK;
 
-	for (const auto file_ : files_)
-	{
-		/*
-		GitStatus svn = GitStatus();
-		if (svn.GetStatus(CTGitPath(I->c_str())) == (-2))
-			return S_OK;			// file/directory not under version control
+	CTGitPath firstFile(files_[0].c_str());
 
-		if (svn.status->entry == NULL)
-			return S_OK;
-		*/
-		if (CTGitPath(file_.c_str()).HasAdminDir(&ProjectTopDir))
-			break;
-		else
+	CString projectTopDir;
+	if (!firstFile.HasAdminDir(&projectTopDir))
+		return S_OK;
+
+	if (files_.size() == 1 && firstFile.IsWCRoot()) // might be a submodule
+	{
+		CString parentRepo;
+		if (firstFile.IsRegisteredSubmoduleOfParentProject(&parentRepo))
+		{
+			LoadLangDll();
+			PROPSHEETPAGE psp = { 0 };
+			HPROPSHEETPAGE hPage;
+			CGitPropertyPage* sheetpage = new (std::nothrow) CGitPropertyPage(files_, parentRepo, true);
+
+			if (!sheetpage)
+				return E_OUTOFMEMORY;
+
+			psp.dwSize = sizeof(psp);
+			psp.dwFlags = PSP_USEREFPARENT | PSP_USETITLE | PSP_USEICONID | PSP_USECALLBACK;
+			psp.hInstance = g_hResInst;
+			psp.pszTemplate = MAKEINTRESOURCE(IDD_PROPPAGE);
+			psp.pszIcon = MAKEINTRESOURCE(IDI_APPSMALL);
+			psp.pszTitle = L"Git Submodule";
+			psp.pfnDlgProc = (DLGPROC)PageProc;
+			psp.lParam = (LPARAM)sheetpage;
+			psp.pfnCallback = PropPageCallbackProc;
+			psp.pcRefParent = (UINT*)&g_cRefThisDll;
+
+			hPage = CreatePropertySheetPage(&psp);
+
+			if (hPage && !lpfnAddPage(hPage, lParam))
+			{
+				delete sheetpage;
+				DestroyPropertySheetPage(hPage);
+			}
+		}
+	}
+
+	for (const auto& file_ : files_)
+	{
+		CString currentProjectTopDir;
+		if (!CTGitPath(file_.c_str()).HasAdminDir(&currentProjectTopDir) || !CPathUtils::ArePathStringsEqual(projectTopDir, currentProjectTopDir))
 			return S_OK;
 	}
 
 	LoadLangDll();
 	PROPSHEETPAGE psp = { 0 };
 	HPROPSHEETPAGE hPage;
-	CGitPropertyPage *sheetpage = new (std::nothrow) CGitPropertyPage(files_);
+	CGitPropertyPage* sheetpage = new (std::nothrow) CGitPropertyPage(files_, projectTopDir, false);
+
+	if (!sheetpage)
+		return E_OUTOFMEMORY;
 
 	psp.dwSize = sizeof (psp);
 	psp.dwFlags = PSP_USEREFPARENT | PSP_USETITLE | PSP_USEICONID | PSP_USECALLBACK;
 	psp.hInstance = g_hResInst;
 	psp.pszTemplate = MAKEINTRESOURCE(IDD_PROPPAGE);
 	psp.pszIcon = MAKEINTRESOURCE(IDI_APPSMALL);
-	psp.pszTitle = _T("Git");
+	psp.pszTitle = L"Git";
 	psp.pfnDlgProc = (DLGPROC) PageProc;
 	psp.lParam = (LPARAM) sheetpage;
 	psp.pfnCallback = PropPageCallbackProc;
@@ -783,7 +775,7 @@ STDMETHODIMP CShellExt::AddPages_Wrap(LPFNADDPROPSHEETPAGE lpfnAddPage, LPARAM l
 
 	hPage = CreatePropertySheetPage (&psp);
 
-	if (hPage != NULL)
+	if (hPage)
 	{
 		if (!lpfnAddPage (hPage, lParam))
 		{

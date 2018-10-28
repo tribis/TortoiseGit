@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2013 - TortoiseGit
+// Copyright (C) 2008-2013, 2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -18,7 +18,7 @@
 //
 
 #pragma once
-
+#include "TGitPath.h"
 #include "SendMail.h"
 
 class CSendMailPatch : public CSendMailCombineable
@@ -28,6 +28,6 @@ public:
 	~CSendMailPatch(void);
 
 protected:
-	virtual int SendAsSingleMail(const CTGitPath& path, CGitProgressList* instance);
-	virtual int SendAsCombinedMail(const CTGitPathList& list, CGitProgressList* instance);
+	virtual int SendAsSingleMail(const CTGitPath& path, CGitProgressList* instance) override;
+	virtual int SendAsCombinedMail(const CTGitPathList& list, CGitProgressList* instance) override;
 };

@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2013, 2015 - TortoiseGit
+// Copyright (C) 2008-2013, 2015-2018 - TortoiseGit
 // Copyright (C) 2011-2013 Sven Strickroth <email@cs-ware.de>
 
 // This program is free software; you can redistribute it and/or
@@ -21,12 +21,13 @@
 #include "stdafx.h"
 #include "GitBlameLogList.h"
 #include "GitRev.h"
+#include "GitRevLoglist.h"
 #include "TortoiseGitBlameDoc.h"
 #include "TortoiseGitBlameView.h"
 #include "MainFrm.h"
 #include "CommonAppUtils.h"
 
-IMPLEMENT_DYNAMIC(CGitBlameLogList, CHintListCtrl)
+IMPLEMENT_DYNAMIC(CGitBlameLogList, CHintCtrl<CListCtrl>)
 
 void CGitBlameLogList::hideUnimplementedCommands()
 {
@@ -36,12 +37,12 @@ void CGitBlameLogList::hideUnimplementedCommands()
 		GetContextMenuBit(ID_GNUDIFF1) |
 		GetContextMenuBit(ID_BLAMEPREVIOUS) |
 		GetContextMenuBit(ID_COPYCLIPBOARD) |
-		GetContextMenuBit(ID_COPYHASH) |
 		GetContextMenuBit(ID_EXPORT) |
 		GetContextMenuBit(ID_CREATE_BRANCH) |
 		GetContextMenuBit(ID_CREATE_TAG) |
 		GetContextMenuBit(ID_SWITCHTOREV) |
 		GetContextMenuBit(ID_LOG) |
+		GetContextMenuBit(ID_SHOWBRANCHES) |
 		GetContextMenuBit(ID_REPOBROWSE)
 		, true);
 }
@@ -92,9 +93,9 @@ void CGitBlameLogList::ContextMenuAction(int cmd, int /*FirstSelect*/, int /*Las
 				GetParentHash(pRev, index, parentHash, parentFilenames);
 				for (size_t i = 0; i < parentFilenames.size(); ++i)
 				{
-					CString procCmd = _T("/path:\"") + pView->ResolveCommitFile(parentFilenames[i]) + _T("\" ");
-					procCmd += _T(" /command:blame");
-					procCmd += _T(" /endrev:") + parentHash.ToString();
+					CString procCmd = L"/path:\"" + pView->ResolveCommitFile(parentFilenames[i]) + L"\" ";
+					procCmd += L" /command:blame";
+					procCmd += L" /endrev:" + parentHash.ToString();
 
 					CCommonAppUtils::RunTortoiseGitProc(procCmd);
 				}
@@ -112,38 +113,40 @@ void CGitBlameLogList::ContextMenuAction(int cmd, int /*FirstSelect*/, int /*Las
 				GetParentHash(pRev, index, parentHash, parentFilenames);
 				for (size_t i = 0; i < parentFilenames.size(); ++i)
 				{
-					CString procCmd = _T("/path:\"") + pView->ResolveCommitFile(parentFilenames[i]) + _T("\" ");
-					procCmd += _T(" /command:diff");
-					procCmd += _T(" /startrev:") + pRev->m_CommitHash.ToString();
-					procCmd += _T(" /endrev:") + parentHash.ToString();
+					CString procCmd = L"/path:\"" + pView->ResolveCommitFile(parentFilenames[i]) + L"\" ";
+					procCmd += L" /command:diff";
+					procCmd += L" /startrev:" + parentHash.ToString();
+					procCmd += L" /endrev:" + pRev->m_CommitHash.ToString();
 					if ((cmd & 0xFFFF) == ID_GNUDIFF1)
-						procCmd += _T(" /unified");
+						procCmd += L" /unified";
+					if (!!(GetAsyncKeyState(VK_SHIFT) & 0x8000))
+						procCmd += L" /alternative";
 
 					CCommonAppUtils::RunTortoiseGitProc(procCmd);
 				}
 			}
 			break;
-		case ID_COPYCLIPBOARD:
-			{
-				CopySelectionToClipBoard();
-			}
-			break;
-		case ID_COPYHASH:
-			{
-				CopySelectionToClipBoard(ID_COPY_HASH);
-			}
+		case ID_COPYCLIPBOARDFULL:
+		case ID_COPYCLIPBOARDFULLNOPATHS:
+		case ID_COPYCLIPBOARDHASH:
+		case ID_COPYCLIPBOARDAUTHORSFULL:
+		case ID_COPYCLIPBOARDAUTHORSNAME:
+		case ID_COPYCLIPBOARDAUTHORSEMAIL:
+		case ID_COPYCLIPBOARDSUBJECTS:
+		case ID_COPYCLIPBOARDMESSAGES:
+			CopySelectionToClipBoard(cmd & 0xFFFF);
 			break;
 		case ID_EXPORT:
-			RunTortoiseGitProcWithCurrentRev(_T("export"), pRev);
+			RunTortoiseGitProcWithCurrentRev(L"export", pRev);
 			break;
 		case ID_CREATE_BRANCH:
-			RunTortoiseGitProcWithCurrentRev(_T("branch"), pRev);
+			RunTortoiseGitProcWithCurrentRev(L"branch", pRev);
 			break;
 		case ID_CREATE_TAG:
-			RunTortoiseGitProcWithCurrentRev(_T("tag"), pRev);
+			RunTortoiseGitProcWithCurrentRev(L"tag", pRev);
 			break;
 		case ID_SWITCHTOREV:
-			RunTortoiseGitProcWithCurrentRev(_T("switch"), pRev);
+			RunTortoiseGitProcWithCurrentRev(L"switch", pRev);
 			break;
 		case ID_LOG:
 			{
@@ -153,10 +156,13 @@ void CGitBlameLogList::ContextMenuAction(int cmd, int /*FirstSelect*/, int /*Las
 			}
 			break;
 		case ID_REPOBROWSE:
-			RunTortoiseGitProcWithCurrentRev(_T("repobrowser"), pRev, ((CMainFrame*)::AfxGetApp()->GetMainWnd())->GetActiveView()->GetDocument()->GetPathName());
+			RunTortoiseGitProcWithCurrentRev(L"repobrowser", pRev, ((CMainFrame*)::AfxGetApp()->GetMainWnd())->GetActiveView()->GetDocument()->GetPathName());
+			break;
+		case ID_SHOWBRANCHES:
+			RunTortoiseGitProcWithCurrentRev(L"commitisonrefs", pRev);
 			break;
 		default:
-			//CMessageBox::Show(NULL,_T("Have not implemented"),_T("TortoiseGit"),MB_OK);
+			//CMessageBox::Show(nullptr, L"Have not implemented", L"TortoiseGit", MB_OK);
 			break;
 	} // switch (cmd)
 }
@@ -168,18 +174,14 @@ void CGitBlameLogList::GetPaths(const CGitHash& hash, std::vector<CTGitPath>& pa
 	{
 		{
 			std::set<CString> filenames;
-			int numberOfLines = pView->m_data.GetNumberOfLines();
-			for (int i = 0; i < numberOfLines; ++i)
+			auto numberOfLines = pView->m_data.GetNumberOfLines();
+			for (size_t i = 0; i < numberOfLines; ++i)
 			{
 				if (pView->m_data.GetHash(i) == hash)
-				{
 					filenames.insert(pView->m_data.GetFilename(i));
-				}
 			}
 			for (auto it = filenames.cbegin(); it != filenames.cend(); ++it)
-			{
 				paths.emplace_back(*it);
-			}
 		}
 		if (paths.empty())
 		{
@@ -194,7 +196,7 @@ void CGitBlameLogList::GetParentNumbers(GitRevLoglist* pRev, const std::vector<C
 	if (pRev->m_ParentHash.empty())
 	{
 		if (pRev->GetParentFromHash(pRev->m_CommitHash))
-			MessageBox(pRev->GetLastErr(), _T("TortoiseGit"), MB_ICONERROR);
+			MessageBox(pRev->GetLastErr(), L"TortoiseGit", MB_ICONERROR);
 	}
 
 	GIT_REV_LIST allParentHash;
@@ -202,7 +204,7 @@ void CGitBlameLogList::GetParentNumbers(GitRevLoglist* pRev, const std::vector<C
 
 	try
 	{
-		const CTGitPathList& files = pRev->GetFiles(NULL);
+		const CTGitPathList& files = pRev->GetFiles(nullptr);
 		for (int j=0, j_size = files.GetCount(); j < j_size; ++j)
 		{
 			const CTGitPath &file =  files[j];
@@ -229,7 +231,7 @@ void CGitBlameLogList::GetParentNumbers(GitRevLoglist* pRev, const std::vector<C
 	}
 	catch (const char* msg)
 	{
-		MessageBox(_T("Could not get files of parents.\nlibgit reports:\n") + CString(msg), _T("TortoiseGit"), MB_ICONERROR);
+		MessageBox(L"Could not get files of parents.\nlibgit reports:\n" + CString(msg), L"TortoiseGit", MB_ICONERROR);
 	}
 }
 
@@ -257,7 +259,7 @@ void CGitBlameLogList::GetParentHash(GitRevLoglist* pRev, int index, CGitHash& p
 
 	try
 	{
-		const CTGitPathList& files = pRev->GetFiles(NULL);
+		const CTGitPathList& files = pRev->GetFiles(nullptr);
 		for (int j = 0, j_size = files.GetCount(); j < j_size; ++j)
 		{
 			const CTGitPath &file =  files[j];
@@ -283,6 +285,6 @@ void CGitBlameLogList::GetParentHash(GitRevLoglist* pRev, int index, CGitHash& p
 	}
 	catch (const char* msg)
 	{
-		MessageBox(_T("Could not get files of parents.\nlibgit reports:\n") + CString(msg), _T("TortoiseGit"), MB_ICONERROR);
+		MessageBox(L"Could not get files of parents.\nlibgit reports:\n" + CString(msg), L"TortoiseGit", MB_ICONERROR);
 	}
 }

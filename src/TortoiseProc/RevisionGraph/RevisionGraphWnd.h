@@ -1,7 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
 // Copyright (C) 2003-2011 - TortoiseSVN
-// Copyright (C) 2012-2015 - TortoiseGit
+// Copyright (C) 2012-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -19,10 +19,7 @@
 //
 #pragma once
 //#include "RevisionGraph/RevisionGraphState.h"
-#pragma warning(push)
-#pragma warning(disable: 4481) // nonstandard extension used: override specifier 'override'
 #include "Future.h"
-#pragma warning(pop)
 #include "ProgressDlg.h"
 #include "Colors.h"
 //#include "SVNDiff.h"
@@ -160,10 +157,10 @@ public:
 	{
 		m_HashMap.clear();
 		if (g_Git.GetMapHashToFriendName(m_HashMap))
-			MessageBox(g_Git.GetGitLastErr(_T("Could not get all refs.")), _T("TortoiseGit"), MB_ICONERROR);
+			MessageBox(g_Git.GetGitLastErr(L"Could not get all refs."), L"TortoiseGit", MB_ICONERROR);
 		m_CurrentBranch=g_Git.GetCurrentBranch();
-		if (g_Git.GetHash(m_HeadHash, _T("HEAD")))
-			MessageBox(g_Git.GetGitLastErr(_T("Could not get HEAD hash.")), _T("TortoiseGit"), MB_ICONERROR);
+		if (g_Git.GetHash(m_HeadHash, L"HEAD"))
+			MessageBox(g_Git.GetGitLastErr(L"Could not get HEAD hash."), L"TortoiseGit", MB_ICONERROR);
 	}
 
 	std::auto_ptr<CFuture<bool>> updateJob;
@@ -239,7 +236,7 @@ protected:
 										// (will be activated only after some delay)
 
 	CString		GetFriendRefName(ogdf::node);
-	STRING_VECTOR		GetFriendRefNames(ogdf::node, CGit::REF_TYPE *refTypes = NULL, int refTypeCount = 0);
+	STRING_VECTOR	GetFriendRefNames(ogdf::node, const CString* exclude = nullptr, CGit::REF_TYPE* onlyRefType = nullptr);
 
 	ogdf::Graph	m_Graph;
 	ogdf::GraphAttributes m_GraphAttr;
@@ -249,8 +246,9 @@ protected:
 
 	int	 GetLeftRightMargin() {return 20;};
 	int	 GetTopBottomMargin() {return 5;};
-	virtual void	DoDataExchange(CDataExchange* pDX);	// DDX/DDV support
+	virtual void	DoDataExchange(CDataExchange* pDX) override;	// DDX/DDV support
 	afx_msg void	OnPaint();
+	virtual ULONG	GetGestureStatus(CPoint ptTouch) override;
 	afx_msg BOOL	OnEraseBkgnd(CDC* pDC);
 	afx_msg void	OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar);
 	afx_msg void	OnVScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar);
@@ -301,10 +299,10 @@ private:
 	{
 	public:
 		GraphicsDevice()
-			: pDC(NULL)
-			, graphics(NULL)
-			, pSVG(NULL)
-			, pGraphviz(NULL)
+			: pDC(nullptr)
+			, graphics(nullptr)
+			, pSVG(nullptr)
+			, pGraphviz(nullptr)
 		{
 		}
 		~GraphicsDevice() {}
@@ -337,8 +335,7 @@ private:
 
 	bool			UpdateSelectedEntry (ogdf::node clickedentry);
 	void			AppendMenu (CMenu& popup, UINT title, UINT command, UINT flags = MF_ENABLED);
-	void			AppendMenu (CMenu &popup, CString title, UINT command, CString *extra = NULL, CMenu *submenu = NULL);
-	void			AddGitOps (CMenu& popup);
+	void			AppendMenu(CMenu& popup, CString title, UINT command, CString* extra = nullptr, CMenu* submenu = nullptr);
 	void			AddGraphOps (CMenu& popup, const CVisibleGraphNode * node);
 	CString			GetSelectedURL() const;
 	CString			GetWCURL() const;
@@ -383,9 +380,6 @@ private:
 	void			DrawShape (GraphicsDevice& graphics, const Color& penColor, int penWidth, const Pen* pen, const Color& fillColor, const Brush* brush, const RectF& rect, NodeShape shape);
 	void			DrawShadow(GraphicsDevice& graphics, const RectF& rect,
 							   Color shadowColor, NodeShape shape);
-	void			DrawNode(GraphicsDevice& graphics, const RectF& rect,
-							 Color contour, Color overlayColor,
-							 const CVisibleGraphNode *node, NodeShape shape);
 	RectF			TransformRectToScreen (const CRect& rect, const CSize& offset) const;
 	RectF			GetNodeRect (const ogdf::node& v, const CSize& offset) const;
 //	RectF			GetBranchCover (const ILayoutNodeList* nodeList, index_t nodeIndex, bool upward, const CSize& offset);
@@ -407,14 +401,11 @@ private:
 	void			DrawStripes (GraphicsDevice& graphics, const CSize& offset);
 
 	void			DrawShadows (GraphicsDevice& graphics, const CRect& logRect, const CSize& offset);
-	void			DrawNodes (GraphicsDevice& graphics, Image* glyphs, const CRect& logRect, const CSize& offset);
 	void			DrawConnections (GraphicsDevice& graphics, const CRect& logRect, const CSize& offset);
 	void			DrawTexts (GraphicsDevice& graphics, const CRect& logRect, const CSize& offset);
 	void			DrawCurrentNodeGlyphs (GraphicsDevice& graphics, Image* glyphs, const CSize& offset);
 	void			DrawGraph(GraphicsDevice& graphics, const CRect& rect, int nVScrollPos, int nHScrollPos, bool bDirectDraw);
 
 	int				GetEncoderClsid(const WCHAR* format, CLSID* pClsid);
-	void			DrawRubberBand();
 	void	SetNodeRect(GraphicsDevice& graphics, ogdf::node *pnode, CGitHash rev, int mode = 0);
-
 };

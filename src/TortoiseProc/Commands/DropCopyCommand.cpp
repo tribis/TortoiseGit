@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2013, 2015 - TortoiseGit
+// Copyright (C) 2008-2013, 2015-2018 - TortoiseGit
 // Copyright (C) 2007-2008 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -27,38 +27,38 @@
 
 bool DropCopyCommand::Execute()
 {
-
-	CString sDroppath = parser.GetVal(_T("droptarget"));
+	CString sDroppath = parser.GetVal(L"droptarget");
 	if (CTGitPath(sDroppath).IsAdminDir())
 	{
-		CMessageBox::Show(NULL,_T("Can't drop to .git repository directory\n"),
-							   _T("TortoiseGit"),MB_OK|MB_ICONERROR);
+		MessageBox(GetExplorerHWND(), L"Can't drop to .git repository directory\n", L"TortoiseGit", MB_OK | MB_ICONERROR);
 		return FALSE;
 	}
 	unsigned long count = 0;
 
 	CString sNewName;
 	pathList.RemoveAdminPaths();
-	if ((parser.HasKey(_T("rename")))&&(pathList.GetCount()==1))
+	if (parser.HasKey(L"rename") && pathList.GetCount() == 1)
 	{
 		// ask for a new name of the source item
-		do
+		CRenameDlg renDlg;
+		renDlg.SetInputValidator([&](const int /*nID*/, const CString& input) -> CString
 		{
-			CRenameDlg renDlg;
-			renDlg.m_windowtitle.LoadString(IDS_PROC_COPYRENAME);
-			renDlg.m_name = pathList[0].GetFileOrDirectoryName();
-			if (renDlg.DoModal() != IDOK)
-			{
-				return FALSE;
-			}
-			sNewName = renDlg.m_name;
-		} while(sNewName.IsEmpty() || PathFileExists(sDroppath+_T("\\")+sNewName));
+			if (PathFileExists(sDroppath + L'\\' + input))
+				return CString(CFormatMessageWrapper(ERROR_FILE_EXISTS));
+
+			return{};
+		});
+		renDlg.m_sBaseDir = sDroppath;
+		renDlg.m_windowtitle.LoadString(IDS_PROC_COPYRENAME);
+		renDlg.m_name = pathList[0].GetFileOrDirectoryName();
+		if (renDlg.DoModal() != IDOK)
+			return FALSE;
+		sNewName = renDlg.m_name;
 	}
 	CSysProgressDlg progress;
 	progress.SetTitle(IDS_PROC_COPYING);
-	progress.SetAnimation(IDR_MOVEANI);
 	progress.SetTime(true);
-	progress.ShowModeless(CWnd::FromHandle(hwndExplorer));
+	progress.ShowModeless(CWnd::FromHandle(GetExplorerHWND()));
 	for (int nPath = 0; nPath < pathList.GetCount(); ++nPath)
 	{
 		const CTGitPath& sourcePath = orgPathList[nPath];
@@ -76,18 +76,26 @@ bool DropCopyCommand::Execute()
 			// Offer a rename
 			progress.Stop();
 			CRenameDlg dlg;
+			dlg.SetInputValidator([&](const int /*nID*/, const CString& input) -> CString
+			{
+				CTGitPath newPath(sDroppath);
+				newPath.AppendPathString(input);
+				if (newPath.Exists())
+					return CString(CFormatMessageWrapper(ERROR_FILE_EXISTS));
+
+				return{};
+			});
+			dlg.m_sBaseDir = fullDropPath.GetContainingDirectory().GetWinPathString();
+			dlg.m_name = fullDropPath.GetFileOrDirectoryName();
 			dlg.m_windowtitle.Format(IDS_PROC_NEWNAMECOPY, (LPCTSTR)sourcePath.GetUIFileOrDirectoryName());
 			if (dlg.DoModal() != IDOK)
-			{
 				return FALSE;
-			}
 			// rebuild the progress dialog
 			progress.EnsureValid();
 			progress.SetTitle(IDS_PROC_COPYING);
-			progress.SetAnimation(IDR_MOVEANI);
 			progress.SetTime(true);
 			progress.SetProgress(count, pathList.GetCount());
-			progress.ShowModeless(CWnd::FromHandle(hwndExplorer));
+			progress.ShowModeless(CWnd::FromHandle(GetExplorerHWND()));
 			// Rebuild the destination path, with the new name
 			fullDropPath.SetFromUnknown(sDroppath);
 			fullDropPath.AppendPathString(dlg.m_name);
@@ -101,30 +109,33 @@ bool DropCopyCommand::Execute()
 				g_Git.SetCurrentDir(ProjectTopDir);
 				SetCurrentDirectory(ProjectTopDir);
 				CString cmd;
-				cmd = _T("git.exe add -- \"");
+				cmd = L"git.exe add -- \"";
 
 				CString path;
 				path=fullDropPath.GetGitPathString().Mid(ProjectTopDir.GetLength());
-				if (!path.IsEmpty() && (path[0] == _T('\\') || path[0] == _T('/')))
+				if (!path.IsEmpty() && (path[0] == L'\\' || path[0] == L'/'))
 					path = path.Mid(1);
 				cmd += path;
-				cmd +=_T('\"');
+				cmd += L'"';
 
 				CString output;
 				if (g_Git.Run(cmd, &output, CP_UTF8))
-				{
-					CMessageBox::Show(NULL, output, _T("TortoiseGit"), MB_OK|MB_ICONERROR);
-				}else
+					MessageBox(GetExplorerHWND(), output, L"TortoiseGit", MB_OK | MB_ICONERROR);
+				else
 					CShellUpdater::Instance().AddPathForUpdate(fullDropPath);
 			}
 
 		}else
 		{
 			CString str;
-			str+=_T("Copy file fail:");
+			str += L"Copy from \"";
 			str+=sourcePath.GetWinPath();
+			str += L"\" to \"";
+			str += fullDropPath.GetWinPath();
+			str += L"\" failed:\n";
+			str += CFormatMessageWrapper();
 
-			CMessageBox::Show(NULL, str, _T("TortoiseGit"), MB_OK|MB_ICONERROR);
+			MessageBox(GetExplorerHWND(), str, L"TortoiseGit", MB_OK | MB_ICONERROR);
 		}
 
 		++count;
@@ -136,7 +147,7 @@ bool DropCopyCommand::Execute()
 		}
 		if ((progress.IsValid())&&(progress.HasUserCancelled()))
 		{
-			CMessageBox::Show(hwndExplorer, IDS_USERCANCELLED, IDS_APPNAME, MB_ICONINFORMATION);
+			CMessageBox::Show(GetExplorerHWND(), IDS_USERCANCELLED, IDS_APPNAME, MB_ICONINFORMATION);
 			return false;
 		}
 	}

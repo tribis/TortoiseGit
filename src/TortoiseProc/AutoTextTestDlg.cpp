@@ -28,10 +28,9 @@
 
 IMPLEMENT_DYNAMIC(CAutoTextTestDlg, CDialog)
 
-CAutoTextTestDlg::CAutoTextTestDlg(CWnd* pParent /*=NULL*/)
+CAutoTextTestDlg::CAutoTextTestDlg(CWnd* pParent /*=nullptr*/)
 	: CDialog(CAutoTextTestDlg::IDD, pParent)
 {
-
 }
 
 CAutoTextTestDlg::~CAutoTextTestDlg()
@@ -46,7 +45,6 @@ void CAutoTextTestDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Text(pDX, IDC_TIMINGLABEL, m_sTimingLabel);
 	DDX_Control(pDX, IDC_AUTOTEXTCONTENT, m_cContent);
 }
-
 
 BEGIN_MESSAGE_MAP(CAutoTextTestDlg, CDialog)
 	ON_BN_CLICKED(IDC_AUTOTEXTSCAN, &CAutoTextTestDlg::OnBnClickedAutotextscan)
@@ -78,17 +76,17 @@ void CAutoTextTestDlg::OnBnClickedAutotextscan()
 			std::wstring s = m_sContent;
 			CHighResClock timer;
 
-			std::tr1::wregex regCheck;
-			regCheck = std::tr1::wregex(m_sRegex, std::tr1::regex_constants::icase | std::tr1::regex_constants::ECMAScript);
-			const std::tr1::wsregex_iterator end;
-			for (std::tr1::wsregex_iterator it(s.cbegin(), s.cend(), regCheck); it != end; ++it)
+			std::wregex regCheck;
+			regCheck = std::wregex(m_sRegex, std::regex_constants::icase | std::regex_constants::ECMAScript);
+			const std::wsregex_iterator end;
+			for (std::wsregex_iterator it(s.cbegin(), s.cend(), regCheck); it != end; ++it)
 			{
-				const std::tr1::wsmatch match = *it;
+				const std::wsmatch match = *it;
 				for (size_t i=1; i<match.size(); ++i)
 				{
 					if (match[i].second-match[i].first)
 					{
-						ATLTRACE(_T("matched keyword : %s\n"), std::wstring(match[i]).c_str());
+						ATLTRACE(L"matched keyword : %s\n", std::wstring(match[i]).c_str());
 						std::wstring result = std::wstring(match[i]);
 						if (!result.empty())
 						{
@@ -101,13 +99,13 @@ void CAutoTextTestDlg::OnBnClickedAutotextscan()
 			for (const auto& append : autolist)
 			{
 				m_sResult += append;
-				m_sResult += _T("\r\n");
+				m_sResult += L"\r\n";
 			}
-			m_sTimingLabel.Format(_T("Parse time: %ld uSecs"), timer.GetMusecsTaken());
+			m_sTimingLabel.Format(L"Parse time: %ld uSecs", timer.GetMusecsTaken());
 		}
 		catch (std::exception &ex)
 		{
-			m_sResult = _T("Regex is invalid!\r\n") + CString(ex.what());
+			m_sResult = L"Regex is invalid!\r\n" + CString(ex.what());
 		}
 	}
 	UpdateData(FALSE);

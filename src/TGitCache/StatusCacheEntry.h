@@ -1,7 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
 // External Cache Copyright (C) 2005 - 2006 - Will Dean, Stefan Kueng
-// Copyright (C) 2008-2012 - TortoiseGit
+// Copyright (C) 2008-2012, 2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -33,21 +33,18 @@ class CStatusCacheEntry
 public:
 	CStatusCacheEntry();
 	CStatusCacheEntry(const git_wc_status_kind status);
-	CStatusCacheEntry(const git_wc_status2_t* pGitStatus, __int64 lastWriteTime, bool bReadOnly, LONGLONG validuntil = 0);
+	CStatusCacheEntry(const git_wc_status2_t* pGitStatus, __int64 lastWriteTime, LONGLONG validuntil = 0);
 	bool HasExpired(LONGLONG now) const;
 	void BuildCacheResponse(TGITCacheResponse& response, DWORD& responseLength) const;
 	bool IsVersioned() const;
 	bool DoesFileTimeMatch(__int64 testTime) const;
 	bool ForceStatus(git_wc_status_kind forcedStatus);
 	git_wc_status_kind GetEffectiveStatus() const { return m_highestPriorityLocalStatus; }
-	bool IsKindKnown() const { return ((m_kind != git_node_none)&&(m_kind != git_node_unknown)); }
 	void SetStatus(const git_wc_status2_t* pGitStatus);
 	bool HasBeenSet() const;
 	void Invalidate();
-	bool IsDirectory() const { return ((m_kind == git_node_dir)&&(m_highestPriorityLocalStatus != git_wc_status_ignored)); }
 	bool SaveToDisk(FILE* pFile) const;
 	bool LoadFromDisk(FILE * pFile);
-	void SetKind(git_node_kind_t kind) { m_kind = kind; if (kind == git_node_dir) { m_bAssumeValid = false; m_bSkipWorktree = false; } }
 private:
 	void SetAsUnversioned();
 
@@ -57,7 +54,6 @@ private:
 	git_wc_status2_t	m_GitStatus;
 	__int64				m_lastWriteTime;
 	bool				m_bSet;
-	git_node_kind_t		m_kind;
 	bool				m_bAssumeValid;
 	bool				m_bSkipWorktree;
 

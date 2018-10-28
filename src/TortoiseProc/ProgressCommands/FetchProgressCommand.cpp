@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2013-2015 - TortoiseGit
+// Copyright (C) 2013-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -31,7 +31,7 @@ bool FetchProgressCommand::Run(CGitProgressList* list, CString& sWindowTitle, in
 
 	list->SetWindowTitle(IDS_PROGRS_TITLE_FETCH, g_Git.m_CurrentDir, sWindowTitle);
 	list->SetBackgroundImage(IDI_UPDATE_BKG);
-	list->ReportCmd(CString(MAKEINTRESOURCE(IDS_PROGRS_TITLE_FETCH)) + _T(" ") + m_url.GetGitPathString() + _T(" ") + m_RefSpec);
+	list->ReportCmd(CString(MAKEINTRESOURCE(IDS_PROGRS_TITLE_FETCH)) + L' ' + m_url.GetGitPathString() + L' ' + m_RefSpec);
 
 	CStringA url = CUnicodeUtils::GetUTF8(m_url.GetGitPathString());
 
@@ -57,6 +57,8 @@ bool FetchProgressCommand::Run(CGitProgressList* list, CString& sWindowTitle, in
 	}
 
 	git_fetch_options fetchopts = GIT_FETCH_OPTIONS_INIT;
+	fetchopts.prune = m_Prune;
+	fetchopts.download_tags = m_AutoTag;
 	git_remote_callbacks& callbacks = fetchopts.callbacks;
 	callbacks.update_tips = RemoteUpdatetipsCallback;
 	callbacks.sideband_progress = RemoteProgressCallback;
@@ -66,8 +68,6 @@ bool FetchProgressCommand::Run(CGitProgressList* list, CString& sWindowTitle, in
 	callbacks.certificate_check = CAppUtils::Git2CertificateCheck;
 	CGitProgressList::Payload cbpayload = { list, repo };
 	callbacks.payload = &cbpayload;
-
-	git_remote_set_autotag(repo, git_remote_name(remote), (git_remote_autotag_option_t)m_AutoTag);
 
 	if (!m_RefSpec.IsEmpty() && git_remote_add_fetch(repo, git_remote_name(remote), CUnicodeUtils::GetUTF8(m_RefSpec)))
 		goto error;

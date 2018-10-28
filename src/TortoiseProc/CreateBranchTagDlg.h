@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2013, 2015 - TortoiseGit
+// Copyright (C) 2008-2013, 2015-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -28,7 +28,7 @@ class CCreateBranchTagDlg : public CResizableStandAloneDialog,public CChooseVers
 	DECLARE_DYNAMIC(CCreateBranchTagDlg)
 
 public:
-	CCreateBranchTagDlg(CWnd* pParent = NULL);   // standard constructor
+	CCreateBranchTagDlg(CWnd* pParent = nullptr);   // standard constructor
 	virtual ~CCreateBranchTagDlg();
 
 // Dialog Data
@@ -45,18 +45,17 @@ public:
 	CString	m_OldSelectBranch;
 
 protected:
-	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
-	virtual BOOL OnInitDialog();
+	virtual void DoDataExchange(CDataExchange* pDX) override;    // DDX/DDV support
+	virtual BOOL OnInitDialog() override;
 
 	CHOOSE_EVENT_RADIO();
 
 	DECLARE_MESSAGE_MAP()
 
-	afx_msg void OnBnClickedRadio();
 	afx_msg void OnBnClickedOk();
 	afx_msg void OnCbnSelchangeComboboxexBranch();
 	afx_msg void OnEnChangeBranchTag();
 
-	virtual void OnVersionChanged();
+	virtual void OnVersionChanged() override;
 	afx_msg void OnDestroy();
 };

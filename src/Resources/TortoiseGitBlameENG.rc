@@ -1,6 +1,6 @@
 // Microsoft Visual C++ generated resource script.
 //
-#include "..\TortoiseGitBlame\resource.h"
+#include "../TortoiseGitBlame/resource.h"
 
 #define APSTUDIO_READONLY_SYMBOLS
 /////////////////////////////////////////////////////////////////////////////
@@ -8,10 +8,10 @@
 // Generated from the TEXTINCLUDE 2 resource.
 //
 #ifndef APSTUDIO_INVOKED
-#include "..\targetver.h"
+#include "../targetver.h"
 #endif
 #include <afxres.h>
-#include "..\TortoiseGitBlame\MenuEncode.h"
+#include "../TortoiseGitBlame/MenuEncode.h"
 
 /////////////////////////////////////////////////////////////////////////////
 #undef APSTUDIO_READONLY_SYMBOLS
@@ -31,16 +31,16 @@ LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
 
 1 TEXTINCLUDE 
 BEGIN
-    "..\\TortoiseGitBlame\\resource.h\0"
+    "../TortoiseGitBlame/resource.h\0"
 END
 
 2 TEXTINCLUDE 
 BEGIN
     "#ifndef APSTUDIO_INVOKED\r\n"
-    "#include ""..\\targetver.h""\r\n"
+    "#include ""../targetver.h""\r\n"
     "#endif\r\n"
     "#include <afxres.h>\r\n"
-    "#include ""..\\TortoiseGitBlame\\MenuEncode.h""\r\n"
+    "#include ""../TortoiseGitBlame/MenuEncode.h""\r\n"
     "\0"
 END
 
@@ -53,12 +53,9 @@ BEGIN
     "#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)\r\n"
     "LANGUAGE 9, 1\r\n"
     "#pragma code_page(1252)\r\n"
-    "#include ""res\\TortoiseGitBlame.rc2""  // non-Microsoft Visual C++ edited resources\r\n"
+    "#include ""res/TortoiseGitBlame.rc2""  // non-Microsoft Visual C++ edited resources\r\n"
     "#include <afxres.rc>         // Standard components\r\n"
     "#include <afxprint.rc>       // printing/print preview resources\r\n"
-    "#if !defined(_AFXDLL)\r\n"
-    "#include <afxribbon.rc>              // MFC ribbon and control bar resources\r\n"
-    "#endif\r\n"
     "#endif\r\n"
     "\0"
 END
@@ -73,25 +70,24 @@ END
 
 // Icon with lowest ID value placed first to ensure application icon
 // remains consistent on all systems.
-IDR_TORTOISE_GIT_BLAME_MAINFRAME ICON                    "..\\Resources\\blameres\\TortoiseGitBlame.ico"
-IDR_MAINFRAME           ICON                    "..\\Resources\\blameres\\TortoiseGitBlame.ico"
-IDR_TortoiseGitBlamTYPE ICON                    "..\\Resources\\blameres\\TortoiseGitBlameDoc.ico"
-IDI_OUTPUT_WND          ICON                    "..\\Resources\\blameres\\output_wnd.ico"
-IDI_OUTPUT_WND_HC       ICON                    "..\\Resources\\blameres\\output_wnd_hc.ico"
-IDI_PROPERTIES_WND      ICON                    "..\\Resources\\blameres\\properties_wnd.ico"
-IDI_PROPERTIES_WND_HC   ICON                    "..\\Resources\\blameres\\properties_wnd_hc.ico"
-IDI_BLAME_POPUP_BLAME   ICON                    "..\\Resources\\menublame.ico"
-IDI_BLAME_POPUP_COMPARE ICON                    "..\\Resources\\menucompare.ico"
-IDI_BLAME_POPUP_LOG     ICON                    "..\\Resources\\menulog.ico"
-IDI_BLAME_POPUP_COPY    ICON                    "..\\Resources\\copy.ico"
+IDR_TORTOISE_GIT_BLAME_MAINFRAME ICON           "TortoiseGitBlame.ico"
+IDR_MAINFRAME           ICON                    "TortoiseGitBlame.ico"
+IDI_OUTPUT_WND          ICON                    "blameres\\output_wnd.ico"
+IDI_OUTPUT_WND_HC       ICON                    "blameres\\output_wnd_hc.ico"
+IDI_PROPERTIES_WND      ICON                    "blameres\\properties_wnd.ico"
+IDI_PROPERTIES_WND_HC   ICON                    "blameres\\properties_wnd_hc.ico"
+IDI_BLAME_POPUP_BLAME   ICON                    "TortoiseGitBlame.ico"
+IDI_BLAME_POPUP_COMPARE ICON                    "menucompare.ico"
+IDI_BLAME_POPUP_LOG     ICON                    "menulog.ico"
+IDI_BLAME_POPUP_COPY    ICON                    "copy.ico"
 
 /////////////////////////////////////////////////////////////////////////////
 //
 // Bitmap
 //
 
-IDR_TORTOISE_GIT_BLAME_MAINFRAME BITMAP                  "..\\Resources\\blameres\\Toolbar.bmp"
-IDR_TORTOISE_GIT_BLAME_MAINFRAME_256 BITMAP                  "..\\Resources\\blameres\\Toolbar256.bmp"
+IDR_TORTOISE_GIT_BLAME_MAINFRAME BITMAP                  "blameres\\Toolbar.bmp"
+IDR_TORTOISE_GIT_BLAME_MAINFRAME_256 BITMAP                  "blameres\\Toolbar256.bmp"
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -261,23 +257,6 @@ BEGIN
             MENUITEM "<placeholder>",               ID_VIEW_TOOLBAR
         END
         MENUITEM "&Status Bar",                 ID_VIEW_STATUS_BAR
-        POPUP "&Application Look"
-        BEGIN
-            MENUITEM "Windows 2000",                ID_VIEW_APPLOOK_WIN_2000
-            MENUITEM "Office XP",                   ID_VIEW_APPLOOK_OFF_XP
-            MENUITEM "Windows XP",                  ID_VIEW_APPLOOK_WIN_XP
-            MENUITEM "Office 2003",                 ID_VIEW_APPLOOK_OFF_2003
-            MENUITEM "Visual Studio 2005",          ID_VIEW_APPLOOK_VS_2005
-            POPUP "Office 2007"
-            BEGIN
-                MENUITEM "Blue Style",                  ID_VIEW_APPLOOK_OFF_2007_BLUE
-                MENUITEM "Black Style",                 ID_VIEW_APPLOOK_OFF_2007_BLACK
-                MENUITEM "Silver Style",                ID_VIEW_APPLOOK_OFF_2007_SILVER
-                MENUITEM "Aqua Style",                  ID_VIEW_APPLOOK_OFF_2007_AQUA
-            END
-            MENUITEM "Visual Studio 2008",          ID_VIEW_APPLOOK_VS_2008
-            MENUITEM "Windows 7",                   ID_VIEW_APPLOOK_WIN7
-        END
         MENUITEM SEPARATOR
         MENUITEM "Show author",                 ID_VIEW_SHOWAUTHOR
         MENUITEM "Show date",                   ID_VIEW_SHOWDATE
@@ -296,9 +275,11 @@ BEGIN
         MENUITEM SEPARATOR
         MENUITEM "Show com&plete log",          ID_VIEW_SHOWCOMPLETELOG
         MENUITEM "&Follow renames",             ID_VIEW_FOLLOWRENAMES
+        MENUITEM "Only consider first parents on blame", ID_VIEW_ONLYCONSIDERFIRSTPARENTS
         MENUITEM SEPARATOR
         MENUITEM "Color by age, &continuous",   ID_VIEW_COLORBYAGE
         MENUITEM "Enable syntax highlighting",  ID_VIEW_ENABLELEXER
+        MENUITEM "Wrap long lines",             ID_VIEW_WRAPLONGLINES
     END
     POPUP "&Help"
     BEGIN
@@ -327,6 +308,7 @@ END
 
 IDR_TORTOISE_GIT_BLAME_MAINFRAME ACCELERATORS
 BEGIN
+    VK_ESCAPE,      ID_APP_EXIT,            VIRTKEY, NOINVERT
     "O",            ID_FILE_OPEN,           VIRTKEY, CONTROL
     "X",            ID_EDIT_CUT,            VIRTKEY, CONTROL
     "C",            ID_EDIT_COPY,           VIRTKEY, CONTROL
@@ -342,6 +324,7 @@ BEGIN
     VK_F1,          ID_HELP,                VIRTKEY 
     VK_F3,          ID_FIND_NEXT,           VIRTKEY, NOINVERT
     VK_F3,          ID_FIND_PREV,           VIRTKEY, SHIFT, NOINVERT
+    "Q",            ID_APP_EXIT,            VIRTKEY, CONTROL, NOINVERT
 END
 
 
@@ -350,23 +333,23 @@ END
 // Dialog
 //
 
-IDD_ABOUTBOX DIALOGEX 0, 0, 230, 90
+IDD_ABOUTBOX DIALOGEX 0, 0, 357, 116
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "About TortoiseGitBlame"
-FONT 8, "MS Shell Dlg", 0, 0, 0x1
+FONT 9, "MS Shell Dlg 2", 400, 0, 0x1
 BEGIN
     ICON            IDR_TORTOISE_GIT_BLAME_MAINFRAME,IDC_STATIC,14,14,20,20
-    LTEXT           "TortoiseGitBlame",IDC_VERSION,42,14,138,8,SS_NOPREFIX
-    LTEXT           "Copyright (C) 2009-2016 TortoiseGit",IDC_COPYRIGHT,42,26,156,8
-    DEFPUSHBUTTON   "OK",IDOK,173,69,50,14,WS_GROUP
-    LTEXT           "Authors:\tFrank Li (lznuaa@gmail.com),\n\t\tSven Strickroth (email@cs-ware.de)",IDC_STATIC,42,37,174,18
-    LTEXT           "Part of code come from TortoiseSVN Blame",IDC_STATIC,42,55,138,8
+    LTEXT           "TortoiseGitBlame",IDC_VERSION,42,14,308,8,SS_NOPREFIX
+    LTEXT           "",IDC_COPYRIGHT,42,26,308,16
+    LTEXT           "Significant contributions by: (see Git repository for a complete list)",IDC_STATIC,42,47,308,9
+    LTEXT           "",IDC_STATIC_AUTHORS,42,56,308,34
+    DEFPUSHBUTTON   "OK",IDOK,300,94,50,14,WS_GROUP
 END
 
 IDD_GOTODLG DIALOGEX 0, 0, 127, 52
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Go to line"
-FONT 8, "MS Shell Dlg", 400, 0, 0x1
+FONT 9, "MS Shell Dlg 2", 400, 0, 0x1
 BEGIN
     LTEXT           "Line:",IDC_STATIC,7,10,57,8
     EDITTEXT        IDC_LINENUMBER,36,7,84,14,ES_AUTOHSCROLL | ES_NUMBER
@@ -386,9 +369,10 @@ BEGIN
     IDD_ABOUTBOX, DIALOG
     BEGIN
         LEFTMARGIN, 7
-        RIGHTMARGIN, 223
+        RIGHTMARGIN, 350
+        VERTGUIDE, 42
         TOPMARGIN, 7
-        BOTTOMMARGIN, 82
+        BOTTOMMARGIN, 108
     END
 END
 #endif    // APSTUDIO_INVOKED
@@ -607,12 +591,9 @@ END
 #if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)
 LANGUAGE 9, 1
 #pragma code_page(1252)
-#include "res\TortoiseGitBlame.rc2"  // non-Microsoft Visual C++ edited resources
+#include "res/TortoiseGitBlame.rc2"  // non-Microsoft Visual C++ edited resources
 #include <afxres.rc>         // Standard components
 #include <afxprint.rc>       // printing/print preview resources
-#if !defined(_AFXDLL)
-#include <afxribbon.rc>              // MFC ribbon and control bar resources
-#endif
 #endif
 
 /////////////////////////////////////////////////////////////////////////////

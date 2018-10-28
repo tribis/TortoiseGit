@@ -13,7 +13,7 @@
 #define VC_EXTRALEAN            // Exclude rarely-used stuff from Windows headers
 #endif
 
-#include "..\targetver.h"
+#include "../targetver.h"
 
 #define WIN32_LEAN_AND_MEAN             // Exclude rarely-used stuff from Windows headers
 
@@ -30,10 +30,7 @@
 #include <afxdisp.h>        // MFC Automation classes
 #include <Commctrl.h>
 
-#pragma warning(push)
-#pragma warning(disable: 4510 4610)
 #include "git2.h"
-#pragma warning(pop)
 #include "SmartLibgit2Ref.h"
 
 #ifndef _AFX_NO_OLE_SUPPORT
@@ -54,6 +51,7 @@
 #include <fstream>
 #include <set>
 #include <algorithm>
+#include <functional>
 
 #define USE_GDI_GRADIENT
 #define HISTORYCOMBO_WITH_SYSIMAGELIST

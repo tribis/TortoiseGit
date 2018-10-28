@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2013-2015 - TortoiseGit
+// Copyright (C) 2013-2016, 2018 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -25,16 +25,16 @@
 
 bool DaemonCommand::Execute()
 {
-	if (CMessageBox::ShowCheck(NULL, IDS_DAEMON_SECURITY_WARN, IDS_APPNAME, 2, IDI_EXCLAMATION, IDS_PROCEEDBUTTON, IDS_ABORTBUTTON, NULL, _T("DaemonNoSecurityWarning"), IDS_MSGBOX_DONOTSHOWAGAIN) == 2)
+	if (CMessageBox::ShowCheck(GetExplorerHWND(), IDS_DAEMON_SECURITY_WARN, IDS_APPNAME, 2, IDI_EXCLAMATION, IDS_PROCEEDBUTTON, IDS_ABORTBUTTON, NULL, L"DaemonNoSecurityWarning", IDS_MSGBOX_DONOTSHOWAGAIN) == 2)
 	{
-		CMessageBox::RemoveRegistryKey(_T("DaemonNoSecurityWarning")); // only store answer if it is "Proceed"
+		CMessageBox::RemoveRegistryKey(L"DaemonNoSecurityWarning"); // only store answer if it is "Proceed"
 		return false;
 	}
 
 	WSADATA wsaData;
 	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != NO_ERROR)
 	{
-		MessageBox(NULL, _T("WSAStartup failed!"), _T("TortoiseGit"), MB_OK | MB_ICONERROR);
+		MessageBox(GetExplorerHWND(), L"WSAStartup failed!", L"TortoiseGit", MB_OK | MB_ICONERROR);
 		return false;
 	}
 	SCOPE_EXIT { WSACleanup(); };
@@ -42,7 +42,7 @@ bool DaemonCommand::Execute()
 	char hostName[128] = { 0 };
 	if (gethostname(hostName, sizeof(hostName)) == SOCKET_ERROR)
 	{
-		MessageBox(NULL, _T("gethostname failed!"), _T("TortoiseGit"), MB_OK | MB_ICONERROR);
+		MessageBox(GetExplorerHWND(), L"gethostname failed!", L"TortoiseGit", MB_OK | MB_ICONERROR);
 		return false;
 	}
 
@@ -63,10 +63,10 @@ bool DaemonCommand::Execute()
 
 		if (ptr->ai_family == AF_INET6)
 		{
-			if (ip.Left(5) == _T("fe80:")) // strip % interface number at the end
-				ip = ip.Left(ip.Find(_T('%')));
-			ip = _T('[') + ip; // IPv6 addresses needs to be enclosed within braces
-			ip += _T(']');
+			if (CStringUtils::StartsWith(ip, L"fe80:")) // strip % interface number at the end
+				ip = ip.Left(ip.Find(L'%'));
+			ip = L'[' + ip; // IPv6 addresses needs to be enclosed within braces
+			ip += L']';
 		}
 		ips.push_back(ip);
 	}
@@ -74,23 +74,24 @@ bool DaemonCommand::Execute()
 		FreeAddrInfoA(result);
 
 	CString basePath(g_Git.m_CurrentDir);
-	basePath.TrimRight(L"\\");
+	basePath.TrimRight(L'\\');
 	if (basePath.GetLength() == 2)
 		basePath += L"\\.";
 
 	CString cmd;
-	cmd.Format(_T("git.exe daemon --verbose --export-all --base-path=\"%s\""), (LPCTSTR)basePath);
+	cmd.Format(L"git.exe daemon --verbose --export-all --base-path=\"%s\"", (LPCTSTR)basePath);
 	CProgressDlg progDlg;
+	theApp.m_pMainWnd = &progDlg;
 	progDlg.m_GitCmd = cmd;
 	if (ips.empty())
-		progDlg.m_PreText = _T("git://localhost/");
+		progDlg.m_PreText = L"git://localhost/";
 	else
 	{
 		for (const auto& ip : ips)
 		{
-			progDlg.m_PreText += _T("git://");
+			progDlg.m_PreText += L"git://";
 			progDlg.m_PreText += ip;
-			progDlg.m_PreText += _T("/\n");
+			progDlg.m_PreText += L"/\n";
 		}
 	}
 	progDlg.DoModal();

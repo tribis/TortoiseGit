@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2013 - TortoiseGit
+// Copyright (C) 2013, 2016-2017 - TortoiseGit
 // Copyright (C) 2003-2006,2012 - Stefan Kueng
 
 // This program is free software; you can redistribute it and/or
@@ -22,28 +22,27 @@
 #include <locale>
 #include <algorithm>
 
-const TCHAR CCmdLineParser::m_sDelims[] = _T("-/");
-const TCHAR CCmdLineParser::m_sQuotes[] = _T("\"");
-const TCHAR CCmdLineParser::m_sValueSep[] = _T(" :"); // don't forget space!!
+const TCHAR CCmdLineParser::m_sDelims[] = L"-/";
+const TCHAR CCmdLineParser::m_sQuotes[] = L"\"";
+const TCHAR CCmdLineParser::m_sValueSep[] = L" :"; // don't forget space!!
 
 
 CCmdLineParser::CCmdLineParser(LPCTSTR sCmdLine)
 {
 	if(sCmdLine)
-	{
 		Parse(sCmdLine);
-	}
 }
 
-CCmdLineParser::~CCmdLineParser()
+CCmdLineParser& CCmdLineParser::operator=(CCmdLineParser&& other)
 {
-	m_valueMap.clear();
+	m_sCmdLine = std::move(other.m_sCmdLine);
+	m_valueMap = std::move(other.m_valueMap);
+	return *this;
 }
 
 BOOL CCmdLineParser::Parse(LPCTSTR sCmdLine)
 {
-	const stdstring sEmpty = _T("");			//use this as a value if no actual value is given in commandline
-	int nArgs = 0;
+	const std::wstring sEmpty;			//use this as a value if no actual value is given in commandline
 
 	if(!sCmdLine)
 		return false;
@@ -51,50 +50,51 @@ BOOL CCmdLineParser::Parse(LPCTSTR sCmdLine)
 	m_valueMap.clear();
 	m_sCmdLine = sCmdLine;
 
-	LPCTSTR sCurrent = sCmdLine;
+	tstring working = sCmdLine;
+	auto sCurrent = working.data();
 
 	for(;;)
 	{
 		//format is  -Key:"arg"
 
-		if (_tcslen(sCurrent) == 0)
+		if (!sCurrent[0])
 			break;		// no more data, leave loop
 
-		LPCTSTR sArg = _tcspbrk(sCurrent, m_sDelims);
+		LPCTSTR sArg = wcspbrk(sCurrent, m_sDelims);
 		if(!sArg)
 			break; // no (more) delimiters found
-		sArg =  _tcsinc(sArg);
+		sArg = _wcsinc(sArg);
 
-		if(_tcslen(sArg) == 0)
+		if (!sArg[0])
 			break; // ends with delim
 
-		LPCTSTR sVal = _tcspbrk(sArg, m_sValueSep);
-		if(sVal == NULL)
+		LPCTSTR sVal = wcspbrk(sArg, m_sValueSep);
+		if (!sVal)
 		{
-			stdstring Key(sArg);
-			std::transform(Key.begin(), Key.end(), Key.begin(), ::tolower);
+			std::wstring Key(sArg);
+			std::transform(Key.begin(), Key.end(), Key.begin(), ::towlower);
 			m_valueMap.insert(CValsMap::value_type(Key, sEmpty));
 			break;
 		}
 		else
 		{
-			stdstring Key(sArg, (int)(sVal - sArg));
-			std::transform(Key.begin(), Key.end(), Key.begin(), ::tolower);
+			std::wstring Key(sArg, (int)(sVal - sArg));
+			std::transform(Key.begin(), Key.end(), Key.begin(), ::towlower);
 
-			LPCTSTR sQuote(NULL), sEndQuote(NULL);
-			if (_tcslen(sVal) > 0)
+			LPCTSTR sQuote(nullptr), sEndQuote(nullptr);
+			if (sVal[0])
 			{
-				if (sVal[0] != _T(' '))
-					sVal = _tcsinc(sVal);
+				if (sVal[0] != L' ')
+					sVal = _wcsinc(sVal);
 				else
 				{
-					while (_tcslen(sVal) > 0 && sVal[0] == _T(' '))
-						sVal = _tcsinc(sVal);
+					while (sVal[0] == L' ')
+						sVal = _wcsinc(sVal);
 				}
 				
-				LPCTSTR nextArg = _tcspbrk(sVal, m_sDelims);
+				LPCTSTR nextArg = wcspbrk(sVal, m_sDelims);
 
-				sQuote = _tcspbrk(sVal, m_sQuotes);
+				sQuote = wcspbrk(sVal, m_sQuotes);
 
 				if (nextArg == sVal)
 				{
@@ -103,34 +103,47 @@ BOOL CCmdLineParser::Parse(LPCTSTR sCmdLine)
 					sQuote = sVal;
 					sEndQuote = sVal;
 				}
-				else if (nextArg != NULL && nextArg < sQuote)
+				else if (nextArg && nextArg < sQuote)
 				{
 					// current key has a value w/o quotes, but next key one has value in quotes
 					sQuote = sVal;
-					sEndQuote = _tcschr(sQuote, _T(' '));
+					sEndQuote = wcschr(sQuote, L' ');
 				}
 				else
 				{
 					if(sQuote == sVal)
 					{
 						// string with quotes (defined in m_sQuotes, e.g. '")
-						sQuote = _tcsinc(sVal);
-						sEndQuote = _tcspbrk(sQuote, m_sQuotes);
+						sQuote = _wcsinc(sVal);
+						sEndQuote = wcspbrk(sQuote, m_sQuotes);
+
+						// search for double quotes
+						while (sEndQuote)
+						{
+							auto nextQuote = _wcsinc(sEndQuote);
+							if (nextQuote[0] == L'"')
+							{
+								working.erase(working.begin() + (sEndQuote - working.data()));
+								sEndQuote = wcspbrk(nextQuote, m_sQuotes);
+								continue;
+							}
+							break;
+						}
 					}
 					else
 					{
 						sQuote = sVal;
-						sEndQuote = _tcschr(sQuote, _T(' '));
+						sEndQuote = wcschr(sQuote, L' ');
 					}
 				}
 			}
 
-			if(sEndQuote == NULL)
+			if (!sEndQuote)
 			{
 				// no end quotes or terminating space, take the rest of the string to its end
 				if (!Key.empty() && sQuote)
 				{
-					stdstring csVal(sQuote);
+					std::wstring csVal(sQuote);
 					m_valueMap.insert(CValsMap::value_type(Key, csVal));
 				}
 				break;
@@ -140,22 +153,22 @@ BOOL CCmdLineParser::Parse(LPCTSTR sCmdLine)
 				// end quote
 				if(!Key.empty())
 				{
-					stdstring csVal(sQuote, (int)(sEndQuote - sQuote));
+					std::wstring csVal(sQuote, (int)(sEndQuote - sQuote));
 					m_valueMap.insert(CValsMap::value_type(Key, csVal));
 				}
-				sCurrent = _tcsinc(sEndQuote);
+				sCurrent = _wcsinc(sEndQuote);
 				continue;
 			}
 		}
 	}
 
-	return (nArgs > 0);		//TRUE if arguments were found
+	return !m_valueMap.empty();		//TRUE if arguments were found
 }
 
 CCmdLineParser::CValsMap::const_iterator CCmdLineParser::findKey(LPCTSTR sKey) const
 {
-	stdstring s(sKey);
-	std::transform(s.begin(), s.end(), s.begin(), ::tolower);
+	std::wstring s(sKey);
+	std::transform(s.begin(), s.end(), s.begin(), ::towlower);
 	return m_valueMap.find(s);
 }
 
@@ -191,7 +204,7 @@ LONG CCmdLineParser::GetLongVal(LPCTSTR sKey) const
 	CValsMap::const_iterator it = findKey(sKey);
 	if (it == m_valueMap.cend())
 		return 0;
-	return _tstol(it->second.c_str());
+	return _wtol(it->second.c_str());
 }
 
 __int64 CCmdLineParser::GetLongLongVal(LPCTSTR sKey) const
@@ -199,7 +212,7 @@ __int64 CCmdLineParser::GetLongLongVal(LPCTSTR sKey) const
 	CValsMap::const_iterator it = findKey(sKey);
 	if (it == m_valueMap.cend())
 		return 0;
-	return _ttoi64(it->second.c_str());
+	return _wtoi64(it->second.c_str());
 }
 
 CCmdLineParser::ITERPOS CCmdLineParser::begin() const
@@ -207,7 +220,7 @@ CCmdLineParser::ITERPOS CCmdLineParser::begin() const
 	return m_valueMap.cbegin();
 }
 
-CCmdLineParser::ITERPOS CCmdLineParser::getNext(ITERPOS& pos, stdstring& sKey, stdstring& sValue) const
+CCmdLineParser::ITERPOS CCmdLineParser::getNext(ITERPOS& pos, std::wstring& sKey, std::wstring& sValue) const
 {
 	if (m_valueMap.cend() == pos)
 	{

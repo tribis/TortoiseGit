@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2013-2015 - TortoiseGit
+// Copyright (C) 2013-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -20,27 +20,28 @@
 //
 #include "stdafx.h"
 #include "resource.h"
+#include "Git.h"
 #include "GitRefCompareList.h"
 #include "registry.h"
 #include "UnicodeUtils.h"
-#include "MessageBox.h"
 #include "IconMenu.h"
 #include "AppUtils.h"
-#include "..\TortoiseShell\resource.h"
+#include "../TortoiseShell/resource.h"
 #include "LoglistCommonResource.h"
 
-IMPLEMENT_DYNAMIC(CGitRefCompareList, CHintListCtrl)
+IMPLEMENT_DYNAMIC(CGitRefCompareList, CHintCtrl<CListCtrl>)
 
-BEGIN_MESSAGE_MAP(CGitRefCompareList, CHintListCtrl)
+BEGIN_MESSAGE_MAP(CGitRefCompareList, CHintCtrl<CListCtrl>)
 	ON_WM_CONTEXTMENU()
+	ON_NOTIFY(HDN_ITEMCLICKA, 0, OnHdnItemclick)
+	ON_NOTIFY(HDN_ITEMCLICKW, 0, OnHdnItemclick)
 END_MESSAGE_MAP()
 
 BOOL CGitRefCompareList::m_bSortLogical = FALSE;
 
 enum IDGITRCL
 {
-	IDGITRCL_DUMMY,
-	IDGITRCL_OLDLOG,
+	IDGITRCL_OLDLOG = 1,
 	IDGITRCL_NEWLOG,
 	IDGITRCL_COMPARE,
 	IDGITRCL_REFLOG,
@@ -48,29 +49,32 @@ enum IDGITRCL
 
 enum IDGITRCLH
 {
-	IDGITRCLH_DUMMY,
-	IDGITRCLH_HIDEUNCHANGED,
+	IDGITRCLH_HIDEUNCHANGED = 1,
 };
 
 CGitRefCompareList::CGitRefCompareList()
-	: CHintListCtrl()
+	: CHintCtrl<CListCtrl>()
 	, colRef(0)
+	, colRefType(0)
 	, colChange(0)
 	, colOldHash(0)
 	, colOldMessage(0)
 	, colNewHash(0)
 	, colNewMessage(0)
+	, m_bAscending(false)
+	, m_nSortedColumn(-1)
 {
 	m_bSortLogical = !CRegDWORD(L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\\NoStrCmpLogical", 0, false, HKEY_CURRENT_USER);
 	if (m_bSortLogical)
 		m_bSortLogical = !CRegDWORD(L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\\NoStrCmpLogical", 0, false, HKEY_LOCAL_MACHINE);
-	m_bHideUnchanged = CRegDWORD(_T("Software\\TortoiseGit\\RefCompareHideUnchanged"), FALSE);
+	m_bHideUnchanged = CRegDWORD(L"Software\\TortoiseGit\\RefCompareHideUnchanged", FALSE);
 }
 
 void CGitRefCompareList::Init()
 {
 	int index = 0;
 	colRef = InsertColumn(index++, CString(MAKEINTRESOURCE(IDS_REF)));
+	colRefType = InsertColumn(index++, CString(MAKEINTRESOURCE(IDS_REF)));
 	colChange = InsertColumn(index++, CString(MAKEINTRESOURCE(IDS_CHANGETYPE)));
 	colOldHash = InsertColumn(index++, CString(MAKEINTRESOURCE(IDS_OLDHASH)));
 	colOldMessage = InsertColumn(index++, CString(MAKEINTRESOURCE(IDS_OLDMESSAGE)));
@@ -84,7 +88,7 @@ void CGitRefCompareList::Init()
 	imagelist->Create(IDB_BITMAP_REFTYPE, 16, 3, RGB(255, 255, 255));
 	SetImageList(imagelist, LVSIL_SMALL);
 
-	SetWindowTheme(m_hWnd, L"Explorer", NULL);
+	SetWindowTheme(m_hWnd, L"Explorer", nullptr);
 }
 
 int CGitRefCompareList::AddEntry(git_repository* repo, const CString& ref, const CGitHash* oldHash, const CGitHash* newHash)
@@ -172,13 +176,86 @@ int CGitRefCompareList::AddEntry(git_repository* repo, const CString& ref, const
 	return (int)m_RefList.size() - 1;
 }
 
+inline static bool StringComparePredicate(bool sortLogical, const CString& e1, const CString& e2)
+{
+	if (sortLogical)
+		return StrCmpLogicalW(e1, e2) < 0;
+	return e1.Compare(e2) < 0;
+}
+
+static CString RefTypeString(CGit::REF_TYPE reftype)
+{
+	CString type;
+	switch (reftype)
+	{
+	case CGit::REF_TYPE::LOCAL_BRANCH:
+		type.LoadString(IDS_PROC_BRANCH);
+		break;
+	case CGit::REF_TYPE::REMOTE_BRANCH:
+		type.LoadString(IDS_PROC_REMOTEBRANCH);
+		break;
+	case CGit::REF_TYPE::ANNOTATED_TAG:
+	case CGit::REF_TYPE::TAG:
+		type.LoadString(IDS_PROC_TAG);
+		break;
+	}
+	return type;
+}
+
 void CGitRefCompareList::Show()
 {
+	{
+		CString pleaseWait;
+		pleaseWait.LoadString(IDS_PROGRESSWAIT);
+		ShowText(pleaseWait, true);
+	}
+	SetRedraw(false);
 	DeleteAllItems();
-	std::sort(m_RefList.begin(), m_RefList.end(), SortPredicate);
+
+	if (m_nSortedColumn >= 0)
+	{
+		auto predicate = [](bool sortLogical, int sortColumn, const RefEntry& e1, const RefEntry& e2)
+		{
+			switch (sortColumn)
+			{
+			case 0:
+				return StringComparePredicate(sortLogical, e1.shortName, e2.shortName);
+				break;
+			case 1:
+				return StringComparePredicate(false, RefTypeString(e1.refType), RefTypeString(e2.refType));
+				break;
+			case 2:
+				return StringComparePredicate(false, e1.change, e2.change);
+				break;
+			case 3:
+				return e1.oldHash.Compare(e2.oldHash) < 0;
+				break;
+			case 4:
+				return StringComparePredicate(sortLogical, e1.oldMessage, e2.oldMessage);
+				break;
+			case 5:
+				return e1.newHash.Compare(e2.newHash) < 0;
+				break;
+			case 6:
+				return StringComparePredicate(sortLogical, e1.newMessage, e2.newMessage);
+				break;
+			}
+			return false;
+		};
+
+		if (m_bAscending)
+			std::stable_sort(m_RefList.begin(), m_RefList.end(), std::bind(predicate, m_bSortLogical, m_nSortedColumn, std::placeholders::_1, std::placeholders::_2));
+		else
+			std::stable_sort(m_RefList.begin(), m_RefList.end(), std::bind(predicate, m_bSortLogical, m_nSortedColumn, std::placeholders::_2, std::placeholders::_1));
+	}
+	else
+		std::sort(m_RefList.begin(), m_RefList.end(), SortPredicate);
+
 	int index = 0;
+	int listIdx = -1;
 	for (const auto& entry : m_RefList)
 	{
+		++listIdx;
 		if (entry.changeType == ChangeType::Same && m_bHideUnchanged)
 			continue;
 
@@ -190,19 +267,64 @@ void CGitRefCompareList::Show()
 		else if (entry.refType == CGit::REF_TYPE::ANNOTATED_TAG || entry.refType == CGit::REF_TYPE::TAG)
 			nImage = 0;
 		InsertItem(index, entry.shortName, nImage);
+		SetItemText(index, colRefType, RefTypeString(entry.refType));
 		SetItemText(index, colChange, entry.change);
 		SetItemText(index, colOldHash, entry.oldHash);
 		SetItemText(index, colOldMessage, entry.oldMessage);
 		SetItemText(index, colNewHash, entry.newHash);
 		SetItemText(index, colNewMessage, entry.newMessage);
-		index++;
+		SetItemData(index, listIdx);
+		++index;
 	}
+
+	auto pHeader = GetHeaderCtrl();
+	HDITEM HeaderItem = { 0 };
+	HeaderItem.mask = HDI_FORMAT;
+	for (int i = 0; i < pHeader->GetItemCount(); ++i)
+	{
+		pHeader->GetItem(i, &HeaderItem);
+		HeaderItem.fmt &= ~(HDF_SORTDOWN | HDF_SORTUP);
+		pHeader->SetItem(i, &HeaderItem);
+	}
+	if (m_nSortedColumn >= 0)
+	{
+		pHeader->GetItem(m_nSortedColumn, &HeaderItem);
+		HeaderItem.fmt |= (m_bAscending ? HDF_SORTUP : HDF_SORTDOWN);
+		pHeader->SetItem(m_nSortedColumn, &HeaderItem);
+	}
+	SetRedraw(true);
+
+	if (!index)
+	{
+		CString empty;
+		empty.LoadString(IDS_COMPAREREV_NODIFF);
+		ShowText(empty, true);
+	}
+	else
+		ShowText(L"", true);
 }
 
 void CGitRefCompareList::Clear()
 {
 	m_RefList.clear();
 	DeleteAllItems();
+}
+
+void CGitRefCompareList::OnHdnItemclick(NMHDR *pNMHDR, LRESULT *pResult)
+{
+	auto phdr = reinterpret_cast<LPNMHEADER>(pNMHDR);
+	*pResult = 0;
+
+	if (m_RefList.empty())
+		return;
+
+	if (m_nSortedColumn == phdr->iItem)
+		m_bAscending = !m_bAscending;
+	else
+		m_bAscending = TRUE;
+	m_nSortedColumn = phdr->iItem;
+
+	Show();
 }
 
 void CGitRefCompareList::OnContextMenu(CWnd *pWnd, CPoint point)
@@ -220,12 +342,16 @@ void CGitRefCompareList::OnContextMenu(CWnd *pWnd, CPoint point)
 void CGitRefCompareList::OnContextMenuList(CWnd * /*pWnd*/, CPoint point)
 {
 	int selIndex = GetSelectionMark();
-	if (selIndex < 0 || (size_t)selIndex >= m_RefList.size())
+	if (selIndex < 0)
 		return;
 
-	CString refName = m_RefList[selIndex].fullName;
-	CString oldHash = m_RefList[selIndex].oldHash;
-	CString newHash = m_RefList[selIndex].newHash;
+	int index = (int)GetItemData(selIndex);
+	if (index < 0 || (size_t)index >= m_RefList.size())
+		return;
+
+	CString refName = m_RefList[index].fullName;
+	CString oldHash = m_RefList[index].oldHash;
+	CString newHash = m_RefList[index].newHash;
 	CIconMenu popup;
 	popup.CreatePopupMenu();
 	CString logStr;
@@ -243,7 +369,7 @@ void CGitRefCompareList::OnContextMenuList(CWnd * /*pWnd*/, CPoint point)
 		popup.AppendMenuIcon(IDGITRCL_COMPARE, IDS_LOG_POPUP_COMPAREWITHPREVIOUS, IDI_DIFF);
 	popup.AppendMenuIcon(IDGITRCL_REFLOG, IDS_MENUREFLOG, IDI_LOG);
 
-	int cmd = popup.TrackPopupMenu(TPM_RETURNCMD | TPM_LEFTALIGN | TPM_NONOTIFY, point.x, point.y, this, 0);
+	int cmd = popup.TrackPopupMenu(TPM_RETURNCMD | TPM_LEFTALIGN | TPM_NONOTIFY, point.x, point.y, this);
 	AfxGetApp()->DoWaitCursor(1);
 	switch (cmd)
 	{
@@ -251,21 +377,23 @@ void CGitRefCompareList::OnContextMenuList(CWnd * /*pWnd*/, CPoint point)
 		case IDGITRCL_NEWLOG:
 		{
 			CString sCmd;
-			sCmd.Format(_T("/command:log /path:\"%s\" /endrev:\"%s\""), (LPCTSTR)g_Git.m_CurrentDir, cmd == IDGITRCL_OLDLOG ? (LPCTSTR)oldHash : (LPCTSTR)newHash);
+			sCmd.Format(L"/command:log /path:\"%s\" /endrev:\"%s\"", (LPCTSTR)g_Git.m_CurrentDir, cmd == IDGITRCL_OLDLOG ? (LPCTSTR)oldHash : (LPCTSTR)newHash);
 			CAppUtils::RunTortoiseGitProc(sCmd);
 			break;
 		}
 		case IDGITRCL_COMPARE:
 		{
 			CString sCmd;
-			sCmd.Format(_T("/command:showcompare /path:\"%s\" /revision1:\"%s\" /revision2:\"%s\""), (LPCTSTR)g_Git.m_CurrentDir, (LPCTSTR)oldHash, (LPCTSTR)newHash);
+			sCmd.Format(L"/command:showcompare /path:\"%s\" /revision1:\"%s\" /revision2:\"%s\"", (LPCTSTR)g_Git.m_CurrentDir, (LPCTSTR)oldHash, (LPCTSTR)newHash);
+			if (!!(GetAsyncKeyState(VK_SHIFT) & 0x8000))
+				sCmd += L" /alternative";
 			CAppUtils::RunTortoiseGitProc(sCmd);
 			break;
 		}
 		case IDGITRCL_REFLOG:
 		{
 			CString sCmd;
-			sCmd.Format(_T("/command:reflog /path:\"%s\" /ref:\"%s\""), (LPCTSTR)g_Git.m_CurrentDir, (LPCTSTR)refName);
+			sCmd.Format(L"/command:reflog /path:\"%s\" /ref:\"%s\"", (LPCTSTR)g_Git.m_CurrentDir, (LPCTSTR)refName);
 			CAppUtils::RunTortoiseGitProc(sCmd);
 			break;
 		}
@@ -287,7 +415,7 @@ void CGitRefCompareList::OnContextMenuHeader(CWnd * /*pWnd*/, CPoint point)
 	{
 		AppendMenuChecked(popup, IDS_HIDEUNCHANGED, IDGITRCLH_HIDEUNCHANGED, m_bHideUnchanged);
 
-		int selection = popup.TrackPopupMenu(TPM_RETURNCMD | TPM_LEFTALIGN | TPM_NONOTIFY, point.x, point.y, this, 0);
+		int selection = popup.TrackPopupMenu(TPM_RETURNCMD | TPM_LEFTALIGN | TPM_NONOTIFY, point.x, point.y, this);
 		switch (selection)
 		{
 			case IDGITRCLH_HIDEUNCHANGED:
@@ -307,7 +435,7 @@ CString CGitRefCompareList::GetCommitMessage(git_commit *commit)
 
 	CString message = CUnicodeUtils::GetUnicode(git_commit_message(commit), encode);
 	int start = 0;
-	message = message.Tokenize(_T("\n"), start);
+	message = message.Tokenize(L"\n", start);
 	return message;
 }
 
@@ -322,3 +450,7 @@ bool CGitRefCompareList::SortPredicate(const RefEntry &e1, const RefEntry &e2)
 	return e1.fullName.Compare(e2.fullName) < 0;
 }
 
+ULONG CGitRefCompareList::GetGestureStatus(CPoint /*ptTouch*/)
+{
+	return 0;
+}

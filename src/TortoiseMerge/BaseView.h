@@ -107,7 +107,7 @@ public: // methods
 	void			UpdateCaret();
 
 	bool			ArePointsSame(const POINT &pt1, const POINT &pt2) {return (pt1.x == pt2.x) && (pt1.y == pt2.y); };
-	POINT			SetupPoint(int x, int y) {POINT ptRet={x, y}; return ptRet; };
+	POINT			SetupPoint(int x, int y) const {POINT ptRet={x, y}; return ptRet; };
 	POINT			ConvertScreenPosToView(const POINT& pt);
 	POINT			ConvertViewPosToScreen(const POINT& pt);
 
@@ -153,7 +153,7 @@ public: // methods
 	static void		SetupViewSelection(CBaseView* view, int start, int end);
 	void			SetupViewSelection(int start, int end);
 	CString			GetSelectedText() const;
-	void			CheckModifications(bool& hasMods, bool& hasConflicts, bool& hasWhitespaceMods);
+	void			CheckModifications(bool& hasMods, bool& hasConflicts, bool& hasWhitespaceMods, bool& hasFilteredMods);
 
 	// state classifying methods; note: state may belong to more classes
 	static bool		IsStateConflicted(DiffStates state);
@@ -298,6 +298,7 @@ protected:  // methods
 	virtual void	OnDraw(CDC * pDC);
 	virtual INT_PTR	OnToolHitTest(CPoint point, TOOLINFO* pTI) const;
 	virtual BOOL	PreTranslateMessage(MSG* pMsg);
+	virtual ULONG	GetGestureStatus(CPoint ptTouch) override;
 	BOOL			OnToolTipNotify(UINT id, NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void	OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar);
 	afx_msg void	OnVScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar);
@@ -459,7 +460,6 @@ protected:  // methods
 	virtual void	AddContextItems(CIconMenu& popup, DiffStates state);
 	void			AddCutCopyAndPaste(CIconMenu& popup);
 	void			CompensateForKeyboard(CPoint& point);
-	static HICON	LoadIcon(WORD iconId);
 	void			ReleaseBitmap();
 	static bool		LinesInOneChange( int direction, DiffStates firstLineState, DiffStates currentLineState );
 	static void		FilterWhitespaces(CString& first, CString& second);
@@ -651,7 +651,7 @@ protected:  // variables
 	{
 	public:
 		Screen2View()
-			: m_pViewData(NULL)
+			: m_pViewData(nullptr)
 		{m_bFull=false; }
 
 		int				GetViewLineForScreen(int screenLine);

@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2010-2013 - TortoiseGit
+// Copyright (C) 2010-2013, 2016 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -30,20 +30,20 @@ int APIENTRY _tWinMain(HINSTANCE /*hInstance*/,
 {
 	SetDllDirectory(L"");
 
-	if(_tcslen(lpCmdLine) == 0)
+	if (!lpCmdLine[0])
 		return -1;
 
 	if(lpCmdLine[0] == '\"')
 	{
 		++lpCmdLine;
-		for (size_t i = 0; i < _tcslen(lpCmdLine); ++i)
+		for (size_t i = 0; lpCmdLine[i]; ++i)
 			if(lpCmdLine[i]== '\"')
 			{
-				lpCmdLine[i]=0;
+				lpCmdLine[i] = L'\0';
 				break;
 			}
 	}
-	HANDLE handle=CreateFile(lpCmdLine,GENERIC_READ | GENERIC_WRITE, 0,NULL,OPEN_ALWAYS,0,NULL);
+	HANDLE handle = CreateFile(lpCmdLine, GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
 	if(handle == INVALID_HANDLE_VALUE)
 		return -1;
 	CloseHandle(handle);

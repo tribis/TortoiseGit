@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2012, 2014-2016 - TortoiseGit
+// Copyright (C) 2012, 2014-2017 - TortoiseGit
 // Copyright (C) 2003-2006, 2009, 2015 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -22,7 +22,7 @@
 #include "DirFileEnum.h"
 #include "CacheInterface.h"
 #include <WinInet.h>
-#include ".\cachedlg.h"
+#include "CacheDlg.h"
 #include <random>
 
 #ifdef _DEBUG
@@ -30,9 +30,8 @@
 #endif
 
 
-CCacheDlg::CCacheDlg(CWnd* pParent /*=NULL*/)
+CCacheDlg::CCacheDlg(CWnd* pParent /*=nullptr*/)
 : CDialog(CCacheDlg::IDD, pParent)
-, m_sRootPath(_T(""))
 , m_hPipe(INVALID_HANDLE_VALUE)
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
@@ -121,41 +120,41 @@ UINT CCacheDlg::TestThread()
 	CString filepath;
 	bool bIsDir = false;
 	while (direnum.NextFile(filepath, &bIsDir))
-		if(filepath.Find(_T(".git"))<0)
+		if (filepath.Find(L".git") < 0)
 			m_filelist.Add(filepath);
 
 	CTime starttime = CTime::GetCurrentTime();
-	GetDlgItem(IDC_STARTTIME)->SetWindowText(starttime.Format(_T("%H:%M:%S")));
+	GetDlgItem(IDC_STARTTIME)->SetWindowText(starttime.Format(L"%H:%M:%S"));
 
 	ULONGLONG startticks = GetTickCount64();
 
 	CString sNumber;
 	std::random_device rd;
 	std::mt19937 mt(rd());
-	std::uniform_int_distribution<int> dist(0, max(0, m_filelist.GetCount() - 1));
-	std::uniform_int_distribution<int> dist2(0, 9);
+	std::uniform_int_distribution<INT_PTR> dist(0, max(0, m_filelist.GetCount() - 1));
+	std::uniform_int_distribution<INT_PTR> dist2(0, 9);
 	for (int i=0; i < 1; ++i)
 	{
-		CString filepath;
+		CString filepath2;
 		//do {
-			filepath = m_filelist.GetAt(dist(mt));
-		//}while(filepath.Find(_T(".git"))>=0);
-		GetDlgItem(IDC_FILEPATH)->SetWindowText(filepath);
-		GetStatusFromRemoteCache(CTGitPath(filepath), true);
-		sNumber.Format(_T("%d"), i);
+			filepath2 = m_filelist.GetAt(dist(mt));
+		//}while(filepath.Find(L".git") >= 0);
+		GetDlgItem(IDC_FILEPATH)->SetWindowText(filepath2);
+		GetStatusFromRemoteCache(CTGitPath(filepath2), true);
+		sNumber.Format(L"%d", i);
 		GetDlgItem(IDC_DONE)->SetWindowText(sNumber);
 		if ((GetTickCount64()%10)==1)
 			Sleep(10);
 		if (dist2(mt) == 3)
-			RemoveFromCache(filepath);
+			RemoveFromCache(filepath2);
 	}
 	CTime endtime = CTime::GetCurrentTime();
-	CString sEnd = endtime.Format(_T("%H:%M:%S"));
+	CString sEnd = endtime.Format(L"%H:%M:%S");
 
 	ULONGLONG endticks = GetTickCount64();
 
 	CString sEndText;
-	sEndText.Format(_T("%s  - %I64u ms"), sEnd, endticks - startticks);
+	sEndText.Format(L"%s  - %I64u ms", (LPCTSTR)sEnd, endticks - startticks);
 
 	GetDlgItem(IDC_ENDTIME)->SetWindowText(sEndText);
 
@@ -175,10 +174,10 @@ bool CCacheDlg::EnsurePipeOpen()
 		GENERIC_READ |					// read and write access
 		GENERIC_WRITE,
 		0,								// no sharing
-		NULL,							// default security attributes
+		nullptr,						// default security attributes
 		OPEN_EXISTING,				// opens existing pipe
 		FILE_FLAG_OVERLAPPED,			// default attributes
-		NULL);							// no template file
+		nullptr);						// no template file
 
 	if (m_hPipe == INVALID_HANDLE_VALUE && GetLastError() == ERROR_PIPE_BUSY)
 	{
@@ -192,10 +191,10 @@ bool CCacheDlg::EnsurePipeOpen()
 				GENERIC_READ |					// read and write access
 				GENERIC_WRITE,
 				0,								// no sharing
-				NULL,							// default security attributes
+				nullptr,						// default security attributes
 				OPEN_EXISTING,				// opens existing pipe
 				FILE_FLAG_OVERLAPPED,			// default attributes
-				NULL);							// no template file
+				nullptr);						// no template file
 		}
 	}
 
@@ -209,8 +208,8 @@ bool CCacheDlg::EnsurePipeOpen()
 		if(!SetNamedPipeHandleState(
 			m_hPipe,    // pipe handle
 			&dwMode,  // new pipe mode
-			NULL,     // don't set maximum bytes
-			NULL))    // don't set maximum time
+			nullptr,  // don't set maximum bytes
+			nullptr)) // don't set maximum time
 		{
 			ATLTRACE("SetNamedPipeHandleState failed");
 			CloseHandle(m_hPipe);
@@ -218,7 +217,7 @@ bool CCacheDlg::EnsurePipeOpen()
 			return false;
 		}
 		// create an unnamed (=local) manual reset event for use in the overlapped structure
-		m_hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+		m_hEvent = CreateEvent(nullptr, TRUE, FALSE, nullptr);
 		if (m_hEvent)
 			return true;
 		ATLTRACE("CreateEvent failed");
@@ -245,14 +244,12 @@ bool CCacheDlg::GetStatusFromRemoteCache(const CTGitPath& Path, bool bRecursive)
 {
 	if(!EnsurePipeOpen())
 	{
-		STARTUPINFO startup;
-		PROCESS_INFORMATION process;
-		memset(&startup, 0, sizeof(startup));
+		STARTUPINFO startup = { 0 };
+		PROCESS_INFORMATION process = { 0 };
 		startup.cb = sizeof(startup);
-		memset(&process, 0, sizeof(process));
 
-		CString sCachePath = _T("TGitCache.exe");
-		if (CreateProcess(sCachePath.GetBuffer(sCachePath.GetLength()+1), _T(""), NULL, NULL, FALSE, 0, 0, 0, &startup, &process)==0)
+		CString sCachePath = L"TGitCache.exe";
+		if (CreateProcess(sCachePath.GetBuffer(sCachePath.GetLength() + 1), L"", nullptr, nullptr, FALSE, 0, nullptr, nullptr, &startup, &process) == 0)
 		{
 			// It's not appropriate to do a message box here, because there may be hundreds of calls
 			sCachePath.ReleaseBuffer();
@@ -334,10 +331,10 @@ void CCacheDlg::RemoveFromCache(const CString& path)
 		GENERIC_READ |					// read and write access 
 		GENERIC_WRITE, 
 		0,								// no sharing 
-		NULL,							// default security attributes
+		nullptr,						// default security attributes
 		OPEN_EXISTING,					// opens existing pipe 
 		FILE_FLAG_OVERLAPPED,			// default attributes 
-		NULL);							// no template file 
+		nullptr);						// no template file 
 
 
 	if (hPipe != INVALID_HANDLE_VALUE) 
@@ -372,14 +369,14 @@ void CCacheDlg::RemoveFromCache(const CString& path)
 			if (hPipe != INVALID_HANDLE_VALUE)
 			{
 				// now tell the cache we don't need it's command thread anymore
-				DWORD cbWritten; 
-				TGITCacheCommand cmd;
-				cmd.command = TGITCACHECOMMAND_END;
+				DWORD cbWritten2; 
+				TGITCacheCommand cmd2;
+				cmd2.command = TGITCACHECOMMAND_END;
 				WriteFile( 
 					hPipe,			// handle to pipe 
-					&cmd,			// buffer to write from 
-					sizeof(cmd),	// number of bytes to write 
-					&cbWritten,		// number of bytes written 
+					&cmd2,			// buffer to write from 
+					sizeof(cmd2),	// number of bytes to write 
+					&cbWritten2,		// number of bytes written 
 					NULL);			// not overlapped I/O 
 				DisconnectNamedPipe(hPipe); 
 				CloseHandle(hPipe); 
@@ -415,14 +412,14 @@ UINT CCacheDlg::WatchTestThread()
 		m_filelist.Add(filepath);
 
 	CTime starttime = CTime::GetCurrentTime();
-	GetDlgItem(IDC_STARTTIME)->SetWindowText(starttime.Format(_T("%H:%M:%S")));
+	GetDlgItem(IDC_STARTTIME)->SetWindowText(starttime.Format(L"%H:%M:%S"));
 
 	ULONGLONG startticks = GetTickCount64();
 
 	CString sNumber;
 	std::random_device rd;
 	std::mt19937 mt(rd());
-	std::uniform_int_distribution<int> dist(0, max(0, m_filelist.GetCount() - 1));
+	std::uniform_int_distribution<INT_PTR> dist(0, max(0, m_filelist.GetCount() - 1));
 	filepath = m_filelist.GetAt(dist(mt));
 	GetStatusFromRemoteCache(CTGitPath(m_sRootPath), false);
 	for (int i=0; i < 10000; ++i)
@@ -431,7 +428,7 @@ UINT CCacheDlg::WatchTestThread()
 		GetDlgItem(IDC_FILEPATH)->SetWindowText(filepath);
 		TouchFile(filepath);
 		CopyRemoveCopy(filepath);
-		sNumber.Format(_T("%d"), i);
+		sNumber.Format(L"%d", i);
 		GetDlgItem(IDC_DONE)->SetWindowText(sNumber);
 	}
 
@@ -440,30 +437,30 @@ UINT CCacheDlg::WatchTestThread()
 	{
 		for (int i=0; i<10; ++i)
 		{
-			filepath.Format(_T("__MyDummyFolder%d"), i);
-			CreateDirectory(m_sRootPath+_T("\\")+filepath, NULL);
-			HANDLE hFile = CreateFile(m_sRootPath+_T("\\")+filepath+_T("\\file"), GENERIC_READ, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+			filepath.Format(L"__MyDummyFolder%d", i);
+			CreateDirectory(m_sRootPath + L'\\' + filepath, nullptr);
+			HANDLE hFile = CreateFile(m_sRootPath + L'\\' + filepath + L"\\file", GENERIC_READ, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
 			CloseHandle(hFile);
-			SHChangeNotify(SHCNE_UPDATEITEM, SHCNF_PATH | SHCNF_FLUSHNOWAIT, m_sRootPath+_T("\\")+filepath+_T("\\file"), NULL);
+			SHChangeNotify(SHCNE_UPDATEITEM, SHCNF_PATH | SHCNF_FLUSHNOWAIT, m_sRootPath + L'\\' + filepath + L"\\file", NULL);
 		}
 		Sleep(500);
 		for (int i=0; i<10; ++i)
 		{
-			filepath.Format(_T("__MyDummyFolder%d"), i);
-			DeleteFile(m_sRootPath+_T("\\")+filepath+_T("\\file"));
-			RemoveDirectory(m_sRootPath+_T("\\")+filepath);
+			filepath.Format(L"__MyDummyFolder%d", i);
+			DeleteFile(m_sRootPath + L'\\' + filepath + L"\\file");
+			RemoveDirectory(m_sRootPath + L'\\' + filepath);
 		}
-		sNumber.Format(_T("%d"), outer);
+		sNumber.Format(L"%d", outer);
 		GetDlgItem(IDC_DONE)->SetWindowText(sNumber);
 	}
 
 	CTime endtime = CTime::GetCurrentTime();
-	CString sEnd = endtime.Format(_T("%H:%M:%S"));
+	CString sEnd = endtime.Format(L"%H:%M:%S");
 
 	ULONGLONG endticks = GetTickCount64();
 
 	CString sEndText;
-	sEndText.Format(_T("%s  - %I64u ms"), sEnd, endticks - startticks);
+	sEndText.Format(L"%s  - %I64u ms", (LPCTSTR)sEnd, endticks - startticks);
 
 	GetDlgItem(IDC_ENDTIME)->SetWindowText(sEndText);
 
@@ -473,7 +470,7 @@ UINT CCacheDlg::WatchTestThread()
 void CCacheDlg::TouchFile(const CString& path)
 {
 	SetFileAttributes(path, FILE_ATTRIBUTE_NORMAL);
-	HANDLE hFile = CreateFile(path, GENERIC_WRITE, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	HANDLE hFile = CreateFile(path, GENERIC_WRITE, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
 	if (hFile == INVALID_HANDLE_VALUE)
 		return;
 
@@ -492,20 +489,20 @@ void CCacheDlg::CopyRemoveCopy(const CString& path)
 {
 	if (PathIsDirectory(path))
 		return;
-	if (path.Find(_T(".git")) >= 0)
+	if (path.Find(L".git") >= 0)
 		return;
-	if (CopyFile(path, path+_T(".tmp"), FALSE))
+	if (CopyFile(path, path+L".tmp", FALSE))
 	{
 		if (DeleteFile(path))
 		{
-			if (MoveFile(path+_T(".tmp"), path))
+			if (MoveFile(path+L".tmp", path))
 				return;
 			else
-				MessageBox(_T("could not move file!"), path);
+				MessageBox(L"could not move file!", path);
 		}
 		else
-			MessageBox(_T("could not delete file!"), path);
+			MessageBox(L"could not delete file!", path);
 	}
 	else
-		MessageBox(_T("could not copy file!"), path);
+		MessageBox(L"could not copy file!", path);
 }

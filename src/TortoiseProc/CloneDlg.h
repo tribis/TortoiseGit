@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2013,2015-2016 - TortoiseGit
+// Copyright (C) 2008-2013, 2015-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -29,7 +29,7 @@ class CCloneDlg : public CHorizontalResizableStandAloneDialog
 	DECLARE_DYNCREATE(CCloneDlg)
 
 public:
-	CCloneDlg(CWnd* pParent = NULL);   // standard constructor
+	CCloneDlg(CWnd* pParent = nullptr);   // standard constructor
 	virtual ~CCloneDlg();
 
 // Dialog Data
@@ -37,11 +37,11 @@ public:
 
 protected:
 	// Overrides
-	virtual void OnOK();
-	virtual void OnCancel();
+	virtual void OnOK() override;
+	virtual void OnCancel() override;
 
-	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
-	virtual BOOL OnInitDialog();
+	virtual void DoDataExchange(CDataExchange* pDX) override;    // DDX/DDV support
+	virtual BOOL OnInitDialog() override;
 
 	CString m_ModuleName;
 	CString m_OldURL;
@@ -74,6 +74,7 @@ public:
 	BOOL	m_bOrigin;
 	BOOL	m_bNoCheckout;
 	BOOL	m_bExactPath;
+	BOOL	m_bUseLFS;
 
 	int		m_nDepth;
 

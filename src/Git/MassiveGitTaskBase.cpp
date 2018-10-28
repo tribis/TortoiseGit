@@ -1,7 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2011-2013 - Sven Strickroth <email@cs-ware.de>
-// Copyright (C) 2013-2016 - TortoiseGit
+// Copyright (C) 2011-2016 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -27,8 +26,8 @@ CMassiveGitTaskBase::CMassiveGitTaskBase(CString gitParameters, BOOL isPath, boo
 	: m_bUnused(true)
 	, m_bIsPath(isPath)
 	, m_bIgnoreErrors(ignoreErrors)
+	, m_sParams(gitParameters)
 {
-	m_sParams = gitParameters;
 }
 
 CMassiveGitTaskBase::~CMassiveGitTaskBase(void)
@@ -81,13 +80,13 @@ bool CMassiveGitTaskBase::ExecuteCommands(volatile BOOL& cancel)
 			CString add;
 			for (int j = firstCombine; j <= i; ++j)
 			{
-				add += _T(" \"");
+				add += L" \"";
 				add += GetListItem(j);
-				add += _T('"');
+				add += L'"';
 			}
 
 			CString cmd, out;
-			cmd.Format(_T("git.exe %s %s%s"), (LPCTSTR)m_sParams, m_bIsPath ? _T("--") : _T(""), (LPCTSTR)add);
+			cmd.Format(L"git.exe %s %s%s", (LPCTSTR)m_sParams, m_bIsPath ? L"--" : L"", (LPCTSTR)add);
 			int exitCode = g_Git.Run(cmd, &out, CP_UTF8);
 			if (exitCode && !m_bIgnoreErrors)
 			{
@@ -111,24 +110,27 @@ bool CMassiveGitTaskBase::ExecuteCommands(volatile BOOL& cancel)
 			}
 		}
 		else
-		{
 			maxLength += 3 + GetListItem(i).GetLength();
-		}
 	}
 	return true;
 }
 
 void CMassiveGitTaskBase::ReportError(const CString& out, int /*exitCode*/)
 {
-	MessageBox(NULL, out, _T("TortoiseGit"), MB_OK | MB_ICONERROR);
+	MessageBox(nullptr, out, L"TortoiseGit", MB_OK | MB_ICONERROR);
 }
 
-int CMassiveGitTaskBase::GetListCount()
+int CMassiveGitTaskBase::GetListCount() const
 {
 	return m_bIsPath ? m_pathList.GetCount() : (int)m_itemList.size();
 }
 
-CString CMassiveGitTaskBase::GetListItem(int index)
+bool CMassiveGitTaskBase::IsListEmpty() const
+{
+	return m_bIsPath ? m_pathList.IsEmpty() : m_itemList.empty();
+}
+
+CString CMassiveGitTaskBase::GetListItem(int index) const
 {
 	return m_bIsPath ? m_pathList[index].GetGitPathString() : m_itemList[index];
 }

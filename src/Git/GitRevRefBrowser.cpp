@@ -1,7 +1,7 @@
 
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2009-2015 - TortoiseGit
+// Copyright (C) 2009-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -23,6 +23,7 @@
 #include "gittype.h"
 #include "Git.h"
 #include "GitRevRefBrowser.h"
+#include "StringUtils.h"
 
 GitRevRefBrowser::GitRevRefBrowser() : GitRev()
 {
@@ -35,14 +36,27 @@ void GitRevRefBrowser::Clear()
 	m_UpstreamRef.Empty();
 }
 
-int GitRevRefBrowser::GetGitRevRefMap(MAP_REF_GITREVREFBROWSER& map, CString& err, std::function<bool(const CString& refName)> filterCallback)
+int GitRevRefBrowser::GetGitRevRefMap(MAP_REF_GITREVREFBROWSER& map, int mergefilter, CString& err, std::function<bool(const CString& refName)> filterCallback)
 {
 	err.Empty();
 	MAP_STRING_STRING descriptions;
 	g_Git.GetBranchDescriptions(descriptions);
 
+	CString args;
+	switch (mergefilter)
+	{
+	case 1:
+		args = L" --merged HEAD";
+		break;
+	case 2:
+		args = L" --no-merged HEAD";
+		break;
+	}
+
+	CString cmd;
+	cmd.Format(L"git.exe for-each-ref%s --format=\"%%(refname)%%04 %%(objectname)%%04 %%(upstream)%%04 %%(subject)%%04 %%(authorname)%%04%%(authordate:raw)%%03\"", (LPCTSTR)args);
 	CString allRefs;
-	if (g_Git.Run(L"git.exe for-each-ref --format=\"%(refname)%04 %(objectname)%04 %(upstream)%04 %(subject)%04 %(authorname)%04%(authordate:raw)%03\"", &allRefs, &err, CP_UTF8))
+	if (g_Git.Run(cmd, &allRefs, &err, CP_UTF8))
 		return -1;
 
 	int linePos = 0;
@@ -64,7 +78,7 @@ int GitRevRefBrowser::GetGitRevRefMap(MAP_REF_GITREVREFBROWSER& map, CString& er
 		CString date = singleRef.Tokenize(L"\04", valuePos).Trim();
 		ref.m_AuthorDate = StrToInt(date);
 
-		if (wcsncmp(refName, L"refs/heads/", 11) == 0)
+		if (CStringUtils::StartsWith(refName, L"refs/heads/"))
 			ref.m_Description = descriptions[refName.Mid(11)];
 
 		map.emplace(refName, ref);

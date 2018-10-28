@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2009, 2011-2013, 2015 - TortoiseGit
+// Copyright (C) 2009, 2011-2013, 2015-2018 - TortoiseGit
 // Copyright (C) 2008 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -24,12 +24,11 @@
 #include "MessageBox.h"
 #include "RenameDlg.h"
 #include "Git.h"
-#include "GitStatus.h"
 #include "ShellUpdater.h"
 
 bool PasteCopyCommand::Execute()
 {
-	CString sDroppath = parser.GetVal(_T("droptarget"));
+	CString sDroppath = parser.GetVal(L"droptarget");
 	CTGitPath dropPath(sDroppath);
 	if (dropPath.IsAdminDir())
 		return FALSE;
@@ -43,9 +42,8 @@ bool PasteCopyCommand::Execute()
 	orgPathList.RemoveAdminPaths();
 	CSysProgressDlg progress;
 	progress.SetTitle(IDS_PROC_COPYING);
-	progress.SetAnimation(IDR_MOVEANI);
 	progress.SetTime(true);
-	progress.ShowModeless(CWnd::FromHandle(hwndExplorer));
+	progress.ShowModeless(CWnd::FromHandle(GetExplorerHWND()));
 	for (int nPath = 0; nPath < orgPathList.GetCount(); ++nPath)
 	{
 		const CTGitPath& sourcePath = orgPathList[nPath];
@@ -64,16 +62,13 @@ bool PasteCopyCommand::Execute()
 			CRenameDlg dlg;
 			dlg.m_windowtitle.Format(IDS_PROC_NEWNAMECOPY, (LPCTSTR)sourcePath.GetUIFileOrDirectoryName());
 			if (dlg.DoModal() != IDOK)
-			{
 				return FALSE;
-			}
 			// rebuild the progress dialog
 			progress.EnsureValid();
 			progress.SetTitle(IDS_PROC_COPYING);
-			progress.SetAnimation(IDR_MOVEANI);
 			progress.SetTime(true);
 			progress.SetProgress(count, orgPathList.GetCount());
-			progress.ShowModeless(CWnd::FromHandle(hwndExplorer));
+			progress.ShowModeless(CWnd::FromHandle(GetExplorerHWND()));
 			// Rebuild the destination path, with the new name
 			fullDropPath.SetFromUnknown(sDroppath);
 			fullDropPath.AppendPathString(dlg.m_name);
@@ -85,11 +80,11 @@ bool PasteCopyCommand::Execute()
 			// source file is unversioned: move the file to the target, then add it
 			CopyFile(sourcePath.GetWinPath(), fullDropPath.GetWinPath(), FALSE);
 			CString cmd,output;
-			cmd.Format(_T("git.exe add -- \"%s\""),fullDropPath.GetWinPath());
+			cmd.Format(L"git.exe add -- \"%s\"", fullDropPath.GetWinPath());
 			if (g_Git.Run(cmd, &output, CP_UTF8))
 			{
-				TRACE(_T("%s\n"), (LPCTSTR)output);
-				CMessageBox::Show(hwndExplorer, output, _T("TortoiseGit"), MB_ICONERROR);
+				TRACE(L"%s\n", (LPCTSTR)output);
+				CMessageBox::Show(GetExplorerHWND(), output, L"TortoiseGit", MB_ICONERROR);
 				return FALSE;		//get out of here
 			}
 			else
@@ -99,8 +94,8 @@ bool PasteCopyCommand::Execute()
 		//{
 		//	if (!svn.Copy(CTSVNPathList(sourcePath), fullDropPath, SVNRev::REV_WC, SVNRev()))
 		//	{
-		//		TRACE(_T("%s\n"), (LPCTSTR)svn.GetLastErrorMessage());
-		//		CMessageBox::Show(hwndExplorer, svn.GetLastErrorMessage(), _T("TortoiseSVN"), MB_ICONERROR);
+		//		TRACE(L"%s\n", (LPCTSTR)svn.GetLastErrorMessage());
+		//		CMessageBox::Show(GetExplorerHWND(), svn.GetLastErrorMessage(), L"TortoiseSVN", MB_ICONERROR);
 		//		return FALSE;		//get out of here
 		//	}
 		//	else
@@ -115,7 +110,7 @@ bool PasteCopyCommand::Execute()
 		}
 		if ((progress.IsValid())&&(progress.HasUserCancelled()))
 		{
-			CMessageBox::Show(hwndExplorer, IDS_USERCANCELLED, IDS_APPNAME, MB_ICONINFORMATION);
+			CMessageBox::Show(GetExplorerHWND(), IDS_USERCANCELLED, IDS_APPNAME, MB_ICONINFORMATION);
 			return false;
 		}
 	}

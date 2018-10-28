@@ -25,6 +25,9 @@
     <Filter Include="Utils\MiscUI">
       <UniqueIdentifier>{13080af5-189e-4b35-b7f6-b9e770cb3539}</UniqueIdentifier>
     </Filter>
+    <Filter Include="SimpleIni">
+      <UniqueIdentifier>{fda10926-3ccf-4768-8445-143f4ccd0dd6}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AboutDlg.cpp">
@@ -249,9 +252,6 @@
     <ClCompile Include="..\Utils\MiscUI\HistoryCombo.cpp">
       <Filter>Utils\MiscUI</Filter>
     </ClCompile>
-    <ClCompile Include="..\Utils\MiscUI\HTMLFormatter.cpp">
-      <Filter>Utils\MiscUI</Filter>
-    </ClCompile>
     <ClCompile Include="..\Utils\MiscUI\HyperLink.cpp">
       <Filter>Utils\MiscUI</Filter>
     </ClCompile>
@@ -337,6 +337,12 @@
       <Filter>Utils\MiscUI</Filter>
     </ClCompile>
     <ClCompile Include="..\Utils\SysImageList.cpp">
+      <Filter>Utils</Filter>
+    </ClCompile>
+    <ClCompile Include="NativeRibbonApp.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Utils\LoadIconEx.cpp">
       <Filter>Utils</Filter>
     </ClCompile>
   </ItemGroup>
@@ -431,9 +437,6 @@
     <ClInclude Include="Patch.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="CustomMFCRibbonButton.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="EncodingDlg.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -477,9 +480,6 @@
       <Filter>Utils\MiscUI</Filter>
     </ClInclude>
     <ClInclude Include="..\Utils\MiscUI\HistoryCombo.h">
-      <Filter>Utils\MiscUI</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Utils\MiscUI\HTMLFormatter.h">
       <Filter>Utils\MiscUI</Filter>
     </ClInclude>
     <ClInclude Include="..\Utils\MiscUI\HyperLink.h">
@@ -539,9 +539,6 @@
     <ClInclude Include="..\Utils\registry.h">
       <Filter>Utils</Filter>
     </ClInclude>
-    <ClInclude Include="..\Utils\SimpleIni.h">
-      <Filter>Utils</Filter>
-    </ClInclude>
     <ClInclude Include="..\Utils\StringUtils.h">
       <Filter>Utils</Filter>
     </ClInclude>
@@ -563,11 +560,26 @@
     <ClInclude Include="..\Utils\SysImageList.h">
       <Filter>Utils</Filter>
     </ClInclude>
+    <ClInclude Include="..\Utils\CreateProcessHelper.h">
+      <Filter>Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Utils\MiscUI\CommonDialogFunctions.h">
+      <Filter>Utils\MiscUI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\ext\simpleini\SimpleIni.h">
+      <Filter>SimpleIni</Filter>
+    </ClInclude>
+    <ClInclude Include="NativeRibbonApp.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Utils\DPIAware.h">
+      <Filter>Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Utils\LoadIconEx.h">
+      <Filter>Utils</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\Resources\download.avi">
-      <Filter>Resource Files</Filter>
-    </None>
     <None Include="..\Resources\lineadded.ico">
       <Filter>Resource Files</Filter>
     </None>
@@ -613,31 +625,13 @@
     <None Include="..\Resources\tortoisemerge_logoflipped.bmp">
       <Filter>Resource Files</Filter>
     </None>
-    <None Include="..\Resources\ttf_glyph.bmp">
-      <Filter>Resource Files</Filter>
-    </None>
     <None Include="..\Resources\moved.ico">
       <Filter>Resource Files</Filter>
     </None>
     <None Include="..\Resources\Margin.cur">
       <Filter>Resource Files</Filter>
     </None>
-    <None Include="..\Resources\ribbon.mfcribbon-ms">
-      <Filter>Resource Files</Filter>
-    </None>
     <None Include="..\Resources\ribbon\TortoiseMerge.png">
-      <Filter>Resource Files</Filter>
-    </None>
-    <None Include="..\Resources\ribbon\ribbonlarge.png">
-      <Filter>Resource Files</Filter>
-    </None>
-    <None Include="..\Resources\ribbon\ribbonlargehdpi.png">
-      <Filter>Resource Files</Filter>
-    </None>
-    <None Include="..\Resources\ribbon\ribbonsmall.png">
-      <Filter>Resource Files</Filter>
-    </None>
-    <None Include="..\Resources\ribbon\ribbonsmallhdpi.png">
       <Filter>Resource Files</Filter>
     </None>
     <None Include="..\Resources\RegexFilter.ini">
@@ -646,10 +640,23 @@
     <None Include="..\Resources\ignorecomments.txt">
       <Filter>Resource Files</Filter>
     </None>
+    <None Include="..\Resources\ttf_glyph.bmp">
+      <Filter>Resource Files</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\Resources\TortoiseMergeENG.rc">
       <Filter>Resource Files</Filter>
     </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\Resources\TortoiseGitMergeRibbon.xml">
+      <Filter>Resource Files</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="..\Resources\ribbon\Filter16.bmp">
+      <Filter>Resource Files</Filter>
+    </Image>
   </ItemGroup>
 </Project>

@@ -1,5 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
+// Copyright (C) 2016 - TortoiseGit
 // Copyright (C) 2003-2007, 2010, 2013-2015 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -62,8 +63,8 @@ public:
     void SetTransparency(BYTE alpha, COLORREF color = 0xFF000000);
 
     virtual bool Create();
-    virtual bool Create(DWORD dwStyles, HWND hParent = NULL, RECT* rect = NULL);
-    virtual bool CreateEx(DWORD dwExStyles, DWORD dwStyles, HWND hParent = NULL, RECT* rect = NULL, LPCTSTR classname = NULL);
+    virtual bool Create(DWORD dwStyles, HWND hParent = nullptr, RECT* rect = nullptr);
+    virtual bool CreateEx(DWORD dwExStyles, DWORD dwStyles, HWND hParent = nullptr, RECT* rect = nullptr, LPCTSTR classname = nullptr);
 
     //void MsgLoop();
     bool IsWindowClosed() const { return bWindowClosed; };
@@ -81,15 +82,15 @@ protected:
     bool bWindowRestored;
 
     //constructor
-    CWindow(HINSTANCE hInstance, CONST WNDCLASSEX* wcx = NULL)
-        : m_hwnd(NULL)
-        , hResource(NULL)
-        , m_hParent(NULL)
+    CWindow(HINSTANCE hInstance, CONST WNDCLASSEX* wcx = nullptr)
+        : m_hwnd(nullptr)
+        , hResource(nullptr)
+        , m_hParent(nullptr)
         , bWindowClosed(FALSE)
         , bWindowRestored(false)
     {
         hResource = hInstance;
-        if (wcx != NULL)
+        if (wcx)
             RegisterWindow(wcx);
     };
 
@@ -99,6 +100,6 @@ protected:
     // returns a pointer the window (stored as the WindowLong)
     inline static CWindow * GetObjectFromWindow(HWND hWnd)
     {
-        return (CWindow *)GetWindowLongPtr(hWnd, GWLP_USERDATA);
+        return reinterpret_cast<CWindow*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
     }
 };

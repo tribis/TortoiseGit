@@ -25,6 +25,17 @@
 <variablelist>
 <varlistentry>
 <term>
+--raw
+</term>
+<listitem>
+<simpara>
+        Print the raw gpg status output to standard error instead of the normal
+        human-readable output.
+</simpara>
+</listitem>
+</varlistentry>
+<varlistentry>
+<term>
 -v
 </term>
 <term>
@@ -42,7 +53,7 @@
 </term>
 <listitem>
 <simpara>
-        SHA1 identifiers of git tag objects.
+        SHA-1 identifiers of Git tag objects.
 </simpara>
 </listitem>
 </varlistentry>

@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2018 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -30,15 +30,15 @@
 
 IMPLEMENT_DYNAMIC(CGitSwitchDlg, CHorizontalResizableStandAloneDialog)
 
-CGitSwitchDlg::CGitSwitchDlg(CWnd* pParent /*=NULL*/)
+CGitSwitchDlg::CGitSwitchDlg(CWnd* pParent /*=nullptr*/)
 	: CHorizontalResizableStandAloneDialog(CGitSwitchDlg::IDD, pParent)
-	,CChooseVersion(this)
+	, CChooseVersion(this)
+	, m_bBranch(BST_UNCHECKED)
+	, m_bMerge(BST_UNCHECKED)
+	, m_bTrack(BST_INDETERMINATE)
+	, m_bForce(BST_UNCHECKED)
+	, m_bBranchOverride(BST_UNCHECKED)
 {
-	m_bBranch=FALSE;
-	m_bMerge = FALSE;
-	m_bTrack = 2;
-	m_bForce=FALSE;
-	m_bBranchOverride = FALSE;
 }
 
 CGitSwitchDlg::~CGitSwitchDlg()
@@ -77,6 +77,15 @@ BOOL CGitSwitchDlg::OnInitDialog()
 	CHorizontalResizableStandAloneDialog::OnInitDialog();
 	CAppUtils::MarkWindowAsUnpinnable(m_hWnd);
 
+	AdjustControlSize(IDC_RADIO_BRANCH);
+	AdjustControlSize(IDC_RADIO_TAGS);
+	AdjustControlSize(IDC_RADIO_VERSION);
+	AdjustControlSize(IDC_CHECK_BRANCH);
+	AdjustControlSize(IDC_CHECK_FORCE);
+	AdjustControlSize(IDC_CHECK_MERGE);
+	AdjustControlSize(IDC_CHECK_TRACK);
+	AdjustControlSize(IDC_CHECK_BRANCHOVERRIDE);
+
 	AddAnchor(IDC_GROUP_OPTION, TOP_LEFT, TOP_RIGHT);
 
 	AddAnchor(IDC_EDIT_BRANCH, TOP_LEFT, TOP_RIGHT);
@@ -88,16 +97,7 @@ BOOL CGitSwitchDlg::OnInitDialog()
 	CHOOSE_VERSION_ADDANCHOR;
 	this->AddOthersToAnchor();
 
-	AdjustControlSize(IDC_RADIO_BRANCH);
-	AdjustControlSize(IDC_RADIO_TAGS);
-	AdjustControlSize(IDC_RADIO_VERSION);
-	AdjustControlSize(IDC_CHECK_BRANCH);
-	AdjustControlSize(IDC_CHECK_FORCE);
-	AdjustControlSize(IDC_CHECK_MERGE);
-	AdjustControlSize(IDC_CHECK_TRACK);
-	AdjustControlSize(IDC_CHECK_BRANCHOVERRIDE);
-
-	EnableSaveRestore(_T("SwitchDlg"));
+	EnableSaveRestore(L"SwitchDlg");
 
 	CString sWindowTitle;
 	GetWindowText(sWindowTitle);
@@ -149,7 +149,7 @@ void CGitSwitchDlg::OnBnClickedOk()
 			// branch already exists
 			CString msg;
 			msg.LoadString(IDS_B_EXISTS);
-			ShowEditBalloon(IDC_EDIT_BRANCH, msg + _T(" ") + CString(MAKEINTRESOURCE(IDS_B_DIFFERENTNAMEOROVERRIDE)), CString(MAKEINTRESOURCE(IDS_WARN_WARNING)));
+			ShowEditBalloon(IDC_EDIT_BRANCH, msg + L' ' + CString(MAKEINTRESOURCE(IDS_B_DIFFERENTNAMEOROVERRIDE)), CString(MAKEINTRESOURCE(IDS_WARN_WARNING)));
 			return;
 		}
 		else if (g_Git.BranchTagExists(m_NewBranch, false))
@@ -172,10 +172,10 @@ void CGitSwitchDlg::SetDefaultName(BOOL isUpdateCreateBranch)
 	CString version = m_VersionName;
 
 	int start = -1;
-	if (version.Left(7)==_T("origin/"))
-		start = version.Find(_T('/'), 8);
-	else if (version.Left(8)==_T("remotes/"))
-		start = version.Find(_T('/'), 9);
+	if (CStringUtils::StartsWith(version, L"origin/"))
+		start = version.Find(L'/', 8);
+	else if (CStringUtils::StartsWith(version, L"remotes/"))
+		start = version.Find(L'/', 9);
 
 	if (start >= 0)
 	{
@@ -190,9 +190,11 @@ void CGitSwitchDlg::SetDefaultName(BOOL isUpdateCreateBranch)
 	}
 	else
 	{
-		if (m_VersionName.Left(11) == _T("refs/heads/"))
+		if (CStringUtils::StartsWith(m_VersionName, L"refs/heads/"))
 			version = m_VersionName.Mid(11);
-		m_NewBranch = CString(_T("Branch_")) + version;
+		else
+			version = version.Left(g_Git.GetShortHASHLength());
+		m_NewBranch = L"Branch_" + version;
 		this->GetDlgItem(IDC_CHECK_TRACK)->EnableWindow(FALSE);
 
 		if(isUpdateCreateBranch)
@@ -237,9 +239,9 @@ void CGitSwitchDlg::OnEnChangeEditBranch()
 
 	CString name;
 	GetDlgItem(IDC_EDIT_BRANCH)->GetWindowText(name);
-	name = _T("/") + name;
+	name = L'/' + name;
 	CString remoteName = m_ChooseVersioinBranch.GetString();
-	if (remoteName.Left(8) == _T("remotes/") && remoteName.Right(name.GetLength()) != name)		
+	if (CStringUtils::StartsWith(remoteName, L"remotes/") && remoteName.Right(name.GetLength()) != name)
 		((CButton *)GetDlgItem(IDC_CHECK_TRACK))->SetCheck(FALSE);
 }
 

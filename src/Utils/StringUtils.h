@@ -1,7 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
 // Copyright (C) 2003-2010 - TortoiseSVN
-// Copyright (C) 2015 - TortoiseGit
+// Copyright (C) 2015-2016 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -20,9 +20,9 @@
 #pragma once
 
 #ifdef UNICODE
-#define _tcswildcmp wcswildcmp
+#define wcswildcmp wcswildcmp
 #else
-#define _tcswildcmp strwildcmp
+#define wcswildcmp strwildcmp
 #endif
 
 /**
@@ -59,6 +59,7 @@ int wcswildcmp(const wchar_t * wild, const wchar_t * string);
 class CStringUtils
 {
 public:
+	CStringUtils() = delete;
 #ifdef _MFC_VER
 
 	/**
@@ -74,17 +75,17 @@ public:
 	/**
 	 * Writes an ASCII CString to the clipboard in CF_TEXT format
 	 */
-	static bool WriteAsciiStringToClipboard(const CStringA& sClipdata, LCID lcid, HWND hOwningWnd = NULL);
+	static bool WriteAsciiStringToClipboard(const CStringA& sClipdata, LCID lcid, HWND hOwningWnd = nullptr);
 	/**
 	 * Writes a String to the clipboard in both CF_UNICODETEXT and CF_TEXT format
 	 */
-	static bool WriteAsciiStringToClipboard(const CStringW& sClipdata, HWND hOwningWnd = NULL);
+	static bool WriteAsciiStringToClipboard(const CStringW& sClipdata, HWND hOwningWnd = nullptr);
 
 	/**
 	* Writes an ASCII CString to the clipboard in TGIT_UNIFIEDDIFF format, which is basically the patch file
 	* as a ASCII string.
 	*/
-	static bool WriteDiffToClipboard(const CStringA& sClipdata, HWND hOwningWnd = NULL);
+	static bool WriteDiffToClipboard(const CStringA& sClipdata, HWND hOwningWnd = nullptr);
 
 	/**
 	 * Reads the string \text from the file \path in utf8 encoding.
@@ -108,7 +109,19 @@ public:
 	static int FastCompareNoCase (const CStringW& lhs, const CStringW& rhs);
 
 	static void ParseEmailAddress(CString mailaddress, CString& parsedAddress, CString* parsedName = nullptr);
+
+	static bool IsPlainReadableASCII(const CString& text);
+
+	static bool StartsWith(const wchar_t* heystack, const CString& needle);
+	static bool StartsWithI(const wchar_t* heystack, const CString& needle);
+	static bool WriteStringToTextFile(LPCTSTR path, LPCTSTR text, bool bUTF8 = true);
+	static bool EndsWith(const CString& heystack, const wchar_t* needle);
+	static bool EndsWith(const CString& heystack, const wchar_t needle);
+	static bool EndsWithI(const CString& heystack, const wchar_t* needle);
 #endif
+	static bool StartsWith(const wchar_t* heystack, const wchar_t* needle);
+	static bool StartsWith(const char* heystack, const char* needle);
+
 	/**
 	 * Writes the string \text to the file \path, either in utf16 or utf8 encoding,
 	 * depending on the \c bUTF8 param.
@@ -116,7 +129,7 @@ public:
 	static bool WriteStringToTextFile(const std::wstring& path, const std::wstring& text, bool bUTF8 = true);
 
 	/**
-	 * Replace all pipe (|) character in the string with a NULL character. Used
+	 * Replace all pipe (|) character in the string with a nullptr character. Used
 	 * for passing into Win32 functions that require such representation
 	 */
 	static void PipesToNulls(TCHAR* buffer, size_t length);

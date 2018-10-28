@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2011-2015 - TortoiseGit
+// Copyright (C) 2011-2018 - TortoiseGit
 // Copyright (C) 2003-2014 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -25,7 +25,8 @@
 
 #include "ShellExt.h"
 #include "ShellObjects.h"
-#include "..\version.h"
+#include "../version.h"
+#include "GitAdminDir.h"
 #undef swprintf
 
 extern ShellObjects g_shellObjects;
@@ -36,12 +37,9 @@ CShellExt::CShellExt(FileState state)
 	, itemStates(0)
 	, itemStatesFolder(0)
 	, space(0)
-#if ENABLE_CRASHHANLDER
-	, m_crasher(L"TortoiseGit", TGIT_VERMAJOR, TGIT_VERMINOR, TGIT_VERMICRO, TGIT_VERBUILD, TGIT_VERDATE, false)
-#endif
+	, m_cRef(0)
 	,regDiffLater(L"Software\\TortoiseGit\\DiffLater", L"")
 {
-	m_cRef = 0L;
 	InterlockedIncrement(&g_cRefThisDll);
 
 	{
@@ -71,26 +69,16 @@ void LoadLangDll()
 		g_langid = g_ShellCache.GetLangID();
 		DWORD langId = g_langid;
 		TCHAR langDll[MAX_PATH*4] = {0};
-		HINSTANCE hInst = NULL;
+		HINSTANCE hInst = nullptr;
 		TCHAR langdir[MAX_PATH] = {0};
-		char langdirA[MAX_PATH] = {0};
 		if (GetModuleFileName(g_hmodThisDll, langdir, _countof(langdir))==0)
 			return;
-		if (GetModuleFileNameA(g_hmodThisDll, langdirA, _countof(langdirA))==0)
-			return;
-		TCHAR * dirpoint = _tcsrchr(langdir, '\\');
-		char * dirpointA = strrchr(langdirA, '\\');
+		TCHAR* dirpoint = wcsrchr(langdir, L'\\');
 		if (dirpoint)
-			*dirpoint = 0;
-		if (dirpointA)
-			*dirpointA = 0;
-		dirpoint = _tcsrchr(langdir, '\\');
-		dirpointA = strrchr(langdirA, '\\');
+			*dirpoint = L'\0';
+		dirpoint = wcsrchr(langdir, L'\\');
 		if (dirpoint)
-			*dirpoint = 0;
-		if (dirpointA)
-			*dirpointA = 0;
-		strcat_s(langdirA, "\\Languages");
+			*dirpoint = L'\0';
 
 		BOOL bIsWow = FALSE;
 		IsWow64Process(GetCurrentProcess(), &bIsWow);
@@ -98,9 +86,9 @@ void LoadLangDll()
 		do
 		{
 			if (bIsWow)
-				_stprintf_s(langDll, _T("%s\\Languages\\TortoiseProc32%lu.dll"), langdir, langId);
+				swprintf_s(langDll, L"%s\\Languages\\TortoiseProc32%lu.dll", langdir, langId);
 			else
-				_stprintf_s(langDll, _T("%s\\Languages\\TortoiseProc%lu.dll"), langdir, langId);
+				swprintf_s(langDll, L"%s\\Languages\\TortoiseProc%lu.dll", langdir, langId);
 			BOOL versionmatch = TRUE;
 
 			struct TRANSARRAY
@@ -116,14 +104,12 @@ void LoadLangDll()
 			{
 				LPVOID pBuffer = (void*) malloc(dwBufferSize);
 
-				if (pBuffer != (void*) NULL)
+				if (pBuffer)
 				{
 					UINT        nInfoSize = 0;
 					UINT        nFixedLength = 0;
-					LPSTR       lpVersion = NULL;
+					LPSTR       lpVersion = nullptr;
 					VOID*       lpFixedPointer;
-					TRANSARRAY* lpTransArray;
-					TCHAR       strLangProductVersion[MAX_PATH] = {0};
 
 					if (GetFileVersionInfo((LPTSTR)langDll,
 						dwReserved,
@@ -132,34 +118,30 @@ void LoadLangDll()
 					{
 						// Query the current language
 						if (VerQueryValue(	pBuffer,
-							_T("\\VarFileInfo\\Translation"),
+							L"\\VarFileInfo\\Translation",
 							&lpFixedPointer,
 							&nFixedLength))
 						{
-							lpTransArray = (TRANSARRAY*) lpFixedPointer;
+							auto lpTransArray = reinterpret_cast<TRANSARRAY*>(lpFixedPointer);
+							TCHAR strLangProductVersion[MAX_PATH] = { 0 };
 
-							_stprintf_s(strLangProductVersion, _T("\\StringFileInfo\\%04x%04x\\ProductVersion"),
+							swprintf_s(strLangProductVersion, L"\\StringFileInfo\\%04x%04x\\ProductVersion",
 								lpTransArray[0].wLanguageID, lpTransArray[0].wCharacterSet);
 
-							if (VerQueryValue(pBuffer,
-								(LPTSTR)strLangProductVersion,
-								(LPVOID *)&lpVersion,
-								&nInfoSize))
-							{
-								versionmatch = (_tcscmp((LPCTSTR)lpVersion, _T(STRPRODUCTVER)) == 0);
-							}
+							if (VerQueryValue(pBuffer, (LPTSTR)strLangProductVersion, (LPVOID*)&lpVersion, &nInfoSize))
+								versionmatch = (wcscmp((LPCTSTR)lpVersion, _T(STRPRODUCTVER)) == 0);
 
 						}
 					}
 					free(pBuffer);
-				} // if (pBuffer != (void*) NULL)
+				} // if (pBuffer)
 			} // if (dwBufferSize > 0)
 			else
 				versionmatch = FALSE;
 
 			if (versionmatch)
 				hInst = LoadLibrary(langDll);
-			if (hInst != NULL)
+			if (hInst)
 			{
 				if (g_hResInst != g_hmodThisDll)
 					FreeLibrary(g_hResInst);
@@ -170,14 +152,12 @@ void LoadLangDll()
 				DWORD lid = SUBLANGID(langId);
 				lid--;
 				if (lid > 0)
-				{
 					langId = MAKELANGID(PRIMARYLANGID(langId), lid);
-				}
 				else
 					langId = 0;
 			}
-		} while ((hInst == NULL) && (langId != 0));
-		if (hInst == NULL)
+		} while (!hInst && langId != 0);
+		if (!hInst)
 		{
 			// either the dll for the selected language is not present, or
 			// it is the wrong version.
@@ -198,43 +178,27 @@ void LoadLangDll()
 
 STDMETHODIMP CShellExt::QueryInterface(REFIID riid, LPVOID FAR *ppv)
 {
-	if(ppv == 0)
+	if (!ppv)
 		return E_POINTER;
 
-	*ppv = NULL;
+	*ppv = nullptr;
 
 	if (IsEqualIID(riid, IID_IShellExtInit) || IsEqualIID(riid, IID_IUnknown))
-	{
 		*ppv = static_cast<LPSHELLEXTINIT>(this);
-	}
 	else if (IsEqualIID(riid, IID_IContextMenu))
-	{
 		*ppv = static_cast<LPCONTEXTMENU>(this);
-	}
 	else if (IsEqualIID(riid, IID_IContextMenu2))
-	{
 		*ppv = static_cast<LPCONTEXTMENU2>(this);
-	}
 	else if (IsEqualIID(riid, IID_IContextMenu3))
-	{
 		*ppv = static_cast<LPCONTEXTMENU3>(this);
-	}
 	else if (IsEqualIID(riid, IID_IShellIconOverlayIdentifier))
-	{
 		*ppv = static_cast<IShellIconOverlayIdentifier*>(this);
-	}
 	else if (IsEqualIID(riid, IID_IShellPropSheetExt))
-	{
 		*ppv = static_cast<LPSHELLPROPSHEETEXT>(this);
-	}
 	else if (IsEqualIID(riid, IID_IShellCopyHook))
-	{
 		*ppv = static_cast<ICopyHook*>(this);
-	}
 	else
-	{
 		return E_NOINTERFACE;
-	}
 
 	AddRef();
 	return S_OK;
@@ -258,7 +222,7 @@ STDMETHODIMP_(ULONG) CShellExt::Release()
 // IPersistFile members
 STDMETHODIMP CShellExt::GetClassID(CLSID *pclsid)
 {
-	if(pclsid == 0)
+	if (!pclsid)
 		return E_POINTER;
 	*pclsid = CLSID_Tortoisegit_UNCONTROLLED;
 	return S_OK;
@@ -270,31 +234,32 @@ STDMETHODIMP CShellExt::Load(LPCOLESTR /*pszFileName*/, DWORD /*dwMode*/)
 }
 
 // ICopyHook member
-UINT __stdcall CShellExt::CopyCallback(HWND hWnd, UINT wFunc, UINT wFlags, LPCTSTR pszSrcFile, DWORD dwSrcAttribs, LPCTSTR pszDestFile, DWORD dwDestAttribs)
-{
-	__try
-	{
-		return CopyCallback_Wrap(hWnd, wFunc, wFlags, pszSrcFile, dwSrcAttribs, pszDestFile, dwDestAttribs);
-	}
-	__except(CCrashReport::Instance().SendReport(GetExceptionInformation()))
-	{
-	}
-	return IDYES;
-}
-
-UINT __stdcall CShellExt::CopyCallback_Wrap(HWND /*hWnd*/, UINT wFunc, UINT /*wFlags*/, LPCTSTR pszSrcFile, DWORD /*dwSrcAttribs*/, LPCTSTR /*pszDestFile*/, DWORD /*dwDestAttribs*/)
+UINT __stdcall CShellExt::CopyCallback(HWND /*hWnd*/, UINT wFunc, UINT /*wFlags*/, LPCTSTR pszSrcFile, DWORD /*dwSrcAttribs*/, LPCTSTR /*pszDestFile*/, DWORD /*dwDestAttribs*/)
 {
 	switch (wFunc)
 	{
 	case FO_MOVE:
 	case FO_DELETE:
 	case FO_RENAME:
-		if (pszSrcFile && pszSrcFile[0])
+		if (pszSrcFile && pszSrcFile[0] && g_ShellCache.IsPathAllowed(pszSrcFile))
 		{
-			CString topDir;
-			if (GitAdminDir::HasAdminDir(pszSrcFile, &topDir))
-				m_CachedStatus.m_GitStatus.ReleasePath(topDir);
-			m_remoteCacheLink.ReleaseLockForPath(CTGitPath(pszSrcFile));
+			auto cacheType = g_ShellCache.GetCacheType();
+			switch (cacheType)
+			{
+			case ShellCache::exe:
+				m_remoteCacheLink.ReleaseLockForPath(CTGitPath(pszSrcFile));
+				break;
+			case ShellCache::dll:
+			case ShellCache::dllFull:
+			{
+				CString topDir;
+				if (GitAdminDir::HasAdminDir(pszSrcFile, &topDir))
+					m_CachedStatus.m_GitStatus.ReleasePath(topDir);
+				break;
+			}
+			default:
+				break;
+			}
 		}
 		break;
 	default:

@@ -1,38 +1,21 @@
-From 47fd8aac030c9a685b930574a34fddc41860ed62 Mon Sep 17 00:00:00 2001
+From 461d63b7ae83edb1375e322b4619467654a47235 Mon Sep 17 00:00:00 2001
 From: Sven Strickroth <email@cs-ware.de>
 Date: Sun, 1 Feb 2015 13:39:31 +0100
-Subject: [PATCH 5/6] Make CRLF filter behave like vanilla git for adding files
+Subject: [PATCH 5/7] Make CRLF filter behave like vanilla git for adding files
  in combination with attributes
 
 Based on lots of manual testing (even with "malformed" files and binary) with vanilla git executable...
 
 Signed-off-by: Sven Strickroth <email@cs-ware.de>
 ---
- CHANGELOG.md |  5 +++++
- src/crlf.c   | 57 +++++++++++++++++++++++++++++++++------------------------
- 2 files changed, 38 insertions(+), 24 deletions(-)
+ src/crlf.c | 57 +++++++++++++++++++++++++++++++++------------------------
+ 1 file changed, 33 insertions(+), 24 deletions(-)
 
-diff --git a/CHANGELOG.md b/CHANGELOG.md
-index d210632..b22b497 100644
---- a/CHANGELOG.md
-+++ b/CHANGELOG.md
-@@ -15,6 +15,11 @@ v0.22 + 1
-   * files containig CRLF in combination with core.autocrlf=input were accepted
-   * adding files containing CR and CRLF but not the same number failed
- 
-+* LF -> CRLF filter now handles files on adding to index the way vanilla git does
-+  * skip files marked as "binary" (-crlf)
-+  * especially files containing single CR chars are added as is now
-+  * honor "text" attribute for forcing a file being interpreted as text
-+
- * Rename and copy detection is enabled for small files.
- 
- * Checkout can now handle an initial checkout of a repository, making
 diff --git a/src/crlf.c b/src/crlf.c
-index 2de107c..444e7a6 100644
+index f476fe32a..013f22e29 100644
 --- a/src/crlf.c
 +++ b/src/crlf.c
-@@ -124,18 +124,21 @@ static int crlf_apply_to_odb(
+@@ -128,18 +128,21 @@ static int crlf_apply_to_odb(
  	const git_buf *from,
  	const git_filter_source *src)
  {
@@ -58,7 +41,7 @@ index 2de107c..444e7a6 100644
  			return GIT_PASSTHROUGH;
  
  		/*
-@@ -146,16 +149,26 @@ static int crlf_apply_to_odb(
+@@ -150,16 +153,26 @@ static int crlf_apply_to_odb(
  		if (stats.cr != stats.crlf)
  			return GIT_PASSTHROUGH;
  
@@ -81,7 +64,7 @@ index 2de107c..444e7a6 100644
 +	if (ca->crlf_action == GIT_CRLF_INPUT ||
 +		(ca->auto_crlf == GIT_AUTO_CRLF_INPUT &&
 +		(ca->crlf_action == GIT_CRLF_GUESS || ca->crlf_action == GIT_CRLF_AUTO ||
-+		(ca->crlf_action == GIT_CRLF_TEXT && ca->eol==GIT_EOL_UNSET)))) {
++		(ca->crlf_action == GIT_CRLF_TEXT && ca->eol == GIT_EOL_UNSET)))) {
 +		if (stats.crlf) {
  			switch (ca->safe_crlf) {
  			case GIT_SAFE_CRLF_FAIL:
@@ -91,7 +74,7 @@ index 2de107c..444e7a6 100644
  					git_filter_source_path(src));
  				return -1;
  			case GIT_SAFE_CRLF_WARN:
-@@ -164,11 +177,15 @@ static int crlf_apply_to_odb(
+@@ -168,11 +181,15 @@ static int crlf_apply_to_odb(
  			default:
  				break;
  			}
@@ -109,7 +92,7 @@ index 2de107c..444e7a6 100644
  					git_filter_source_path(src));
  				return -1;
  			case GIT_SAFE_CRLF_WARN:
-@@ -178,20 +195,12 @@ static int crlf_apply_to_odb(
+@@ -182,20 +199,12 @@ static int crlf_apply_to_odb(
  				break;
  			}
  		}
@@ -135,5 +118,5 @@ index 2de107c..444e7a6 100644
  	return git_buf_text_crlf_to_lf(to, from);
  }
 -- 
-2.4.4.windows.2
+2.16.1.windows.4
 

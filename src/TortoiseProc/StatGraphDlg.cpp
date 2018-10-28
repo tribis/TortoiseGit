@@ -1,7 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2016 - TortoiseGit
-// Copyright (C) 2003-2011,2014-2015 - TortoiseSVN
+// Copyright (C) 2008-2018 - TortoiseGit
+// Copyright (C) 2003-2011, 2014-2016, 2018 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -20,18 +20,14 @@
 #include "stdafx.h"
 #include "TortoiseProc.h"
 #include "StatGraphDlg.h"
-#include <GdiPlus.h>
 #include "AppUtils.h"
 #include "PathUtils.h"
-#include "MessageBox.h"
 #include "registry.h"
 #include "FormatMessageWrapper.h"
 #include "SysProgressDlg.h"
 
-#include <iterator>
 #include <cmath>
 #include <locale>
-#include <list>
 #include <utility>
 #include <strsafe.h>
 
@@ -54,12 +50,14 @@ private:
 
 
 IMPLEMENT_DYNAMIC(CStatGraphDlg, CResizableStandAloneDialog)
-CStatGraphDlg::CStatGraphDlg(CWnd* pParent /*=NULL*/)
+CStatGraphDlg::CStatGraphDlg(CWnd* pParent /*=nullptr*/)
 : CResizableStandAloneDialog(CStatGraphDlg::IDD, pParent)
 , m_bStacked(FALSE)
 , m_GraphType(MyGraph::Bar)
 , m_bAuthorsCaseSensitive(TRUE)
 , m_bSortByCommitCount(TRUE)
+, m_bUseCommitterNames(FALSE)
+, m_bUseCommitDates(TRUE)
 , m_nWeeks(-1)
 , m_nDays(-1)
 , m_langOrder(0)
@@ -71,7 +69,6 @@ CStatGraphDlg::CStatGraphDlg(CWnd* pParent /*=NULL*/)
 , m_nTotalLinesNew(0)
 , m_nTotalLinesDel(0)
 , m_bDiffFetched(FALSE)
-, m_ShowList(NULL)
 , m_minDate(0)
 , m_maxDate(0)
 , m_nTotalFileChanges(0)
@@ -101,6 +98,8 @@ void CStatGraphDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_SKIPPER, m_Skipper);
 	DDX_Check(pDX, IDC_AUTHORSCASESENSITIVE, m_bAuthorsCaseSensitive);
 	DDX_Check(pDX, IDC_SORTBYCOMMITCOUNT, m_bSortByCommitCount);
+	DDX_Check(pDX, IDC_COMMITTERNAMES, m_bUseCommitterNames);
+	DDX_Check(pDX, IDC_COMMITDATES, m_bUseCommitDates);
 	DDX_Control(pDX, IDC_GRAPHBARBUTTON, m_btnGraphBar);
 	DDX_Control(pDX, IDC_GRAPHBARSTACKEDBUTTON, m_btnGraphBarStacked);
 	DDX_Control(pDX, IDC_GRAPHLINEBUTTON, m_btnGraphLine);
@@ -112,7 +111,7 @@ void CStatGraphDlg::DoDataExchange(CDataExchange* pDX)
 BEGIN_MESSAGE_MAP(CStatGraphDlg, CResizableStandAloneDialog)
 	ON_CBN_SELCHANGE(IDC_GRAPHCOMBO, OnCbnSelchangeGraphcombo)
 	ON_WM_HSCROLL()
-	ON_NOTIFY(TTN_NEEDTEXT, NULL, OnNeedText)
+	ON_NOTIFY(TTN_NEEDTEXT, nullptr, OnNeedText)
 	ON_BN_CLICKED(IDC_AUTHORSCASESENSITIVE, &CStatGraphDlg::AuthorsCaseSensitiveChanged)
 	ON_BN_CLICKED(IDC_SORTBYCOMMITCOUNT, &CStatGraphDlg::SortModeChanged)
 	ON_BN_CLICKED(IDC_GRAPHBARBUTTON, &CStatGraphDlg::OnBnClickedGraphbarbutton)
@@ -122,6 +121,8 @@ BEGIN_MESSAGE_MAP(CStatGraphDlg, CResizableStandAloneDialog)
 	ON_BN_CLICKED(IDC_GRAPHPIEBUTTON, &CStatGraphDlg::OnBnClickedGraphpiebutton)
 	ON_COMMAND(ID_FILE_SAVESTATGRAPHAS, &CStatGraphDlg::OnFileSavestatgraphas)
 	ON_BN_CLICKED(IDC_CALC_DIFF, &CStatGraphDlg::OnBnClickedFetchDiff)
+	ON_BN_CLICKED(IDC_COMMITTERNAMES, &CStatGraphDlg::OnBnClickedCommitternames)
+	ON_BN_CLICKED(IDC_COMMITDATES, &CStatGraphDlg::OnBnClickedCommitdates)
 END_MESSAGE_MAP()
 
 void CStatGraphDlg::LoadStatQueries (__in UINT curStr, Metrics loadMetric, bool setDef /* = false */)
@@ -153,10 +154,6 @@ BOOL CStatGraphDlg::OnInitDialog()
 {
 	CResizableStandAloneDialog::OnInitDialog();
 
-	// gather statistics data, only needs to be updated when the checkbox with
-	// the case sensitivity of author names is changed
-	GatherData();
-
 	m_tooltips.AddTool(&m_btnGraphPie, IDS_STATGRAPH_PIEBUTTON_TT);
 	m_tooltips.AddTool(&m_btnGraphLineStacked, IDS_STATGRAPH_LINESTACKEDBUTTON_TT);
 	m_tooltips.AddTool(&m_btnGraphLine, IDS_STATGRAPH_LINEBUTTON_TT);
@@ -164,9 +161,15 @@ BOOL CStatGraphDlg::OnInitDialog()
 	m_tooltips.AddTool(&m_btnGraphBar, IDS_STATGRAPH_BARBUTTON_TT);
 	m_tooltips.Activate(TRUE);
 
-	m_bAuthorsCaseSensitive = DWORD(CRegDWORD(_T("Software\\TortoiseGit\\StatAuthorsCaseSensitive")));
-	m_bSortByCommitCount = DWORD(CRegDWORD(_T("Software\\TortoiseGit\\StatSortByCommitCount")));
+	m_bAuthorsCaseSensitive = DWORD(CRegDWORD(L"Software\\TortoiseGit\\StatAuthorsCaseSensitive", m_bAuthorsCaseSensitive));
+	m_bSortByCommitCount = DWORD(CRegDWORD(L"Software\\TortoiseGit\\StatSortByCommitCount", m_bSortByCommitCount));
+	m_bUseCommitterNames = DWORD(CRegDWORD(L"Software\\TortoiseGit\\StatCommiterNames", m_bUseCommitterNames));
+	m_bUseCommitDates = DWORD(CRegDWORD(L"Software\\TortoiseGit\\StatCommitDates", m_bUseCommitDates));
 	UpdateData(FALSE);
+
+	// gather statistics data, only needs to be updated when the checkbox with
+	// the case sensitivity of author names is changed
+	GatherData();
 
 	//Load statistical queries
 	LoadStatQueries(IDS_STATGRAPH_STATS, AllStat, true);
@@ -184,21 +187,28 @@ BOOL CStatGraphDlg::OnInitDialog()
 	else
 		CAppUtils::SetWindowTitle(m_hWnd, m_path.GetUIPathString(), sTitle);
 
-	m_btnGraphBar.SetImage((HICON)LoadImage(AfxGetResourceHandle(), MAKEINTRESOURCE(IDI_GRAPHBAR), IMAGE_ICON, 16, 16, LR_DEFAULTCOLOR));
+	int iconWidth = GetSystemMetrics(SM_CXSMICON);
+	int iconHeight = GetSystemMetrics(SM_CYSMICON);
+	m_btnGraphBar.SetImage(CCommonAppUtils::LoadIconEx(IDI_GRAPHBAR, iconWidth, iconHeight));
 	m_btnGraphBar.SizeToContent();
 	m_btnGraphBar.Invalidate();
-	m_btnGraphBarStacked.SetImage((HICON)LoadImage(AfxGetResourceHandle(), MAKEINTRESOURCE(IDI_GRAPHBARSTACKED), IMAGE_ICON, 16, 16, LR_DEFAULTCOLOR));
+	m_btnGraphBarStacked.SetImage(CCommonAppUtils::LoadIconEx(IDI_GRAPHBARSTACKED, iconWidth, iconHeight));
 	m_btnGraphBarStacked.SizeToContent();
 	m_btnGraphBarStacked.Invalidate();
-	m_btnGraphLine.SetImage((HICON)LoadImage(AfxGetResourceHandle(), MAKEINTRESOURCE(IDI_GRAPHLINE), IMAGE_ICON, 16, 16, LR_DEFAULTCOLOR));
+	m_btnGraphLine.SetImage(CCommonAppUtils::LoadIconEx(IDI_GRAPHLINE, iconWidth, iconHeight));
 	m_btnGraphLine.SizeToContent();
 	m_btnGraphLine.Invalidate();
-	m_btnGraphLineStacked.SetImage((HICON)LoadImage(AfxGetResourceHandle(), MAKEINTRESOURCE(IDI_GRAPHLINESTACKED), IMAGE_ICON, 16, 16, LR_DEFAULTCOLOR));
+	m_btnGraphLineStacked.SetImage(CCommonAppUtils::LoadIconEx(IDI_GRAPHLINESTACKED, iconWidth, iconHeight));
 	m_btnGraphLineStacked.SizeToContent();
 	m_btnGraphLineStacked.Invalidate();
-	m_btnGraphPie.SetImage((HICON)LoadImage(AfxGetResourceHandle(), MAKEINTRESOURCE(IDI_GRAPHPIE), IMAGE_ICON, 16, 16, LR_DEFAULTCOLOR));
+	m_btnGraphPie.SetImage(CCommonAppUtils::LoadIconEx(IDI_GRAPHPIE, iconWidth, iconHeight));
 	m_btnGraphPie.SizeToContent();
 	m_btnGraphPie.Invalidate();
+
+	AdjustControlSize(IDC_AUTHORSCASESENSITIVE);
+	AdjustControlSize(IDC_SORTBYCOMMITCOUNT);
+	AdjustControlSize(IDC_COMMITTERNAMES);
+	AdjustControlSize(IDC_COMMITDATES);
 
 	AddAnchor(IDC_GRAPHTYPELABEL, TOP_LEFT);
 	AddAnchor(IDC_GRAPH, TOP_LEFT, BOTTOM_RIGHT);
@@ -250,16 +260,18 @@ BOOL CStatGraphDlg::OnInitDialog()
 
 	AddAnchor(IDC_AUTHORSCASESENSITIVE, BOTTOM_LEFT);
 	AddAnchor(IDC_SORTBYCOMMITCOUNT, BOTTOM_LEFT);
+	AddAnchor(IDC_COMMITTERNAMES, BOTTOM_LEFT);
+	AddAnchor(IDC_COMMITDATES, BOTTOM_LEFT);
 	AddAnchor(IDC_SKIPPER, BOTTOM_LEFT, BOTTOM_RIGHT);
 	AddAnchor(IDC_SKIPPERLABEL, BOTTOM_LEFT);
 	AddAnchor(IDOK, BOTTOM_RIGHT);
-	EnableSaveRestore(_T("StatGraphDlg"));
+	EnableSaveRestore(L"StatGraphDlg");
 
 	// set the min/max values on the skipper
 	SetSkipper (true);
 
 	// we use a stats page encoding here, 0 stands for the statistics dialog
-	CRegDWORD lastStatsPage(_T("Software\\TortoiseGit\\LastViewedStatsPage"), 0);
+	CRegDWORD lastStatsPage(L"Software\\TortoiseGit\\LastViewedStatsPage", 0);
 
 	// open last viewed statistics page as first page
 	int graphtype = lastStatsPage / 10;
@@ -299,16 +311,15 @@ BOOL CStatGraphDlg::OnInitDialog()
 		default : return TRUE;
 	}
 
-	LCID m_locale = MAKELCID((DWORD)CRegStdDWORD(_T("Software\\TortoiseGit\\LanguageID"), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT)), SORT_DEFAULT);
+	LCID m_locale = MAKELCID((DWORD)CRegStdDWORD(L"Software\\TortoiseGit\\LanguageID", MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT)), SORT_DEFAULT);
 
-	bool bUseSystemLocale = !!(DWORD)CRegStdDWORD(_T("Software\\TortoiseGit\\UseSystemLocaleForDates"), TRUE);
+	bool bUseSystemLocale = !!(DWORD)CRegStdDWORD(L"Software\\TortoiseGit\\UseSystemLocaleForDates", TRUE);
 	LCID locale = bUseSystemLocale ? MAKELCID(MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), SORT_DEFAULT) : m_locale;
 
 	TCHAR langBuf[11] = { 0 };
-	memset(langBuf, 0, sizeof(langBuf));
 	GetLocaleInfo(locale, LOCALE_IDATE, langBuf, _countof(langBuf));
 
-	m_langOrder = _ttoi(langBuf);
+	m_langOrder = _wtoi(langBuf);
 
 	return TRUE;
 }
@@ -448,9 +459,8 @@ int CStatGraphDlg::GetCalendarWeek(const CTime& time)
 				{
 					iDayOfWeek = (time.GetDayOfWeek()+5+iFirstDayOfWeek)%7;
 				}
-				catch (CException* e)
+				catch (CAtlException)
 				{
-					e->Delete();
 				}
 				CTime dStartOfWeek = time-CTimeSpan(iDayOfWeek,0,0,0);
 
@@ -550,161 +560,6 @@ int CStatGraphDlg::GetCalendarWeek(const CTime& time)
 	return iWeekOfYear;
 }
 
-class CDateSorter
-{
-public:
-	class CCommitPointer
-	{
-	public:
-		CCommitPointer()
-		: m_cont(nullptr)
-		, m_place(0)
-		, m_Date(0)
-		, m_Changes(0)
-		, m_lineInc(0)
-		, m_lineDec(0)
-		, m_lineNew(0)
-		, m_lineDel(0)
-		{}
-		CCommitPointer(const CCommitPointer& P_Right)
-		: m_cont(NULL)
-		, m_place(0)
-		, m_Date(0)
-		, m_Changes(0)
-		, m_lineInc(0)
-		, m_lineDec(0)
-		, m_lineNew(0)
-		, m_lineDel(0)
-		{
-			*this = P_Right;
-		}
-
-		CCommitPointer& operator = (const CCommitPointer& P_Right)
-		{
-			if(IsPointer())
-			{
-				(*m_cont->m_parDates)[m_place]			= P_Right.GetDate();
-				(*m_cont->m_parFileChanges)[m_place]	= P_Right.GetChanges();
-				(*m_cont->m_parAuthors)[m_place]		= P_Right.GetAuthor();
-				(*m_cont->m_lineInc)[m_place]			= P_Right.GetLineInc();
-				(*m_cont->m_lineDec)[m_place]			= P_Right.GetLineDec();
-				(*m_cont->m_lineNew)[m_place]			= P_Right.GetLineNew();
-				(*m_cont->m_lineDel)[m_place]			= P_Right.GetLineDel();
-			}
-			else
-			{
-				m_Date								= P_Right.GetDate();
-				m_Changes							= P_Right.GetChanges();
-				m_csAuthor							= P_Right.GetAuthor();
-				m_lineInc							= P_Right.GetLineInc();
-				m_lineDec							= P_Right.GetLineDec();
-				m_lineNew							= P_Right.GetLineNew();
-				m_lineDel							= P_Right.GetLineDel();
-			}
-			return *this;
-		}
-
-		void Clone(const CCommitPointer& P_Right)
-		{
-			m_cont = P_Right.m_cont;
-			m_place = P_Right.m_place;
-			m_Date = P_Right.m_Date;
-			m_Changes = P_Right.m_Changes;
-			m_csAuthor = P_Right.m_csAuthor;
-		}
-
-		DWORD		 GetDate()		const {return IsPointer() ? (*m_cont->m_parDates)[m_place] : m_Date;}
-		DWORD		 GetChanges()	const {return IsPointer() ? (*m_cont->m_parFileChanges)[m_place] : m_Changes;}
-		DWORD		 GetLineInc()	const {return IsPointer() ? (*m_cont->m_lineInc)[m_place] : m_lineInc;}
-		DWORD		 GetLineDec()	const {return IsPointer() ? (*m_cont->m_lineDec)[m_place] : m_lineDec;}
-		DWORD		 GetLineNew()	const {return IsPointer() ? (*m_cont->m_lineNew)[m_place] : m_lineNew;}
-		DWORD		 GetLineDel()	const {return IsPointer() ? (*m_cont->m_lineDel)[m_place] : m_lineDel;}
-		CString		 GetAuthor()	const {return IsPointer() ? (*m_cont->m_parAuthors)[m_place] : m_csAuthor;}
-
-		bool		IsPointer() const {return m_cont != NULL;}
-		//When pointer
-		CDateSorter* m_cont;
-		int			 m_place;
-
-		//When element
-		DWORD		 m_Date;
-		DWORD		 m_Changes;
-		DWORD		 m_lineInc;
-		DWORD		 m_lineDec;
-		DWORD		 m_lineNew;
-		DWORD		 m_lineDel;
-		CString		 m_csAuthor;
-
-	};
-	class iterator : public std::iterator<std::random_access_iterator_tag, CCommitPointer>
-	{
-	public:
-		CCommitPointer m_ptr;
-
-		iterator(){}
-		iterator(const iterator& P_Right){*this = P_Right;}
-		iterator& operator=(const iterator& P_Right)
-		{
-			m_ptr.Clone(P_Right.m_ptr);
-			return *this;
-		}
-
-		CCommitPointer& operator*(){return m_ptr;}
-		CCommitPointer* operator->(){return &m_ptr;}
-		const CCommitPointer& operator*()const{return m_ptr;}
-		const CCommitPointer* operator->()const{return &m_ptr;}
-
-		iterator& operator+=(size_t P_iOffset){m_ptr.m_place += (int)P_iOffset;return *this;}
-		iterator& operator-=(size_t P_iOffset){m_ptr.m_place -= (int)P_iOffset;return *this;}
-		iterator operator+(size_t P_iOffset)const{iterator it(*this); it += P_iOffset;return it;}
-		iterator operator-(size_t P_iOffset)const{iterator it(*this); it -= P_iOffset;return it;}
-
-		iterator& operator++(){++m_ptr.m_place;return *this;}
-		iterator& operator--(){--m_ptr.m_place;return *this;}
-		iterator operator++(int){iterator it(*this);++*this;return it;}
-		iterator operator--(int){iterator it(*this);--*this;return it;}
-
-		size_t operator-(const iterator& P_itRight)const{return m_ptr.m_place - P_itRight->m_place;}
-
-		bool operator<(const iterator& P_itRight)const{return m_ptr.m_place < P_itRight->m_place;}
-		bool operator!=(const iterator& P_itRight)const{return m_ptr.m_place != P_itRight->m_place;}
-		bool operator==(const iterator& P_itRight)const{return m_ptr.m_place == P_itRight->m_place;}
-		bool operator>(const iterator& P_itRight)const{return m_ptr.m_place > P_itRight->m_place;}
-	};
-	iterator begin()
-	{
-		iterator it;
-		it->m_place = 0;
-		it->m_cont = this;
-		return it;
-	}
-	iterator end()
-	{
-		iterator it;
-		it->m_place = (int)m_parDates->GetCount();
-		it->m_cont = this;
-		return it;
-	}
-
-	CDWordArray	*	m_parDates;
-	CDWordArray	*	m_parFileChanges;
-	CDWordArray *	m_lineInc;
-	CDWordArray *	m_lineDec;
-	CDWordArray *	m_lineNew;
-	CDWordArray *	m_lineDel;
-	CStringArray *	m_parAuthors;
-};
-
-class CDateSorterLess
-{
-public:
-	bool operator () (const CDateSorter::CCommitPointer& P_Left, const CDateSorter::CCommitPointer& P_Right) const
-	{
-		return P_Left.GetDate() > P_Right.GetDate(); //Last date first
-	}
-
-};
-
 int CStatGraphDlg::GatherData(BOOL fetchdiff, BOOL keepFetchedData)
 {
 	m_parAuthors.RemoveAll();
@@ -733,7 +588,6 @@ int CStatGraphDlg::GatherData(BOOL fetchdiff, BOOL keepFetchedData)
 	{
 		progress.SetTitle(CString(MAKEINTRESOURCE(IDS_PROGS_TITLE_GATHERSTATISTICS)));
 		progress.FormatNonPathLine(1, IDS_PROC_STATISTICS_DIFF);
-		progress.SetAnimation(IDR_MOVEANI);
 		progress.SetTime(true);
 		progress.ShowModeless(this);
 	}
@@ -741,53 +595,55 @@ int CStatGraphDlg::GatherData(BOOL fetchdiff, BOOL keepFetchedData)
 	// create arrays which are aware of the current filter
 	ULONGLONG starttime = GetTickCount64();
 
+	if (m_bUseCommitDates)
+		std::sort(m_ShowList.begin(), m_ShowList.end(), [](GitRevLoglist* pLhs, GitRevLoglist* pRhs) { return pLhs->GetCommitterDate() > pRhs->GetCommitterDate(); });
+	else
+		std::sort(m_ShowList.begin(), m_ShowList.end(), [](GitRevLoglist* pLhs, GitRevLoglist* pRhs) { return pLhs->GetAuthorDate() > pRhs->GetAuthorDate(); });
+
 	GIT_MAILMAP mailmap = nullptr;
 	git_read_mailmap(&mailmap);
 	for (size_t i = 0; i < m_ShowList.size(); ++i)
 	{
-		GitRevLoglist* pLogEntry = m_ShowList.SafeGetAt(i);
+		auto pLogEntry = m_ShowList[i];
 		int inc, dec, incnewfile, decdeletedfile, files;
 		inc = dec = incnewfile = decdeletedfile = files= 0;
 
-		// do not take working dir changes into statistics
-		if (pLogEntry->m_CommitHash.IsEmpty()) {
-			continue;
-		}
-
-		CString strAuthor = pLogEntry->GetAuthorName();
-		if (strAuthor.IsEmpty())
-		{
-			strAuthor.LoadString(IDS_STATGRAPH_EMPTYAUTHOR);
-		}
+		CString strAuthor = m_bUseCommitterNames ? pLogEntry->GetCommitterName() : pLogEntry->GetAuthorName();
 		if (mailmap)
 		{
-			CStringA email2A = CUnicodeUtils::GetUTF8(pLogEntry->GetAuthorEmail());
-			struct payload_struct { GitRev* rev; const char *authorName; };
-			payload_struct payload = { pLogEntry, nullptr };
-			const char *author1 = git_get_mailmap_author(mailmap, email2A, &payload, 
-				[] (void *payload) -> const char * { return ((payload_struct *)payload)->authorName = _strdup(CUnicodeUtils::GetUTF8(((payload_struct *)payload)->rev->GetAuthorName())); });
+			CStringA email2A = CUnicodeUtils::GetUTF8(m_bUseCommitterNames ? pLogEntry->GetCommitterEmail() : pLogEntry->GetAuthorEmail());
+			struct payload_struct { GitRev* rev; const char *authorName; BOOL useCommitterNames; };
+			payload_struct payload = { pLogEntry, nullptr, m_bUseCommitterNames };
+			const char* author1 = nullptr;
+			git_lookup_mailmap(mailmap, nullptr, &author1, email2A, &payload, 
+				[](void* payload) -> const char* { return reinterpret_cast<payload_struct*>(payload)->authorName = _strdup(CUnicodeUtils::GetUTF8(reinterpret_cast<payload_struct*>(payload)->useCommitterNames ? reinterpret_cast<payload_struct*>(payload)->rev->GetCommitterName() : reinterpret_cast<payload_struct*>(payload)->rev->GetAuthorName())); });
 			free((void *)payload.authorName);
 			if (author1)
 				strAuthor = CUnicodeUtils::GetUnicode(author1);
 		}
+		if (strAuthor.IsEmpty())
+			strAuthor.LoadString(IDS_STATGRAPH_EMPTYAUTHOR);
 		m_parAuthors.Add(strAuthor);
-		m_parDates.Add((DWORD)pLogEntry->GetCommitterDate().GetTime());
+		if (m_bUseCommitDates)
+			m_parDates.Add((DWORD)pLogEntry->GetCommitterDate().GetTime());
+		else
+			m_parDates.Add((DWORD)pLogEntry->GetAuthorDate().GetTime());
 
 		if (fetchdiff && (pLogEntry->m_ParentHash.size() <= 1))
 		{
-			CTGitPathList &list = pLogEntry->GetFiles(NULL);
+			CTGitPathList& list = pLogEntry->GetFiles(nullptr);
 			files = list.GetCount();
 
 			for (int j = 0; j < files; j++)
 			{
 				if (list[j].m_Action & CTGitPath::LOGACTIONS_DELETED)
-					decdeletedfile += _tstol(list[j].m_StatDel);
+					decdeletedfile += _wtol(list[j].m_StatDel);
 				else if(list[j].m_Action & CTGitPath::LOGACTIONS_ADDED)
-					incnewfile += _tstol(list[j].m_StatAdd);
+					incnewfile += _wtol(list[j].m_StatAdd);
 				else
 				{
-					inc += _tstol(list[j].m_StatAdd);
-					dec += _tstol(list[j].m_StatDel);
+					inc += _wtol(list[j].m_StatAdd);
+					dec += _wtol(list[j].m_StatDel);
 				}
 
 				if (progress.HasUserCancelled())
@@ -808,7 +664,7 @@ int CStatGraphDlg::GatherData(BOOL fetchdiff, BOOL keepFetchedData)
 
 		if (progress.IsVisible() && (GetTickCount64() - starttime > 100UL))
 		{
-			progress.FormatNonPathLine(2, _T("%s: %s"), (LPCTSTR)pLogEntry->m_CommitHash.ToString().Left(g_Git.GetShortHASHLength()), (LPCTSTR)pLogEntry->GetSubject());
+			progress.FormatNonPathLine(2, L"%s: %s", (LPCTSTR)pLogEntry->m_CommitHash.ToString().Left(g_Git.GetShortHASHLength()), (LPCTSTR)pLogEntry->GetSubject());
 			progress.SetProgress64(i, m_ShowList.size());
 			starttime = GetTickCount64();
 		}
@@ -824,17 +680,6 @@ int CStatGraphDlg::GatherData(BOOL fetchdiff, BOOL keepFetchedData)
 		m_lineInc2.Copy(m_lineInc);
 		m_lineDec2.Copy(m_lineDec);
 	}
-
-	CDateSorter W_Sorter;
-	W_Sorter.m_parAuthors		= &m_parAuthors;
-	W_Sorter.m_parDates			= &m_parDates;
-	W_Sorter.m_parFileChanges	= &m_parFileChanges;
-	W_Sorter.m_lineNew			= &m_lineNew;
-	W_Sorter.m_lineDel			= &m_lineDel;
-	W_Sorter.m_lineInc			= &m_lineInc;
-	W_Sorter.m_lineDec			= &m_lineDec;
-
-	std::sort(W_Sorter.begin(), W_Sorter.end(), CDateSorterLess());
 
 	m_nTotalCommits = m_parAuthors.GetCount();
 	m_nTotalFileChanges = 0;
@@ -927,7 +772,6 @@ int CStatGraphDlg::GatherData(BOOL fetchdiff, BOOL keepFetchedData)
 	// extract the information to be shown.
 
 	return 0;
-
 }
 
 void CStatGraphDlg::FilterSkippedAuthors(std::list<tstring>& included_authors,
@@ -981,14 +825,14 @@ bool  CStatGraphDlg::PreViewStat(bool fShowLabels)
 	return true;
 }
 
-MyGraphSeries *CStatGraphDlg::PreViewGraph(__in UINT GraphTitle, __in UINT YAxisLabel, __in UINT XAxisLabel /*= NULL*/)
+MyGraphSeries *CStatGraphDlg::PreViewGraph(__in UINT GraphTitle, __in UINT YAxisLabel, __in UINT XAxisLabel /*= nullptr*/)
 {
 	if(!PreViewStat(false))
-		return NULL;
+		return nullptr;
 
 	// We need at least one author
 	if (m_authorNames.empty())
-		return NULL;
+		return nullptr;
 
 	// Add a single series to the chart
 	MyGraphSeries * graphData = new MyGraphSeries();
@@ -1015,7 +859,7 @@ void CStatGraphDlg::ShowPercentageOfAuthorship()
 	MyGraphSeries * graphData = PreViewGraph(IDS_STATGRAPH_PERCENTAGE_OF_AUTHORSHIP,
 		IDS_STATGRAPH_PERCENTAGE_OF_AUTHORSHIPY,
 		IDS_STATGRAPH_COMMITSBYAUTHORMOREX);
-	if(graphData == NULL) return;
+	if (!graphData) return;
 
 	// Find out which authors are to be shown and which are to be skipped.
 	std::list<tstring> authors;
@@ -1050,7 +894,7 @@ void CStatGraphDlg::ShowCommitsByAuthor()
 	MyGraphSeries * graphData = PreViewGraph(IDS_STATGRAPH_COMMITSBYAUTHOR,
 		IDS_STATGRAPH_COMMITSBYAUTHORY,
 		IDS_STATGRAPH_COMMITSBYAUTHORX);
-	if(graphData == NULL) return;
+	if (!graphData) return;
 
 	// Find out which authors are to be shown and which are to be skipped.
 	std::list<tstring> authors;
@@ -1109,8 +953,7 @@ void CStatGraphDlg::ShowByDate(int stringx, int title, IntervalDataMap &data)
 	tstring othersName;
 	if (!others.empty())
 	{
-		temp.Format(_T(" (%Iu)"), others.size());
-		sOthers += temp;
+		sOthers.AppendFormat(L" (%Iu)", others.size());
 		othersName = (LPCWSTR)sOthers;
 		authorGraphMap[othersName] = m_graph.AppendGroup(sOthers);
 	}
@@ -1270,65 +1113,65 @@ void CStatGraphDlg::ShowStats()
 	SetDlgItemText(IDC_FILECHANGESEACHWEEK, (LPCTSTR)labelText);
 	// We have now all data we want and we can fill in the labels...
 	CString number;
-	number.Format(_T("%d"), nWeeks);
+	number.Format(L"%d", nWeeks);
 	SetDlgItemText(IDC_NUMWEEKVALUE, number);
-	number.Format(_T("%Iu"), nAuthors);
+	number.Format(L"%Iu", nAuthors);
 	SetDlgItemText(IDC_NUMAUTHORVALUE, number);
-	number.Format(_T("%Id"), m_nTotalCommits);
+	number.Format(L"%Id", m_nTotalCommits);
 	SetDlgItemText(IDC_NUMCOMMITSVALUE, number);
-	number.Format(_T("%ld"), m_nTotalFileChanges);
+	number.Format(L"%ld", m_nTotalFileChanges);
 	if (m_bDiffFetched)
 		SetDlgItemText(IDC_NUMFILECHANGESVALUE, number);
 
-	number.Format(_T("%Id"), m_parAuthors.GetCount() / nWeeks);
+	number.Format(L"%Id", m_parAuthors.GetCount() / nWeeks);
 	SetDlgItemText(IDC_COMMITSEACHWEEKAVG, number);
-	number.Format(_T("%ld"), nCommitsMax);
+	number.Format(L"%ld", nCommitsMax);
 	SetDlgItemText(IDC_COMMITSEACHWEEKMAX, number);
-	number.Format(_T("%ld"), nCommitsMin);
+	number.Format(L"%ld", nCommitsMin);
 	SetDlgItemText(IDC_COMMITSEACHWEEKMIN, number);
 
-	number.Format(_T("%ld"), m_nTotalFileChanges / nWeeks);
+	number.Format(L"%ld", m_nTotalFileChanges / nWeeks);
 	//SetDlgItemText(IDC_FILECHANGESEACHWEEKAVG, number);
-	number.Format(_T("%ld"), nFileChangesMax);
+	number.Format(L"%ld", nFileChangesMax);
 	//SetDlgItemText(IDC_FILECHANGESEACHWEEKMAX, number);
-	number.Format(_T("%ld"), nFileChangesMin);
+	number.Format(L"%ld", nFileChangesMin);
 	//SetDlgItemText(IDC_FILECHANGESEACHWEEKMIN, number);
 
-	number.Format(_T("%ld (%ld (+) %ld (-))"), m_nTotalLinesInc + m_nTotalLinesDec, m_nTotalLinesInc, m_nTotalLinesDec);
+	number.Format(L"%ld (%ld (+) %ld (-))", m_nTotalLinesInc + m_nTotalLinesDec, m_nTotalLinesInc, m_nTotalLinesDec);
 	if (m_bDiffFetched)
 		SetDlgItemText(IDC_TOTAL_LINE_WITHOUT_NEW_DEL_VALUE, number);
-	number.Format(_T("%ld (%ld (+) %ld (-))"), m_nTotalLinesInc + m_nTotalLinesDec + m_nTotalLinesNew + m_nTotalLinesDel,
+	number.Format(L"%ld (%ld (+) %ld (-))", m_nTotalLinesInc + m_nTotalLinesDec + m_nTotalLinesNew + m_nTotalLinesDel,
 												m_nTotalLinesInc + m_nTotalLinesNew, m_nTotalLinesDec + m_nTotalLinesDel);
 	if (m_bDiffFetched)
 		SetDlgItemText(IDC_TOTAL_LINE_WITH_NEW_DEL_VALUE, number);
 
 	if (nAuthors == 0)
 	{
-		SetDlgItemText(IDC_MOSTACTIVEAUTHORNAME, _T(""));
-		SetDlgItemText(IDC_MOSTACTIVEAUTHORAVG, _T("0"));
-		SetDlgItemText(IDC_MOSTACTIVEAUTHORMAX, _T("0"));
-		SetDlgItemText(IDC_MOSTACTIVEAUTHORMIN, _T("0"));
-		SetDlgItemText(IDC_LEASTACTIVEAUTHORNAME, _T(""));
-		SetDlgItemText(IDC_LEASTACTIVEAUTHORAVG, _T("0"));
-		SetDlgItemText(IDC_LEASTACTIVEAUTHORMAX, _T("0"));
-		SetDlgItemText(IDC_LEASTACTIVEAUTHORMIN, _T("0"));
+		SetDlgItemText(IDC_MOSTACTIVEAUTHORNAME, L"");
+		SetDlgItemText(IDC_MOSTACTIVEAUTHORAVG, L"0");
+		SetDlgItemText(IDC_MOSTACTIVEAUTHORMAX, L"0");
+		SetDlgItemText(IDC_MOSTACTIVEAUTHORMIN, L"0");
+		SetDlgItemText(IDC_LEASTACTIVEAUTHORNAME, L"");
+		SetDlgItemText(IDC_LEASTACTIVEAUTHORAVG, L"0");
+		SetDlgItemText(IDC_LEASTACTIVEAUTHORMAX, L"0");
+		SetDlgItemText(IDC_LEASTACTIVEAUTHORMIN, L"0");
 	}
 	else
 	{
 		SetDlgItemText(IDC_MOSTACTIVEAUTHORNAME, mostActiveAuthor.c_str());
-		number.Format(_T("%ld"), m_commitsPerAuthor[mostActiveAuthor] / nWeeks);
+		number.Format(L"%ld", m_commitsPerAuthor[mostActiveAuthor] / nWeeks);
 		SetDlgItemText(IDC_MOSTACTIVEAUTHORAVG, number);
-		number.Format(_T("%ld"), nMostActiveMaxCommits);
+		number.Format(L"%ld", nMostActiveMaxCommits);
 		SetDlgItemText(IDC_MOSTACTIVEAUTHORMAX, number);
-		number.Format(_T("%ld"), nMostActiveMinCommits);
+		number.Format(L"%ld", nMostActiveMinCommits);
 		SetDlgItemText(IDC_MOSTACTIVEAUTHORMIN, number);
 
 		SetDlgItemText(IDC_LEASTACTIVEAUTHORNAME, leastActiveAuthor.c_str());
-		number.Format(_T("%ld"), m_commitsPerAuthor[leastActiveAuthor] / nWeeks);
+		number.Format(L"%ld", m_commitsPerAuthor[leastActiveAuthor] / nWeeks);
 		SetDlgItemText(IDC_LEASTACTIVEAUTHORAVG, number);
-		number.Format(_T("%ld"), nLeastActiveMaxCommits);
+		number.Format(L"%ld", nLeastActiveMaxCommits);
 		SetDlgItemText(IDC_LEASTACTIVEAUTHORMAX, number);
-		number.Format(_T("%ld"), nLeastActiveMinCommits);
+		number.Format(L"%ld", nLeastActiveMinCommits);
 		SetDlgItemText(IDC_LEASTACTIVEAUTHORMIN, number);
 	}
 }
@@ -1431,14 +1274,14 @@ CString CStatGraphDlg::GetUnitLabel(int unit, CTime &lasttime)
 			switch (m_langOrder)
 			{
 			case 0: // month day year
-				temp.Format(_T("%d/%d/%.2d"), month, day, lasttime.GetYear()%100);
+				temp.Format(L"%d/%d/%.2d", month, day, lasttime.GetYear() % 100);
 				break;
 			case 1: // day month year
 			default:
-				temp.Format(_T("%d/%d/%.2d"), day, month, lasttime.GetYear()%100);
+				temp.Format(L"%d/%d/%.2d", day, month, lasttime.GetYear() % 100);
 				break;
 			case 2: // year month day
-				temp.Format(_T("%.2d/%d/%d"), lasttime.GetYear()%100, month, day);
+				temp.Format(L"%.2d/%d/%d", lasttime.GetYear() % 100, month, day);
 				break;
 			}
 		}
@@ -1454,10 +1297,10 @@ CString CStatGraphDlg::GetUnitLabel(int unit, CTime &lasttime)
 			case 0: // month day year
 			case 1: // day month year
 			default:
-				temp.Format(_T("%d/%.2d"), unit, year%100);
+				temp.Format(L"%d/%.2d", unit, year % 100);
 				break;
 			case 2: // year month day
-				temp.Format(_T("%.2d/%d"), year%100, unit);
+				temp.Format(L"%.2d/%d", year % 100, unit);
 				break;
 			}
 		}
@@ -1468,10 +1311,10 @@ CString CStatGraphDlg::GetUnitLabel(int unit, CTime &lasttime)
 		case 0: // month day year
 		case 1: // day month year
 		default:
-			temp.Format(_T("%d/%.2d"), unit, lasttime.GetYear()%100);
+			temp.Format(L"%d/%.2d", unit, lasttime.GetYear() % 100);
 			break;
 		case 2: // year month day
-			temp.Format(_T("%.2d/%d"), lasttime.GetYear()%100, unit);
+			temp.Format(L"%.2d/%d", lasttime.GetYear() % 100, unit);
 			break;
 		}
 		break;
@@ -1481,15 +1324,15 @@ CString CStatGraphDlg::GetUnitLabel(int unit, CTime &lasttime)
 		case 0: // month day year
 		case 1: // day month year
 		default:
-			temp.Format(_T("%d/%.2d"), unit, lasttime.GetYear()%100);
+			temp.Format(L"%d/%.2d", unit, lasttime.GetYear() % 100);
 			break;
 		case 2: // year month day
-			temp.Format(_T("%.2d/%d"), lasttime.GetYear()%100, unit);
+			temp.Format(L"%.2d/%d", lasttime.GetYear() % 100, unit);
 			break;
 		}
 		break;
 	case Years:
-		temp.Format(_T("%d"), unit);
+		temp.Format(L"%d", unit);
 		break;
 	}
 	return temp;
@@ -1524,7 +1367,7 @@ void CStatGraphDlg::OnNeedText(NMHDR *pnmh, LRESULT * /*pResult*/)
 
 		CString string;
 		int percentage = int(min_commits*100.0/(m_nTotalCommits ? m_nTotalCommits : 1));
-		string.Format(IDS_STATGRAPH_AUTHORSLIDER_TT, m_Skipper.GetPos(), min_commits, percentage);
+		string.FormatMessage(IDS_STATGRAPH_AUTHORSLIDER_TT, m_Skipper.GetPos(), min_commits, percentage);
 		StringCchCopy(pttt->szText, _countof(pttt->szText), (LPCTSTR) string);
 	}
 }
@@ -1539,6 +1382,20 @@ void CStatGraphDlg::AuthorsCaseSensitiveChanged()
 void CStatGraphDlg::SortModeChanged()
 {
 	UpdateData();   // update checkbox state
+	RedrawGraph();  // then update the current statistics page
+}
+
+void CStatGraphDlg::OnBnClickedCommitternames()
+{
+	UpdateData();   // update checkbox state
+	GatherData(FALSE, TRUE);   // first regenerate the statistics data
+	RedrawGraph();  // then update the current statistics page
+}
+
+void CStatGraphDlg::OnBnClickedCommitdates()
+{
+	UpdateData();   // update checkbox state
+	GatherData(FALSE, TRUE);   // first regenerate the statistics data
 	RedrawGraph();  // then update the current statistics page
 }
 
@@ -1647,7 +1504,7 @@ void CStatGraphDlg::OnFileSavestatgraphas()
 			extension = tempfile.Mid(dotPos);
 		if ((filterindex == 1)&&(extension.IsEmpty()))
 		{
-			extension = _T(".wmf");
+			extension = L".wmf";
 			tempfile += extension;
 		}
 		SaveGraph(tempfile);
@@ -1657,11 +1514,11 @@ void CStatGraphDlg::OnFileSavestatgraphas()
 void CStatGraphDlg::SaveGraph(CString sFilename)
 {
 	CString extension = CPathUtils::GetFileExtFromPath(sFilename);
-	if (extension.CompareNoCase(_T(".wmf"))==0)
+	if (extension.CompareNoCase(L".wmf") == 0)
 	{
 		// save the graph as an enhanced meta file
 		CMyMetaFileDC wmfDC;
-		wmfDC.CreateEnhanced(NULL, sFilename, NULL, _T("TortoiseGit\0Statistics\0\0"));
+		wmfDC.CreateEnhanced(nullptr, sFilename, nullptr, L"TortoiseGit\0Statistics\0\0");
 		wmfDC.SetAttribDC(GetDC()->GetSafeHdc());
 		RedrawGraph();
 		m_graph.DrawGraph(wmfDC);
@@ -1698,63 +1555,55 @@ void CStatGraphDlg::SaveGraph(CString sFilename)
 			GdiplusStartupInput gdiplusStartupInput;
 			ULONG_PTR gdiplusToken;
 			CString sErrormessage;
-			if (GdiplusStartup( &gdiplusToken, &gdiplusStartupInput, NULL )==Ok)
+			if (GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, nullptr) == Ok)
 			{
 				{
-					Bitmap bitmap(hbm, NULL);
+					Bitmap bitmap(hbm, nullptr);
 					if (bitmap.GetLastStatus()==Ok)
 					{
 						// Get the CLSID of the encoder.
 						int ret = 0;
-						if (CPathUtils::GetFileExtFromPath(sFilename).CompareNoCase(_T(".png"))==0)
+						if (CPathUtils::GetFileExtFromPath(sFilename).CompareNoCase(L".png") == 0)
 							ret = GetEncoderClsid(L"image/png", &encoderClsid);
-						else if (CPathUtils::GetFileExtFromPath(sFilename).CompareNoCase(_T(".jpg"))==0)
+						else if (CPathUtils::GetFileExtFromPath(sFilename).CompareNoCase(L".jpg") == 0)
 							ret = GetEncoderClsid(L"image/jpeg", &encoderClsid);
-						else if (CPathUtils::GetFileExtFromPath(sFilename).CompareNoCase(_T(".jpeg"))==0)
+						else if (CPathUtils::GetFileExtFromPath(sFilename).CompareNoCase(L".jpeg") == 0)
 							ret = GetEncoderClsid(L"image/jpeg", &encoderClsid);
-						else if (CPathUtils::GetFileExtFromPath(sFilename).CompareNoCase(_T(".bmp"))==0)
+						else if (CPathUtils::GetFileExtFromPath(sFilename).CompareNoCase(L".bmp") == 0)
 							ret = GetEncoderClsid(L"image/bmp", &encoderClsid);
-						else if (CPathUtils::GetFileExtFromPath(sFilename).CompareNoCase(_T(".gif"))==0)
+						else if (CPathUtils::GetFileExtFromPath(sFilename).CompareNoCase(L".gif") == 0)
 							ret = GetEncoderClsid(L"image/gif", &encoderClsid);
 						else
 						{
-							sFilename += _T(".jpg");
+							sFilename += L".jpg";
 							ret = GetEncoderClsid(L"image/jpeg", &encoderClsid);
 						}
 						if (ret >= 0)
 						{
 							CStringW tfile = CStringW(sFilename);
-							bitmap.Save(tfile, &encoderClsid, NULL);
+							bitmap.Save(tfile, &encoderClsid, nullptr);
 						}
 						else
-						{
 							sErrormessage.Format(IDS_REVGRAPH_ERR_NOENCODER, (LPCTSTR)CPathUtils::GetFileExtFromPath(sFilename));
-						}
 					}
 					else
-					{
 						sErrormessage.LoadString(IDS_REVGRAPH_ERR_NOBITMAP);
-					}
 				}
 				GdiplusShutdown(gdiplusToken);
 			}
 			else
-			{
 				sErrormessage.LoadString(IDS_REVGRAPH_ERR_GDIINIT);
-			}
 			dc.SelectObject(oldbm);
 			dc.DeleteDC();
 			if (!sErrormessage.IsEmpty())
-			{
-				::MessageBox(m_hWnd, sErrormessage, _T("TortoiseGit"), MB_ICONERROR);
-			}
+				::MessageBox(m_hWnd, sErrormessage, L"TortoiseGit", MB_ICONERROR);
 		}
 		catch (CException * pE)
 		{
 			TCHAR szErrorMsg[2048] = { 0 };
 			pE->GetErrorMessage(szErrorMsg, 2048);
 			pE->Delete();
-			::MessageBox(m_hWnd, szErrorMsg, _T("TortoiseGit"), MB_ICONERROR);
+			::MessageBox(m_hWnd, szErrorMsg, L"TortoiseGit", MB_ICONERROR);
 		}
 	}
 }
@@ -1771,7 +1620,7 @@ int CStatGraphDlg::GetEncoderClsid(const WCHAR* format, CLSID* pClsid)
 
 	auto pMem = std::make_unique<BYTE[]>(size);
 	auto pImageCodecInfo = (ImageCodecInfo*)(pMem.get());
-	if (pImageCodecInfo == NULL)
+	if (!pImageCodecInfo)
 		return -1;  // Failure
 
 	if (GetImageEncoders(num, size, pImageCodecInfo)==Ok)
@@ -1795,42 +1644,38 @@ void CStatGraphDlg::StoreCurrentGraphType()
 	// encode the current chart type
 	DWORD statspage = graphtype*10;
 	if ((m_GraphType == MyGraph::Bar)&&(m_bStacked))
-	{
 		statspage += 1;
-	}
 	if ((m_GraphType == MyGraph::Bar)&&(!m_bStacked))
-	{
 		statspage += 2;
-	}
 	if ((m_GraphType == MyGraph::Line)&&(m_bStacked))
-	{
 		statspage += 3;
-	}
 	if ((m_GraphType == MyGraph::Line)&&(!m_bStacked))
-	{
 		statspage += 4;
-	}
 	if (m_GraphType == MyGraph::PieChart)
-	{
 		statspage += 5;
-	}
 
 	// store current chart type in registry
-	CRegDWORD lastStatsPage(_T("Software\\TortoiseGit\\LastViewedStatsPage"), 0);
+	CRegDWORD lastStatsPage(L"Software\\TortoiseGit\\LastViewedStatsPage", 0);
 	lastStatsPage = statspage;
 
-	CRegDWORD regAuthors(_T("Software\\TortoiseGit\\StatAuthorsCaseSensitive"));
+	CRegDWORD regAuthors(L"Software\\TortoiseGit\\StatAuthorsCaseSensitive");
 	regAuthors = m_bAuthorsCaseSensitive;
 
-	CRegDWORD regSort(_T("Software\\TortoiseGit\\StatSortByCommitCount"));
+	CRegDWORD regSort(L"Software\\TortoiseGit\\StatSortByCommitCount");
 	regSort = m_bSortByCommitCount;
+
+	CRegDWORD regCommitterName(L"Software\\TortoiseGit\\StatCommiterNames");
+	regCommitterName = m_bUseCommitterNames;
+
+	CRegDWORD regCommitDates(L"Software\\TortoiseGit\\StatCommitDates");
+	regCommitDates = m_bUseCommitDates;
 }
 
 void CStatGraphDlg::ShowErrorMessage()
 {
 	CFormatMessageWrapper errorDetails;
 	if (errorDetails)
-		MessageBox( errorDetails, _T("Error"), MB_OK | MB_ICONINFORMATION );
+		MessageBox(errorDetails, L"Error", MB_OK | MB_ICONINFORMATION);
 }
 
 void CStatGraphDlg::ShowSelectStat(Metrics SelectedMetric, bool reloadSkiper /* = false */)
@@ -1877,15 +1722,10 @@ void CStatGraphDlg::DrawOthers(const std::list<tstring> &others, MyGraphSeries *
 {
 	int  nCommits = 0;
 	for (std::list<tstring>::const_iterator it = others.begin(); it != others.end(); ++it)
-	{
 		nCommits += RollPercentageOfAuthorship(map[*it]);
-	}
-
-	CString temp;
-	temp.Format(_T(" (%Iu)"), others.size());
 
 	CString sOthers(MAKEINTRESOURCE(IDS_STATGRAPH_OTHERGROUP));
-	sOthers += temp;
+	sOthers.AppendFormat(L" (%Iu)", others.size());
 	int group = m_graph.AppendGroup(sOthers);
 	graphData->SetData(group, (int)nCommits);
 }

@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2012-2015 - TortoiseGit
+// Copyright (C) 2012-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -22,13 +22,12 @@
 #include "SubmoduleUpdateDlg.h"
 #include "AppUtils.h"
 #include "UnicodeUtils.h"
-#include "MessageBox.h"
 
 IMPLEMENT_DYNAMIC(CSubmoduleUpdateDlg, CResizableStandAloneDialog)
 
 bool CSubmoduleUpdateDlg::s_bSortLogical = true;
 
-CSubmoduleUpdateDlg::CSubmoduleUpdateDlg(CWnd* pParent /*=NULL*/)
+CSubmoduleUpdateDlg::CSubmoduleUpdateDlg(CWnd* pParent /*=nullptr*/)
 	: CResizableStandAloneDialog(CSubmoduleUpdateDlg::IDD, pParent)
 	, m_bInit(TRUE)
 	, m_bRecursive(FALSE)
@@ -63,7 +62,6 @@ void CSubmoduleUpdateDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Check(pDX, IDC_CHECK_SUBMODULE_REMOTE, m_bRemote);
 }
 
-
 BEGIN_MESSAGE_MAP(CSubmoduleUpdateDlg, CResizableStandAloneDialog)
 	ON_BN_CLICKED(IDC_SELECTALL, OnBnClickedSelectall)
 	ON_BN_CLICKED(IDC_WHOLE_PROJECT, OnBnClickedShowWholeProject)
@@ -77,15 +75,13 @@ static int SubmoduleCallback(git_submodule *sm, const char * /*name*/, void *pay
 	STRING_VECTOR *prefixList = *((STRING_VECTOR **)payload + 1);
 	CString path = CUnicodeUtils::GetUnicode(git_submodule_path(sm));
 	if (prefixList->empty())
-	{
 		list->push_back(path);
-	}
 	else
 	{
 		for (size_t i = 0; i < prefixList->size(); ++i)
 		{
-			CString prefix = prefixList->at(i) + _T("/");
-			if (path.Left(prefix.GetLength()) == prefix)
+			CString prefix = prefixList->at(i) + L'/';
+			if (CStringUtils::StartsWith(path, prefix))
 				list->push_back(path);
 		}
 	}
@@ -104,14 +100,14 @@ static void GetSubmodulePathList(STRING_VECTOR &list, STRING_VECTOR &prefixList)
 	CAutoRepository repo(g_Git.GetGitRepository());
 	if (!repo)
 	{
-		MessageBox(NULL, CGit::GetLibGit2LastErr(_T("Could not open repository.")), _T("TortoiseGit"), MB_ICONERROR);
+		MessageBox(nullptr, CGit::GetLibGit2LastErr(L"Could not open repository."), L"TortoiseGit", MB_ICONERROR);
 		return;
 	}
 
 	STRING_VECTOR *listParams[] = { &list, &prefixList };
 	if (git_submodule_foreach(repo, SubmoduleCallback, &listParams))
 	{
-		MessageBox(NULL, CGit::GetLibGit2LastErr(_T("Could not get submodule list.")), _T("TortoiseGit"), MB_ICONERROR);
+		MessageBox(nullptr, CGit::GetLibGit2LastErr(L"Could not get submodule list."), L"TortoiseGit", MB_ICONERROR);
 		return;
 	}
 
@@ -122,6 +118,12 @@ BOOL CSubmoduleUpdateDlg::OnInitDialog()
 {
 	CResizableStandAloneDialog::OnInitDialog();
 	CAppUtils::MarkWindowAsUnpinnable(m_hWnd);
+
+	AdjustControlSize(IDC_CHECK_SUBMODULE_INIT);
+	AdjustControlSize(IDC_CHECK_SUBMODULE_RECURSIVE);
+	AdjustControlSize(IDC_CHECK_SUBMODULE_NOFETCH);
+	AdjustControlSize(IDC_CHECK_SUBMODULE_MERGE);
+	AdjustControlSize(IDC_CHECK_SUBMODULE_REBASE);
 
 	AddAnchor(IDOK, BOTTOM_RIGHT);
 	AddAnchor(IDCANCEL, BOTTOM_RIGHT);
@@ -140,36 +142,30 @@ BOOL CSubmoduleUpdateDlg::OnInitDialog()
 	AddAnchor(IDC_CHECK_SUBMODULE_REBASE, BOTTOM_RIGHT);
 
 	CString str(g_Git.m_CurrentDir);
-	str.Replace(_T(":"), _T("_"));
-	m_regShowWholeProject = CRegDWORD(_T("Software\\TortoiseGit\\TortoiseProc\\ShowWholeProject\\") + str, FALSE);
+	str.Replace(L':', L'_');
+	m_regShowWholeProject = CRegDWORD(L"Software\\TortoiseGit\\TortoiseProc\\ShowWholeProject\\" + str, FALSE);
 	m_bWholeProject = m_regShowWholeProject;
 
-	m_regInit = CRegDWORD(_T("Software\\TortoiseGit\\TortoiseProc\\SubmoduleUpdate\\") + str + _T("\\init"), TRUE);
+	m_regInit = CRegDWORD(L"Software\\TortoiseGit\\TortoiseProc\\SubmoduleUpdate\\" + str + L"\\init", TRUE);
 	m_bInit = m_regInit;
-	m_regRecursive = CRegDWORD(_T("Software\\TortoiseGit\\TortoiseProc\\SubmoduleUpdate\\") + str + _T("\\recursive"), FALSE);
+	m_regRecursive = CRegDWORD(L"Software\\TortoiseGit\\TortoiseProc\\SubmoduleUpdate\\" + str + L"\\recursive", FALSE);
 	m_bRecursive = m_regRecursive;
-	m_regForce = CRegDWORD(_T("Software\\TortoiseGit\\TortoiseProc\\SubmoduleUpdate\\") + str + _T("\\force"), FALSE);
+	m_regForce = CRegDWORD(L"Software\\TortoiseGit\\TortoiseProc\\SubmoduleUpdate\\" + str + L"\\force", FALSE);
 	m_bForce = m_regForce;
-	m_regRemote = CRegDWORD(_T("Software\\TortoiseGit\\TortoiseProc\\SubmoduleUpdate\\") + str + _T("\\remote"), FALSE);
+	m_regRemote = CRegDWORD(L"Software\\TortoiseGit\\TortoiseProc\\SubmoduleUpdate\\" + str + L"\\remote", FALSE);
 	m_bRemote = m_regRemote;
-	m_regNoFetch = CRegDWORD(_T("Software\\TortoiseGit\\TortoiseProc\\SubmoduleUpdate\\") + str + _T("\\nofetch"), FALSE);
+	m_regNoFetch = CRegDWORD(L"Software\\TortoiseGit\\TortoiseProc\\SubmoduleUpdate\\" + str + L"\\nofetch", FALSE);
 	m_bNoFetch = m_regNoFetch;
-	m_regMerge = CRegDWORD(_T("Software\\TortoiseGit\\TortoiseProc\\SubmoduleUpdate\\") + str + _T("\\merge"), FALSE);
+	m_regMerge = CRegDWORD(L"Software\\TortoiseGit\\TortoiseProc\\SubmoduleUpdate\\" + str + L"\\merge", FALSE);
 	m_bMerge = m_regMerge;
-	m_regRebase = CRegDWORD(_T("Software\\TortoiseGit\\TortoiseProc\\SubmoduleUpdate\\") + str + _T("\\rebase"), FALSE);
+	m_regRebase = CRegDWORD(L"Software\\TortoiseGit\\TortoiseProc\\SubmoduleUpdate\\" + str + L"\\rebase", FALSE);
 	m_bRebase = m_regRebase;
 
 	DialogEnableWindow(IDC_WHOLE_PROJECT, !(m_PathFilterList.empty() || (m_PathFilterList.size() == 1 && m_PathFilterList[0].IsEmpty())));
 
 	SetDlgTitle();
 
-	AdjustControlSize(IDC_CHECK_SUBMODULE_INIT);
-	AdjustControlSize(IDC_CHECK_SUBMODULE_RECURSIVE);
-	AdjustControlSize(IDC_CHECK_SUBMODULE_NOFETCH);
-	AdjustControlSize(IDC_CHECK_SUBMODULE_MERGE);
-	AdjustControlSize(IDC_CHECK_SUBMODULE_REBASE);
-
-	EnableSaveRestore(_T("SubmoduleUpdateDlg"));
+	EnableSaveRestore(L"SubmoduleUpdateDlg");
 
 	Refresh();
 	UpdateData(FALSE);
@@ -185,9 +181,9 @@ void CSubmoduleUpdateDlg::SetDlgTitle()
 	if (!m_bWholeProject)
 	{
 		if (!m_PathFilterList.empty())
-			dir += (g_Git.m_CurrentDir.Right(1) == _T('\\') ? _T("") : _T("\\")) + CTGitPath(m_PathFilterList[0]).GetWinPathString();
+			dir += (CStringUtils::EndsWith(g_Git.m_CurrentDir, L'\\') ? L"" : L"\\") + CTGitPath(m_PathFilterList[0]).GetWinPathString();
 		if (m_PathFilterList.size() > 1)
-			dir += _T(", ...");
+			dir += L", ...";
 	}
 	CAppUtils::SetWindowTitle(m_hWnd, dir, m_sTitle);
 }
@@ -203,7 +199,7 @@ void CSubmoduleUpdateDlg::OnBnClickedOk()
 		if (m_PathListBox.GetSel(i))
 		{
 			if (!selected.IsEmpty())
-				selected.Append(_T("|"));
+				selected.AppendChar(L'|');
 			CString text;
 			m_PathListBox.GetText(i, text);
 			m_PathList.push_back(text);
@@ -271,9 +267,9 @@ void CSubmoduleUpdateDlg::Refresh()
 		m_PathListBox.DeleteString(m_PathListBox.GetCount() - 1);
 
 	CString WorkingDir = g_Git.m_CurrentDir;
-	WorkingDir.Replace(_T(':'), _T('_'));
+	WorkingDir.Replace(L':', L'_');
 
-	m_regPath = CRegString(CString(_T("Software\\TortoiseGit\\History\\SubmoduleUpdatePath\\") + WorkingDir));
+	m_regPath = CRegString(L"Software\\TortoiseGit\\History\\SubmoduleUpdatePath\\" + WorkingDir);
 	CString path = m_regPath;
 	STRING_VECTOR emptylist;
 	STRING_VECTOR list;
@@ -284,7 +280,7 @@ void CSubmoduleUpdateDlg::Refresh()
 		int pos = 0;
 		while (pos >= 0)
 		{
-			CString part = path.Tokenize(_T("|"), pos);
+			CString part = path.Tokenize(L"|", pos);
 			if (!part.IsEmpty())
 				selected.push_back(part);
 		}

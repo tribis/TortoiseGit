@@ -1,5 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
+// Copyright (C) 2011, 2013-2014, 2016 - TortoiseGit
 // Copyright (C) 2007-2008 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -33,18 +34,19 @@ public:
 	CSettingsTBlame();
 	virtual ~CSettingsTBlame();
 
-	UINT GetIconID() {return IDI_TORTOISEBLAME;}
+	UINT GetIconID() override { return IDI_TORTOISEBLAME; }
 
 // Dialog Data
 	enum { IDD = IDD_SETTINGSTBLAME };
 
 protected:
-	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
-	virtual BOOL OnInitDialog();
-	virtual BOOL OnApply();
+	virtual void DoDataExchange(CDataExchange* pDX) override;    // DDX/DDV support
+	virtual BOOL OnInitDialog() override;
+	virtual BOOL OnApply() override;
 	afx_msg void OnBnClickedColor();
 	afx_msg void OnChange();
 	afx_msg void OnBnClickedRestore();
+	afx_msg void OnMeasureItem(int nIDCtl, LPMEASUREITEMSTRUCT lpMeasureItemStruct);
 
 	void UpdateDependencies();
 
@@ -77,4 +79,6 @@ private:
 	CRegDWORD			m_regShowCompleteLog;
 	BOOL				m_bFollowRenames;
 	CRegDWORD			m_regFollowRenames;
+	BOOL				m_bFirstParent;
+	CRegDWORD			m_regFirstParent;
 };

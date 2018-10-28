@@ -1,5 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
+// Copyright (C) 2015-2016 - TortoiseGit
 // Copyright (C) 2003-2015 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -21,6 +22,7 @@
 #include "ResizableDialog.h"
 #include "TaskbarUUID.h"
 #include "Tooltip.h"
+#include "CommonDialogFunctions.h"
 
 #pragma comment(lib, "htmlhelp.lib")
 
@@ -37,17 +39,14 @@
  * \remark Replace all references to CDialog or CResizableDialog in your dialog class with
  * either CResizableStandAloneDialog, CStandAloneDialog or CStateStandAloneDialog, as appropriate
  */
-template <typename BaseType> class CStandAloneDialogTmpl : public BaseType
+template <typename BaseType> class CStandAloneDialogTmpl : public BaseType, protected CommonDialogFunctions<BaseType>
 {
 protected:
-	CStandAloneDialogTmpl(UINT nIDTemplate, CWnd* pParentWnd = NULL) : BaseType(nIDTemplate, pParentWnd)
+	CStandAloneDialogTmpl(UINT nIDTemplate, CWnd* pParentWnd = nullptr) : BaseType(nIDTemplate, pParentWnd), CommonDialogFunctions(this)
 	{
 		m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
-		m_nResizeBlock = 0;
-		m_height = 0;
-		m_width = 0;
 	}
-	virtual BOOL OnInitDialog()
+	virtual BOOL OnInitDialog() override
 	{
 		BaseType::OnInitDialog();
 
@@ -56,17 +55,13 @@ protected:
 		SetIcon(m_hIcon, TRUE);			// Set big icon
 		SetIcon(m_hIcon, FALSE);		// Set small icon
 
-		RECT rect;
-		GetWindowRect(&rect);
-		m_height = rect.bottom - rect.top;
-		m_width = rect.right - rect.left;
 		EnableToolTips();
 		m_tooltips.Create(this);
 
 		return FALSE;
 	}
 
-	virtual BOOL PreTranslateMessage(MSG* pMsg)
+	virtual BOOL PreTranslateMessage(MSG* pMsg) override
 	{
 		m_tooltips.RelayEvent(pMsg, this);
 		if (pMsg->message == WM_KEYDOWN)
@@ -76,9 +71,9 @@ protected:
 			if (nVirtKey == 'A' && (GetKeyState(VK_CONTROL) & 0x8000 ) )
 			{
 				TCHAR buffer[129];
-				::GetClassName(pMsg->hwnd, buffer,128);
+				::GetClassName(pMsg->hwnd, buffer, _countof(buffer) - 1);
 
-				if(_tcsnicmp(buffer,_T("EDIT"),128) == 0)
+				if (_wcsnicmp(buffer, L"EDIT", _countof(buffer) - 1) == 0)
 				{
 					::PostMessage(pMsg->hwnd,EM_SETSEL,0,-1);
 					return TRUE;
@@ -107,9 +102,7 @@ protected:
 			dc.DrawIcon(x, y, m_hIcon);
 		}
 		else
-		{
 			BaseType::OnPaint();
-		}
 	}
 	/**
 	 * Wrapper around the CWnd::EnableWindow() method, but
@@ -119,7 +112,7 @@ protected:
 	BOOL DialogEnableWindow(UINT nID, BOOL bEnable)
 	{
 		CWnd * pwndDlgItem = GetDlgItem(nID);
-		if (pwndDlgItem == NULL)
+		if (!pwndDlgItem)
 			return FALSE;
 		if (bEnable)
 			return pwndDlgItem->EnableWindow(bEnable);
@@ -128,118 +121,6 @@ protected:
 			SendMessage(WM_NEXTDLGCTL, 0, FALSE);
 		}
 		return pwndDlgItem->EnableWindow(bEnable);
-	}
-
-	/**
-	 * Adjusts the size of a checkbox or radio button control.
-	 * Since we always make the size of those bigger than 'necessary'
-	 * for making sure that translated strings can fit in those too,
-	 * this method can reduce the size of those controls again to only
-	 * fit the text.
-	 */
-	RECT AdjustControlSize(UINT nID)
-	{
-		CWnd * pwndDlgItem = GetDlgItem(nID);
-		// adjust the size of the control to fit its content
-		CString sControlText;
-		pwndDlgItem->GetWindowText(sControlText);
-		// next step: find the rectangle the control text needs to
-		// be displayed
-
-		CDC * pDC = pwndDlgItem->GetWindowDC();
-		RECT controlrect;
-		RECT controlrectorig;
-		pwndDlgItem->GetWindowRect(&controlrect);
-		::MapWindowPoints(NULL, GetSafeHwnd(), (LPPOINT)&controlrect, 2);
-		controlrectorig = controlrect;
-		if (pDC)
-		{
-			CFont * font = pwndDlgItem->GetFont();
-			CFont * pOldFont = pDC->SelectObject(font);
-			if (pDC->DrawText(sControlText, -1, &controlrect, DT_WORDBREAK | DT_EDITCONTROL | DT_EXPANDTABS | DT_LEFT | DT_CALCRECT))
-			{
-				// now we have the rectangle the control really needs
-				if ((controlrectorig.right - controlrectorig.left) > (controlrect.right - controlrect.left))
-				{
-					// we're dealing with radio buttons and check boxes,
-					// which means we have to add a little space for the checkbox
-					// the value of 3 pixels added here is necessary in case certain visual styles have
-					// been disabled. Without this, the width is calculated too short.
-					const int checkWidth = GetSystemMetrics(SM_CXMENUCHECK) + 2*GetSystemMetrics(SM_CXEDGE) + 3;
-					controlrectorig.right = controlrectorig.left + (controlrect.right - controlrect.left) + checkWidth;
-					pwndDlgItem->MoveWindow(&controlrectorig);
-				}
-			}
-			pDC->SelectObject(pOldFont);
-			ReleaseDC(pDC);
-		}
-		return controlrectorig;
-	}
-
-	/**
-	* Adjusts the size of a static control.
-	* \param nID control ID
-	* \param rc the position of the control where this control shall
-	*           be positioned next to on its right side.
-	* \param spacing number of pixels to add to rc.right
-	*/
-	RECT AdjustStaticSize(UINT nID, RECT rc, long spacing)
-	{
-		CWnd * pwndDlgItem = GetDlgItem(nID);
-		// adjust the size of the control to fit its content
-		CString sControlText;
-		pwndDlgItem->GetWindowText(sControlText);
-		// next step: find the rectangle the control text needs to
-		// be displayed
-
-		CDC * pDC = pwndDlgItem->GetWindowDC();
-		RECT controlrect;
-		RECT controlrectorig;
-		pwndDlgItem->GetWindowRect(&controlrect);
-		::MapWindowPoints(NULL, GetSafeHwnd(), (LPPOINT)&controlrect, 2);
-		controlrect.right += 200;   // in case the control needs to be bigger than it currently is (e.g., due to translations)
-		controlrectorig = controlrect;
-
-		long height = controlrectorig.bottom-controlrectorig.top;
-		long width = controlrectorig.right-controlrectorig.left;
-		controlrectorig.left = rc.right + spacing;
-		controlrectorig.right = controlrectorig.left + width;
-		controlrectorig.bottom = rc.bottom;
-		controlrectorig.top = controlrectorig.bottom - height;
-
-		if (pDC)
-		{
-			CFont * font = pwndDlgItem->GetFont();
-			CFont * pOldFont = pDC->SelectObject(font);
-			if (pDC->DrawText(sControlText, -1, &controlrect, DT_WORDBREAK | DT_EDITCONTROL | DT_EXPANDTABS | DT_LEFT | DT_CALCRECT))
-			{
-				// now we have the rectangle the control really needs
-				controlrectorig.right = controlrectorig.left + (controlrect.right - controlrect.left);
-				pwndDlgItem->MoveWindow(&controlrectorig);
-			}
-			pDC->SelectObject(pOldFont);
-			ReleaseDC(pDC);
-		}
-		return controlrectorig;
-	}
-
-	/**
-	 * Display a balloon with close button, anchored at a given edit control on this dialog.
-	 */
-	void ShowEditBalloon(UINT nIdControl, UINT nIdText, UINT nIdTitle, int nIcon = TTI_WARNING)
-	{
-		CString text(MAKEINTRESOURCE(nIdText));
-		CString title(MAKEINTRESOURCE(nIdTitle));
-		ShowEditBalloon(nIdControl, text, title, nIcon);
-	}
-	void ShowEditBalloon(UINT nIdControl, const CString& text, const CString& title, int nIcon = TTI_WARNING)
-	{
-		EDITBALLOONTIP bt;
-		bt.cbStruct = sizeof(bt);
-		bt.pszText  = text;
-		bt.pszTitle = title;
-		bt.ttiIcon = nIcon;
-		SendDlgItemMessage(nIdControl, EM_SHOWBALLOONTIP, 0, (LPARAM)&bt);
 	}
 
 	/**
@@ -252,23 +133,8 @@ protected:
 		SetCursorPos(pt.x, pt.y);
 	}
 
-	void BlockResize(int block)
-	{
-		m_nResizeBlock = block;
-	}
-
-	void EnableSaveRestore(LPCTSTR pszSection, bool bRectOnly = FALSE)
-	{
-		// call the base method with the bHorzResize and bVertResize parameters
-		// figured out from the resize block flags.
-		BaseType::EnableSaveRestore(pszSection, bRectOnly, (m_nResizeBlock & DIALOG_BLOCKHORIZONTAL) == 0, (m_nResizeBlock & DIALOG_BLOCKVERTICAL) == 0);
-	};
-
 protected:
 	CToolTips	m_tooltips;
-	int			m_nResizeBlock;
-	long		m_width;
-	long		m_height;
 
 	DECLARE_MESSAGE_MAP()
 
@@ -278,11 +144,11 @@ private:
 		return static_cast<HCURSOR>(m_hIcon);
 	}
 protected:
-	virtual void HtmlHelp(DWORD_PTR dwData, UINT nCmd = 0x000F)
+	virtual void HtmlHelp(DWORD_PTR dwData, UINT nCmd = 0x000F) override
 	{
 		CWinApp* pApp = AfxGetApp();
 		ASSERT_VALID(pApp);
-		ASSERT(pApp->m_pszHelpFilePath != NULL);
+		ASSERT(pApp->m_pszHelpFilePath);
 		// to call HtmlHelp the m_fUseHtmlHelp must be set in
 		// the application's constructor
 		ASSERT(pApp->m_eHelpType == afxHTMLHelp);
@@ -296,7 +162,7 @@ protected:
 			AfxMessageBox(AFX_IDP_FAILED_TO_LAUNCH_HELP);
 		}
 	}
-private:
+
 	afx_msg LRESULT OnTaskbarButtonCreated(WPARAM /*wParam*/, LPARAM /*lParam*/)
 	{
 		SetUUIDOverlayIcon(m_hWnd);
@@ -314,12 +180,12 @@ public:
 	, m_bEnableSaveRestore(false)
 	, m_bRectOnly(false)
 	{}
-	CStateDialog(UINT nIDTemplate, CWnd* pParentWnd = NULL)
+	CStateDialog(UINT nIDTemplate, CWnd* pParentWnd = nullptr)
 	: CDialog(nIDTemplate, pParentWnd)
 	, m_bEnableSaveRestore(false)
 	, m_bRectOnly(false)
 	{}
-	CStateDialog(LPCTSTR lpszTemplateName, CWnd* pParentWnd = NULL)
+	CStateDialog(LPCTSTR lpszTemplateName, CWnd* pParentWnd = nullptr)
 	: CDialog(lpszTemplateName, pParentWnd)
 	, m_bEnableSaveRestore(false)
 	, m_bRectOnly(false)
@@ -351,7 +217,7 @@ protected:
 		LoadWindowRect(pszSection, bRectOnly, false, false);
 	};
 
-	virtual CWnd* GetResizableWnd() const
+	virtual CWnd* GetResizableWnd() const override
 	{
 		// make the layout know its parent window
 		return CWnd::FromHandle(m_hWnd);
@@ -365,18 +231,18 @@ protected:
 	};
 
 	DECLARE_MESSAGE_MAP()
-
 };
 
 class CResizableStandAloneDialog : public CStandAloneDialogTmpl<CResizableDialog>
 {
 public:
-	CResizableStandAloneDialog(UINT nIDTemplate, CWnd* pParentWnd = NULL);
+	CResizableStandAloneDialog(UINT nIDTemplate, CWnd* pParentWnd = nullptr);
 
 private:
 	DECLARE_DYNAMIC(CResizableStandAloneDialog)
 
 protected:
+	virtual BOOL	OnInitDialog() override;
 	afx_msg void	OnSizing(UINT fwSide, LPRECT pRect);
 	afx_msg void	OnMoving(UINT fwSide, LPRECT pRect);
 	afx_msg void	OnNcMButtonUp(UINT nHitTest, CPoint point);
@@ -384,6 +250,23 @@ protected:
 	afx_msg LRESULT OnNcHitTest(CPoint point);
 
 	DECLARE_MESSAGE_MAP()
+
+protected:
+	int			m_nResizeBlock;
+	long		m_width;
+	long		m_height;
+
+	void BlockResize(int block)
+	{
+		m_nResizeBlock = block;
+	}
+
+	void EnableSaveRestore(LPCTSTR pszSection, bool bRectOnly = FALSE)
+	{
+		// call the base method with the bHorzResize and bVertResize parameters
+		// figured out from the resize block flags.
+		__super::EnableSaveRestore(pszSection, bRectOnly, (m_nResizeBlock & DIALOG_BLOCKHORIZONTAL) == 0, (m_nResizeBlock & DIALOG_BLOCKVERTICAL) == 0);
+	};
 
 private:
 	bool		m_bVertical;
@@ -394,7 +277,7 @@ private:
 class CStandAloneDialog : public CStandAloneDialogTmpl<CDialog>
 {
 public:
-	CStandAloneDialog(UINT nIDTemplate, CWnd* pParentWnd = NULL);
+	CStandAloneDialog(UINT nIDTemplate, CWnd* pParentWnd = nullptr);
 protected:
 	DECLARE_MESSAGE_MAP()
 private:
@@ -404,9 +287,18 @@ private:
 class CStateStandAloneDialog : public CStandAloneDialogTmpl<CStateDialog>
 {
 public:
-	CStateStandAloneDialog(UINT nIDTemplate, CWnd* pParentWnd = NULL);
+	CStateStandAloneDialog(UINT nIDTemplate, CWnd* pParentWnd = nullptr);
 protected:
 	DECLARE_MESSAGE_MAP()
 private:
 	DECLARE_DYNAMIC(CStateStandAloneDialog)
 };
+
+const UINT TaskBarButtonCreated = RegisterWindowMessage(L"TaskbarButtonCreated");
+
+BEGIN_TEMPLATE_MESSAGE_MAP(CStandAloneDialogTmpl, BaseType, BaseType)
+	ON_WM_PAINT()
+	ON_WM_QUERYDRAGICON()
+	ON_REGISTERED_MESSAGE(TaskBarButtonCreated, OnTaskbarButtonCreated)
+END_MESSAGE_MAP()
+

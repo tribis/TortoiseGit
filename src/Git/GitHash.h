@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2014 - TortoiseGit
+// Copyright (C) 2008-2018 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -20,6 +20,8 @@
 #pragma once
 #define GIT_HASH_SIZE 20
 
+#define GIT_REV_ZERO L"0000000000000000000000000000000000000000"
+
 class CGitHash
 {
 public:
@@ -29,7 +31,7 @@ public:
 	{
 		memset(m_hash,0, GIT_HASH_SIZE);
 	}
-	CGitHash(const char *p)
+	CGitHash(const unsigned char* p)
 	{
 		memcpy(m_hash,p,GIT_HASH_SIZE);
 	}
@@ -63,13 +65,13 @@ public:
 			{
 				a =a<<4;
 
-					TCHAR ch = str[j];
-				if(ch >= _T('0') && ch <= _T('9'))
-					a |= (ch - _T('0'))&0xF;
-				else if(ch >=_T('A') && ch <= _T('F'))
-					a |= ((ch - _T('A'))&0xF) + 10 ;
-				else if(ch >=_T('a') && ch <= _T('f'))
-					a |= ((ch - _T('a'))&0xF) + 10;
+				TCHAR ch = str[j];
+				if (ch >= L'0' && ch <= L'9')
+					a |= (ch - L'0') & 0xF;
+				else if (ch >=L'A' && ch <= L'F')
+					a |= ((ch - L'A') & 0xF) + 10 ;
+				else if (ch >=L'a' && ch <= L'f')
+					a |= ((ch - L'a') & 0xF) + 10;
 
 			}
 			m_hash[i]=a;
@@ -87,12 +89,12 @@ public:
 				a =a<<4;
 
 				char ch = str[j];
-				if(ch >= '0' && ch <= '9')
-					a |= (ch - ('0'))&0xF;
-				else if(ch >=('A') && ch <= ('F'))
-					a |= ((ch - ('A'))&0xF) + 10 ;
-				else if(ch >=_T('a') && ch <= ('f'))
-					a |= ((ch - ('a'))&0xF) + 10;
+				if (ch >= '0' && ch <= '9')
+					a |= (ch - '0') & 0xF;
+				else if (ch >= 'A' && ch <= 'F')
+					a |= ((ch - 'A') & 0xF) + 10 ;
+				else if (ch >= 'a' && ch <= 'f')
+					a |= ((ch - 'a') & 0xF) + 10;
 
 			}
 			m_hash[i]=a;
@@ -115,12 +117,8 @@ public:
 	CString ToString() const
 	{
 		CString str;
-		CString a;
 		for (int i = 0; i < GIT_HASH_SIZE; ++i)
-		{
-			a.Format(_T("%02x"),m_hash[i]);
-			str+=a;
-		}
+			str.AppendFormat(L"%02x", m_hash[i]);
 		return str;
 	}
 	operator CString () const
@@ -148,6 +146,13 @@ public:
 		return memcmp(left.m_hash, right.m_hash, GIT_HASH_SIZE) != 0;
 	}
 
+	bool MatchesPrefix(const CGitHash& hash, const CString& hashString, size_t prefixLen) const
+	{
+		if (memcmp(m_hash, hash.m_hash, prefixLen >> 1))
+			return false;
+		return prefixLen == 2 * GIT_HASH_SIZE || wcsncmp(ToString(), hashString, prefixLen) == 0;
+	}
+
 	static bool IsValidSHA1(const CString &possibleSHA1)
 	{
 		if (possibleSHA1.GetLength() != 2 * GIT_HASH_SIZE)
@@ -161,3 +166,14 @@ public:
 	}
 };
 
+namespace std
+{
+	template <>
+	struct hash<CGitHash>
+	{
+		std::size_t operator()(const CGitHash& k) const
+		{
+			return *(size_t*)k.m_hash;
+		}
+	};
+}

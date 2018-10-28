@@ -1,7 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2007-2008 - TortoiseSVN
-// Copyright (C) 2011-2015 - TortoiseGit
+// Copyright (C) 2007-2008, 2018 - TortoiseSVN
+// Copyright (C) 2011-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -19,10 +19,9 @@
 //
 #include "stdafx.h"
 #include "TortoiseProc.h"
-#include "MessageBox.h"
 #include "SettingsTBlame.h"
-#include "..\TortoiseGitBlame\BlameIndexColors.h"
-#include "..\TortoiseGitBlame\BlameDetectMovedOrCopiedLines.h"
+#include "../TortoiseGitBlame/BlameIndexColors.h"
+#include "../TortoiseGitBlame/BlameDetectMovedOrCopiedLines.h"
 
 
 // CSettingsTBlame dialog
@@ -38,19 +37,21 @@ CSettingsTBlame::CSettingsTBlame()
 	, m_dwDetectMovedOrCopiedLinesNumCharactersFromFiles(BLAME_DETECT_MOVED_OR_COPIED_LINES_NUM_CHARACTERS_FROM_FILES_DEFAULT)
 	, m_bIgnoreWhitespace(0)
 	, m_bShowCompleteLog(0)
+	, m_bFirstParent(0)
 	, m_bFollowRenames(0)
 {
-	m_regNewLinesColor = CRegDWORD(_T("Software\\TortoiseGit\\BlameNewColor"), BLAMENEWCOLOR);
-	m_regOldLinesColor = CRegDWORD(_T("Software\\TortoiseGit\\BlameOldColor"), BLAMEOLDCOLOR);
-	m_regFontName = CRegString(_T("Software\\TortoiseGit\\BlameFontName"), _T("Courier New"));
-	m_regFontSize = CRegDWORD(_T("Software\\TortoiseGit\\BlameFontSize"), 10);
-	m_regTabSize = CRegDWORD(_T("Software\\TortoiseGit\\BlameTabSize"), 4);
-	m_regDetectMovedOrCopiedLines = CRegDWORD(_T("Software\\TortoiseGit\\TortoiseGitBlame\\Workspace\\DetectMovedOrCopiedLines"), BLAME_DETECT_MOVED_OR_COPIED_LINES_DISABLED);
-	m_regDetectMovedOrCopiedLinesNumCharactersWithinFile = CRegDWORD(_T("Software\\TortoiseGit\\TortoiseGitBlame\\Workspace\\DetectMovedOrCopiedLinesNumCharactersWithinFile"), BLAME_DETECT_MOVED_OR_COPIED_LINES_NUM_CHARACTERS_WITHIN_FILE_DEFAULT);
-	m_regDetectMovedOrCopiedLinesNumCharactersFromFiles = CRegDWORD(_T("Software\\TortoiseGit\\TortoiseGitBlame\\Workspace\\DetectMovedOrCopiedLinesNumCharactersFromFiles"), BLAME_DETECT_MOVED_OR_COPIED_LINES_NUM_CHARACTERS_FROM_FILES_DEFAULT);
-	m_regIgnoreWhitespace = CRegDWORD(_T("Software\\TortoiseGit\\TortoiseGitBlame\\Workspace\\IgnoreWhitespace"), 0);
-	m_regShowCompleteLog = CRegDWORD(_T("Software\\TortoiseGit\\TortoiseGitBlame\\Workspace\\ShowCompleteLog"), 1);
-	m_regFollowRenames = CRegDWORD(_T("Software\\TortoiseGit\\TortoiseGitBlame\\Workspace\\FollowRenames"), 0);
+	m_regNewLinesColor = CRegDWORD(L"Software\\TortoiseGit\\BlameNewColor", BLAMENEWCOLOR);
+	m_regOldLinesColor = CRegDWORD(L"Software\\TortoiseGit\\BlameOldColor", BLAMEOLDCOLOR);
+	m_regFontName = CRegString(L"Software\\TortoiseGit\\BlameFontName", L"Consolas");
+	m_regFontSize = CRegDWORD(L"Software\\TortoiseGit\\BlameFontSize", 10);
+	m_regTabSize = CRegDWORD(L"Software\\TortoiseGit\\BlameTabSize", 4);
+	m_regDetectMovedOrCopiedLines = CRegDWORD(L"Software\\TortoiseGit\\TortoiseGitBlame\\Workspace\\DetectMovedOrCopiedLines", BLAME_DETECT_MOVED_OR_COPIED_LINES_DISABLED);
+	m_regDetectMovedOrCopiedLinesNumCharactersWithinFile = CRegDWORD(L"Software\\TortoiseGit\\TortoiseGitBlame\\Workspace\\DetectMovedOrCopiedLinesNumCharactersWithinFile", BLAME_DETECT_MOVED_OR_COPIED_LINES_NUM_CHARACTERS_WITHIN_FILE_DEFAULT);
+	m_regDetectMovedOrCopiedLinesNumCharactersFromFiles = CRegDWORD(L"Software\\TortoiseGit\\TortoiseGitBlame\\Workspace\\DetectMovedOrCopiedLinesNumCharactersFromFiles", BLAME_DETECT_MOVED_OR_COPIED_LINES_NUM_CHARACTERS_FROM_FILES_DEFAULT);
+	m_regIgnoreWhitespace = CRegDWORD(L"Software\\TortoiseGit\\TortoiseGitBlame\\Workspace\\IgnoreWhitespace", 0);
+	m_regShowCompleteLog = CRegDWORD(L"Software\\TortoiseGit\\TortoiseGitBlame\\Workspace\\ShowCompleteLog", 1);
+	m_regFirstParent = CRegDWORD(L"Software\\TortoiseGit\\TortoiseGitBlame\\Workspace\\OnlyFirstParent", 0);
+	m_regFollowRenames = CRegDWORD(L"Software\\TortoiseGit\\TortoiseGitBlame\\Workspace\\FollowRenames", 0);
 }
 
 CSettingsTBlame::~CSettingsTBlame()
@@ -68,7 +69,7 @@ void CSettingsTBlame::DoDataExchange(CDataExchange* pDX)
 	{
 		CString t;
 		m_cFontSizes.GetWindowText(t);
-		m_dwFontSize = _ttoi(t);
+		m_dwFontSize = _wtoi(t);
 	}
 	DDX_Control(pDX, IDC_FONTNAMES, m_cFontNames);
 	DDX_Text(pDX, IDC_TABSIZE, m_dwTabSize);
@@ -81,6 +82,7 @@ void CSettingsTBlame::DoDataExchange(CDataExchange* pDX)
 	DDX_Text(pDX, IDC_DETECT_MOVED_OR_COPIED_LINES_NUM_CHARACTERS_FROM_FILES, m_dwDetectMovedOrCopiedLinesNumCharactersFromFiles);
 	DDX_Check(pDX, IDC_IGNORE_WHITESPACE, m_bIgnoreWhitespace);
 	DDX_Check(pDX, IDC_SHOWCOMPLETELOG, m_bShowCompleteLog);
+	DDX_Check(pDX, IDC_BLAME_ONLYFIRSTPARENT, m_bFirstParent);
 	DDX_Check(pDX, IDC_FOLLOWRENAMES, m_bFollowRenames);
 }
 
@@ -95,9 +97,11 @@ BEGIN_MESSAGE_MAP(CSettingsTBlame, ISettingsPropPage)
 	ON_EN_CHANGE(IDC_DETECT_MOVED_OR_COPIED_LINES_NUM_CHARACTERS_FROM_FILES, OnChange)
 	ON_BN_CLICKED(IDC_IGNORE_WHITESPACE, OnChange)
 	ON_BN_CLICKED(IDC_SHOWCOMPLETELOG, OnChange)
+	ON_BN_CLICKED(IDC_BLAME_ONLYFIRSTPARENT, OnChange)
 	ON_BN_CLICKED(IDC_FOLLOWRENAMES, OnChange)
 	ON_BN_CLICKED(IDC_NEWLINESCOLOR, &CSettingsTBlame::OnBnClickedColor)
 	ON_BN_CLICKED(IDC_OLDLINESCOLOR, &CSettingsTBlame::OnBnClickedColor)
+	ON_WM_MEASUREITEM()
 END_MESSAGE_MAP()
 
 
@@ -111,6 +115,7 @@ BOOL CSettingsTBlame::OnInitDialog()
 
 	AdjustControlSize(IDC_IGNORE_WHITESPACE);
 	AdjustControlSize(IDC_SHOWCOMPLETELOG);
+	AdjustControlSize(IDC_BLAME_ONLYFIRSTPARENT);
 	AdjustControlSize(IDC_FOLLOWRENAMES);
 
 	m_cNewLinesColor.SetColor((DWORD)m_regNewLinesColor);
@@ -132,12 +137,13 @@ BOOL CSettingsTBlame::OnInitDialog()
 	m_dwDetectMovedOrCopiedLinesNumCharactersFromFiles = m_regDetectMovedOrCopiedLinesNumCharactersFromFiles;
 	m_bIgnoreWhitespace = m_regIgnoreWhitespace;
 	m_bShowCompleteLog = m_regShowCompleteLog;
+	m_bFirstParent = m_regFirstParent;
 	m_bFollowRenames = m_regFollowRenames;
 	int count = 0;
 	CString temp;
 	for (int i=6; i<32; i=i+2)
 	{
-		temp.Format(_T("%d"), i);
+		temp.Format(L"%d", i);
 		m_cFontSizes.AddString(temp);
 		m_cFontSizes.SetItemData(count++, i);
 	}
@@ -152,11 +158,12 @@ BOOL CSettingsTBlame::OnInitDialog()
 	}
 	if (!foundfont)
 	{
-		temp.Format(_T("%lu"), m_dwFontSize);
+		temp.Format(L"%lu", m_dwFontSize);
 		m_cFontSizes.SetWindowText(temp);
 	}
 	m_cFontNames.Setup(DEVICE_FONTTYPE|RASTER_FONTTYPE|TRUETYPE_FONTTYPE, 1, FIXED_PITCH);
 	m_cFontNames.SelectFont(m_sFontName);
+	m_cFontNames.SendMessage(CB_SETITEMHEIGHT, (WPARAM)-1, m_cFontSizes.GetItemHeight(-1));
 
 	CString sDetectMovedOrCopiedLinesDisabled;
 	CString sDetectMovedOrCopiedLinesWithinFile;
@@ -225,6 +232,7 @@ BOOL CSettingsTBlame::OnApply()
 	Store(m_dwDetectMovedOrCopiedLinesNumCharactersFromFiles, m_regDetectMovedOrCopiedLinesNumCharactersFromFiles);
 	Store(m_bIgnoreWhitespace, m_regIgnoreWhitespace);
 	Store(m_bShowCompleteLog, m_regShowCompleteLog);
+	Store(m_bFirstParent, m_regFirstParent);
 	Store(m_bFollowRenames, m_regFollowRenames);
 
 	SetModified(FALSE);
@@ -241,16 +249,12 @@ void CSettingsTBlame::UpdateDependencies()
 	BOOL enableDetectMovedOrCopiedLinesNumCharactersWithinFile = FALSE;
 	BOOL enableDetectMovedOrCopiedLinesNumCharactersFromFiles = FALSE;
 	if (m_dwDetectMovedOrCopiedLines == BLAME_DETECT_MOVED_OR_COPIED_LINES_WITHIN_FILE)
-	{
 		enableDetectMovedOrCopiedLinesNumCharactersWithinFile = TRUE;
-	}
 	if (m_dwDetectMovedOrCopiedLines == BLAME_DETECT_MOVED_OR_COPIED_LINES_FROM_MODIFIED_FILES || m_dwDetectMovedOrCopiedLines == BLAME_DETECT_MOVED_OR_COPIED_LINES_FROM_EXISTING_FILES_AT_FILE_CREATION || m_dwDetectMovedOrCopiedLines == BLAME_DETECT_MOVED_OR_COPIED_LINES_FROM_EXISTING_FILES)
-	{
 		enableDetectMovedOrCopiedLinesNumCharactersFromFiles = TRUE;
-	}
 	BOOL enableShowCompleteLog = FALSE;
 	BOOL enableFollowRenames = FALSE;
-	if (BlameIsLimitedToOneFilename(m_dwDetectMovedOrCopiedLines))
+	if (BlameIsLimitedToOneFilename(m_dwDetectMovedOrCopiedLines) && !m_bFirstParent)
 	{
 		enableShowCompleteLog = TRUE;
 		if (m_bShowCompleteLog)
@@ -272,3 +276,20 @@ void CSettingsTBlame::UpdateDependencies()
 	GetDlgItem(IDC_SHOWCOMPLETELOG)->EnableWindow(enableShowCompleteLog);
 	GetDlgItem(IDC_FOLLOWRENAMES)->EnableWindow(enableFollowRenames);
 }
+
+void CSettingsTBlame::OnMeasureItem(int nIDCtl, LPMEASUREITEMSTRUCT lpMeasureItemStruct)
+{
+	CFont* pFont = GetFont();
+	if (pFont)
+	{
+		CDC* pDC = GetDC();
+		CFont* pFontPrev = pDC->SelectObject(pFont);
+		int iborder = ::GetSystemMetrics(SM_CYBORDER);
+		CSize sz = pDC->GetTextExtent(L"0");
+		lpMeasureItemStruct->itemHeight = sz.cy + 2 * iborder;
+		pDC->SelectObject(pFontPrev);
+		ReleaseDC(pDC);
+	}
+	ISettingsPropPage::OnMeasureItem(nIDCtl, lpMeasureItemStruct);
+}
+

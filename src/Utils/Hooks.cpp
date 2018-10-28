@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2011-2015 - TortoiseGit
+// Copyright (C) 2011-2016 - TortoiseGit
 // Copyright (C) 2007-2008 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -37,15 +37,15 @@ CHooks::~CHooks()
 
 bool CHooks::Create()
 {
-	if (m_pInstance == NULL)
+	if (!m_pInstance)
 		m_pInstance = new CHooks();
-	CRegString reghooks(_T("Software\\TortoiseGit\\hooks"));
+	CRegString reghooks(L"Software\\TortoiseGit\\hooks");
 	CString strhooks = reghooks;
 	// now fill the map with all the hooks defined in the string
 	// the string consists of multiple lines, where one hook script is defined
 	// as four lines:
 	// line 1: the hook type
-	// line 2: path to working copy where to apply the hook script
+	// line 2: path to working copy where to apply the hook script, if it starts with "!" this hook is disabled (this should provide backward and forward compatibility)
 	// line 3: command line to execute
 	// line 4: 'true' or 'false' for waiting for the script to finish
 	// line 5: 'show' or 'hide' on how to start the hook script
@@ -64,6 +64,13 @@ bool CHooks::Create()
 		if ((pos = strhooks.Find('\n')) >= 0)
 		{
 			// line 2
+			cmd.bEnabled = true;
+			if (strhooks[0] == L'!' && pos > 1)
+			{
+				cmd.bEnabled = false;
+				strhooks = strhooks.Mid(1);
+				--pos;
+			}
 			key.path = CTGitPath(strhooks.Mid(0, pos));
 			if (pos+1 < strhooks.GetLength())
 				strhooks = strhooks.Mid(pos+1);
@@ -80,7 +87,7 @@ bool CHooks::Create()
 				if ((pos = strhooks.Find('\n')) >= 0)
 				{
 					// line 4
-					cmd.bWait = (strhooks.Mid(0, pos).CompareNoCase(_T("true"))==0);
+					cmd.bWait = (strhooks.Mid(0, pos).CompareNoCase(L"true") == 0);
 					if (pos+1 < strhooks.GetLength())
 						strhooks = strhooks.Mid(pos+1);
 					else
@@ -88,7 +95,7 @@ bool CHooks::Create()
 					if ((pos = strhooks.Find('\n')) >= 0)
 					{
 						// line 5
-						cmd.bShow = (strhooks.Mid(0, pos).CompareNoCase(_T("show"))==0);
+						cmd.bShow = (strhooks.Mid(0, pos).CompareNoCase(L"show") == 0);
 						if (pos+1 < strhooks.GetLength())
 							strhooks = strhooks.Mid(pos+1);
 						else
@@ -123,16 +130,18 @@ bool CHooks::Save()
 	{
 		strhooks += GetHookTypeString(it->first.htype);
 		strhooks += '\n';
+		if (!it->second.bEnabled)
+			strhooks += '!';
 		strhooks += it->first.path.GetWinPathString();
 		strhooks += '\n';
 		strhooks += it->second.commandline;
 		strhooks += '\n';
-		strhooks += (it->second.bWait ? _T("true") : _T("false"));
+		strhooks += (it->second.bWait ? L"true" : L"false");
 		strhooks += '\n';
-		strhooks += (it->second.bShow ? _T("show") : _T("hide"));
+		strhooks += (it->second.bShow ? L"show" : L"hide");
 		strhooks += '\n';
 	}
-	CRegString reghooks(_T("Software\\TortoiseGit\\hooks"));
+	CRegString reghooks(L"Software\\TortoiseGit\\hooks");
 	reghooks = strhooks;
 	if (reghooks.GetLastError())
 		return false;
@@ -144,7 +153,7 @@ bool CHooks::Remove(const hookkey &key)
 	return (erase(key) > 0);
 }
 
-void CHooks::Add(hooktype ht, const CTGitPath& Path, LPCTSTR szCmd, bool bWait, bool bShow)
+void CHooks::Add(hooktype ht, const CTGitPath& Path, LPCTSTR szCmd, bool bWait, bool bShow, bool bEnabled)
 {
 	hookkey key;
 	key.htype = ht;
@@ -157,7 +166,19 @@ void CHooks::Add(hooktype ht, const CTGitPath& Path, LPCTSTR szCmd, bool bWait, 
 	cmd.commandline = szCmd;
 	cmd.bWait = bWait;
 	cmd.bShow = bShow;
+	cmd.bEnabled = bEnabled;
 	insert(std::pair<hookkey, hookcmd>(key, cmd));
+}
+
+bool CHooks::SetEnabled(const hookkey& k, bool bEnabled)
+{
+	auto it = find(k);
+	if (it == end())
+		return false;
+	if (it->second.bEnabled == bEnabled)
+		return false;
+	it->second.bEnabled = bEnabled;
+	return true;
 }
 
 CString CHooks::GetHookTypeString(hooktype t)
@@ -165,40 +186,44 @@ CString CHooks::GetHookTypeString(hooktype t)
 	switch (t)
 	{
 	case start_commit_hook:
-		return _T("start_commit_hook");
+		return L"start_commit_hook";
 	case pre_commit_hook:
-		return _T("pre_commit_hook");
+		return L"pre_commit_hook";
 	case post_commit_hook:
-		return _T("post_commit_hook");
+		return L"post_commit_hook";
 	case pre_push_hook:
-		return _T("pre_push_hook");
+		return L"pre_push_hook";
 	case post_push_hook:
-		return _T("post_push_hook");
+		return L"post_push_hook";
+	case pre_rebase_hook:
+		return L"pre_rebase_hook";
 	}
-	return _T("");
+	return L"";
 }
 
 hooktype CHooks::GetHookType(const CString& s)
 {
-	if (s.Compare(_T("start_commit_hook"))==0)
+	if (s.Compare(L"start_commit_hook") == 0)
 		return start_commit_hook;
-	if (s.Compare(_T("pre_commit_hook"))==0)
+	if (s.Compare(L"pre_commit_hook") == 0)
 		return pre_commit_hook;
-	if (s.Compare(_T("post_commit_hook"))==0)
+	if (s.Compare(L"post_commit_hook") == 0)
 		return post_commit_hook;
-	if (s.Compare(_T("pre_push_hook"))==0)
+	if (s.Compare(L"pre_push_hook") == 0)
 		return pre_push_hook;
-	if (s.Compare(_T("post_push_hook"))==0)
+	if (s.Compare(L"post_push_hook") == 0)
 		return post_push_hook;
+	if (s.Compare(L"pre_rebase_hook") == 0)
+		return pre_rebase_hook;
 
 	return unknown_hook;
 }
 
 void CHooks::AddParam(CString& sCmd, const CString& param)
 {
-	sCmd += _T(" \"");
+	sCmd += L" \"";
 	sCmd += param;
-	sCmd += _T("\"");
+	sCmd += L'"';
 }
 
 void CHooks::AddPathParam(CString& sCmd, const CTGitPathList& pathList)
@@ -262,17 +287,17 @@ bool CHooks::PreCommit(const CString& workingTree, const CTGitPathList& pathList
 	return true;
 }
 
-bool CHooks::PostCommit(const CString& workingTree, const CTGitPathList& pathList, const GitRev& rev, const CString& message, DWORD& exitcode, CString& error)
+bool CHooks::PostCommit(const CString& workingTree, bool amend, DWORD& exitcode, CString& error)
 {
 	auto it = FindItem(post_commit_hook, workingTree);
 	if (it == end())
 		return false;
 	CString sCmd = it->second.commandline;
-	AddPathParam(sCmd, pathList);
-	AddMessageFileParam(sCmd, message);
-	AddParam(sCmd, rev.m_CommitHash.ToString());
-	AddErrorParam(sCmd, error);
 	AddCWDParam(sCmd, workingTree);
+	if (amend)
+		AddParam(sCmd, L"true");
+	else
+		AddParam(sCmd, L"false");
 	exitcode = RunScript(sCmd, workingTree, error, it->second.bWait, it->second.bShow);
 	return true;
 }
@@ -301,6 +326,20 @@ bool CHooks::PostPush(const CString& workingTree, DWORD& exitcode, CString& erro
 	return true;
 }
 
+bool CHooks::PreRebase(const CString& workingTree, const CString& upstream, const CString& rebasedBranch, DWORD& exitcode, CString& error)
+{
+	auto it = FindItem(pre_rebase_hook, workingTree);
+	if (it == end())
+		return false;
+	CString sCmd = it->second.commandline;
+	AddParam(sCmd, upstream);
+	AddParam(sCmd, rebasedBranch);
+	AddErrorParam(sCmd, error);
+	AddCWDParam(sCmd, workingTree);
+	exitcode = RunScript(sCmd, workingTree, error, it->second.bWait, it->second.bShow);
+	return true;
+}
+
 bool CHooks::IsHookPresent(hooktype t, const CString& workingTree) const
 {
 	auto it = FindItem(t, workingTree);
@@ -316,17 +355,15 @@ const_hookiterator CHooks::FindItem(hooktype t, const CString& workingTree) cons
 		key.htype = t;
 		key.path = path;
 		auto it = find(key);
-		if (it != end())
-		{
+		if (it != end() && it->second.bEnabled)
 			return it;
-		}
 		path = path.GetContainingDirectory();
 	} while(!path.IsEmpty());
 	// look for a script with a path as '*'
 	key.htype = t;
-	key.path = CTGitPath(_T("*"));
+	key.path = CTGitPath(L"*");
 	auto it = find(key);
-	if (it != end())
+	if (it != end() && it->second.bEnabled)
 	{
 		return it;
 	}
@@ -353,12 +390,12 @@ DWORD CHooks::RunScript(CString cmd, LPCTSTR currentDir, CString& error, bool bW
 	TCHAR szOutput[MAX_PATH] = {0};
 	TCHAR szErr[MAX_PATH] = {0};
 	GetTortoiseGitTempPath(_countof(szTempPath), szTempPath);
-	GetTempFileName(szTempPath, _T("git"), 0, szErr);
+	GetTempFileName(szTempPath, L"git", 0, szErr);
 
 	// setup redirection handles
 	// output handle must be WRITE mode, share READ
 	// redirect handle must be READ mode, share WRITE
-	hErr   = CreateFile(szErr, GENERIC_WRITE, FILE_SHARE_READ, &sa, CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY,	0);
+	hErr   = CreateFile(szErr, GENERIC_WRITE, FILE_SHARE_READ, &sa, CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY, nullptr);
 
 	if (!hErr)
 	{
@@ -366,7 +403,7 @@ DWORD CHooks::RunScript(CString cmd, LPCTSTR currentDir, CString& error, bool bW
 		return (DWORD)-1;
 	}
 
-	hRedir = CreateFile(szErr, GENERIC_READ, FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0);
+	hRedir = CreateFile(szErr, GENERIC_READ, FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr);
 
 	if (!hRedir)
 	{
@@ -374,8 +411,8 @@ DWORD CHooks::RunScript(CString cmd, LPCTSTR currentDir, CString& error, bool bW
 		return (DWORD)-1;
 	}
 
-	GetTempFileName(szTempPath, _T("git"), 0, szOutput);
-	hOut   = CreateFile(szOutput, GENERIC_WRITE, FILE_SHARE_READ, &sa, CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY,	0);
+	GetTempFileName(szTempPath, L"git", 0, szOutput);
+	hOut   = CreateFile(szOutput, GENERIC_WRITE, FILE_SHARE_READ, &sa, CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY, nullptr);
 
 	if (!hOut)
 	{
@@ -393,7 +430,7 @@ DWORD CHooks::RunScript(CString cmd, LPCTSTR currentDir, CString& error, bool bW
 	si.wShowWindow = bShow ? SW_SHOW : SW_HIDE;
 
 	PROCESS_INFORMATION pi = { 0 };
-	if (!CreateProcess(nullptr, cmd.GetBuffer(), nullptr, nullptr, TRUE, 0, nullptr, currentDir, &si, &pi))
+	if (!CreateProcess(nullptr, cmd.GetBuffer(), nullptr, nullptr, TRUE, CREATE_UNICODE_ENVIRONMENT, nullptr, currentDir, &si, &pi))
 	{
 		const DWORD err = GetLastError();  // preserve the CreateProcess error
 		error = CFormatMessageWrapper(err);
@@ -413,7 +450,7 @@ DWORD CHooks::RunScript(CString cmd, LPCTSTR currentDir, CString& error, bool bW
 		char buf[256] = { 0 };
 		do
 		{
-			while (ReadFile(hRedir, &buf, sizeof(buf)-1, &dw, NULL))
+			while (ReadFile(hRedir, &buf, sizeof(buf) - 1, &dw, nullptr))
 			{
 				if (dw == 0)
 					break;
@@ -423,7 +460,7 @@ DWORD CHooks::RunScript(CString cmd, LPCTSTR currentDir, CString& error, bool bW
 		} while (WaitForSingleObject(pi.hProcess, 0) != WAIT_OBJECT_0);
 
 		// perform any final flushing
-		while (ReadFile(hRedir, &buf, sizeof(buf)-1, &dw, NULL))
+		while (ReadFile(hRedir, &buf, sizeof(buf) - 1, &dw, nullptr))
 		{
 			if (dw == 0)
 				break;

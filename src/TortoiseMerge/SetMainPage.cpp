@@ -1,7 +1,7 @@
 // TortoiseGitMerge - a Diff/Patch program
 
 // Copyright (C) 2013-2014 - TortoiseGit
-// Copyright (C) 2006-2010, 2012-2014 - TortoiseSVN
+// Copyright (C) 2006-2010, 2012-2014, 2016, 2018 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -48,23 +48,22 @@ CSetMainPage::CSetMainPage()
 	, m_nMaxInline(3000)
 	, m_dwFontSize(0)
 {
-	m_regBackup = CRegDWORD(_T("Software\\TortoiseGitMerge\\Backup"));
-	m_regFirstDiffOnLoad = CRegDWORD(_T("Software\\TortoiseGitMerge\\FirstDiffOnLoad"), TRUE);
-	m_regFirstConflictOnLoad = CRegDWORD(_T("Software\\TortoiseGitMerge\\FirstConflictOnLoad"), TRUE);
-	m_regTabMode = CRegDWORD(_T("Software\\TortoiseGitMerge\\TabMode"), 0);
-	m_regTabSize = CRegDWORD(_T("Software\\TortoiseGitMerge\\TabSize"), 4);
-	m_regEnableEditorConfig = CRegDWORD(_T("Software\\TortoiseGitMerge\\EnableEditorConfig"), FALSE);
-	m_regIgnoreEOL = CRegDWORD(_T("Software\\TortoiseGitMerge\\IgnoreEOL"), TRUE);
-	m_regOnePane = CRegDWORD(_T("Software\\TortoiseGitMerge\\OnePane"));
-	m_regViewLinenumbers = CRegDWORD(_T("Software\\TortoiseGitMerge\\ViewLinenumbers"), 1);
-	m_regFontName = CRegString(_T("Software\\TortoiseGitMerge\\LogFontName"), _T("Courier New"));
-	m_regFontSize = CRegDWORD(_T("Software\\TortoiseGitMerge\\LogFontSize"), 10);
-	m_regCaseInsensitive = CRegDWORD(_T("Software\\TortoiseGitMerge\\CaseInsensitive"), FALSE);
-	m_regUTF8Default = CRegDWORD(_T("Software\\TortoiseGitMerge\\UseUTF8"), FALSE);
-	m_regAutoAdd = CRegDWORD(_T("Software\\TortoiseGitMerge\\AutoAdd"), TRUE);
-	m_regMaxInline = CRegDWORD(_T("Software\\TortoiseGitMerge\\InlineDiffMaxLineLength"), 3000);
+	m_regBackup = CRegDWORD(L"Software\\TortoiseGitMerge\\Backup");
+	m_regFirstDiffOnLoad = CRegDWORD(L"Software\\TortoiseGitMerge\\FirstDiffOnLoad", TRUE);
+	m_regFirstConflictOnLoad = CRegDWORD(L"Software\\TortoiseGitMerge\\FirstConflictOnLoad", TRUE);
+	m_regTabMode = CRegDWORD(L"Software\\TortoiseGitMerge\\TabMode", 0);
+	m_regTabSize = CRegDWORD(L"Software\\TortoiseGitMerge\\TabSize", 4);
+	m_regEnableEditorConfig = CRegDWORD(L"Software\\TortoiseGitMerge\\EnableEditorConfig", FALSE);
+	m_regIgnoreEOL = CRegDWORD(L"Software\\TortoiseGitMerge\\IgnoreEOL", TRUE);
+	m_regOnePane = CRegDWORD(L"Software\\TortoiseGitMerge\\OnePane");
+	m_regViewLinenumbers = CRegDWORD(L"Software\\TortoiseGitMerge\\ViewLinenumbers", 1);
+	m_regFontName = CRegString(L"Software\\TortoiseGitMerge\\LogFontName", L"Consolas");
+	m_regFontSize = CRegDWORD(L"Software\\TortoiseGitMerge\\LogFontSize", 10);
+	m_regCaseInsensitive = CRegDWORD(L"Software\\TortoiseGitMerge\\CaseInsensitive", FALSE);
+	m_regUTF8Default = CRegDWORD(L"Software\\TortoiseGitMerge\\UseUTF8", FALSE);
+	m_regAutoAdd = CRegDWORD(L"Software\\TortoiseGitMerge\\AutoAdd", TRUE);
+	m_regMaxInline = CRegDWORD(L"Software\\TortoiseGitMerge\\InlineDiffMaxLineLength", 3000);
 	m_regUseRibbons = CRegDWORD(L"Software\\TortoiseGitMerge\\UseRibbons", TRUE);
-	m_regUseTaskDialog = CRegDWORD(L"Software\\TortoiseGitMerge\\UseTaskDialog", TRUE);
 	m_regContextLines = CRegDWORD(L"Software\\TortoiseGitMerge\\ContextLines", (DWORD)-1);
 
 	m_bBackup = m_regBackup;
@@ -83,7 +82,6 @@ CSetMainPage::CSetMainPage()
 	m_bAutoAdd = m_regAutoAdd;
 	m_nMaxInline = m_regMaxInline;
 	m_bUseRibbons = m_regUseRibbons;
-	m_bUseTaskDialog = CTaskDialog::IsSupported() && (DWORD)m_regUseTaskDialog;
 }
 
 CSetMainPage::~CSetMainPage()
@@ -111,7 +109,7 @@ void CSetMainPage::DoDataExchange(CDataExchange* pDX)
 	{
 		CString t;
 		m_cFontSizes.GetWindowText(t);
-		m_dwFontSize = _ttoi(t);
+		m_dwFontSize = _wtoi(t);
 	}
 	DDX_Control(pDX, IDC_FONTNAMES, m_cFontNames);
 	DDX_Check(pDX, IDC_LINENUMBERS, m_bViewLinenumbers);
@@ -120,7 +118,6 @@ void CSetMainPage::DoDataExchange(CDataExchange* pDX)
 	DDX_Check(pDX, IDC_AUTOADD, m_bAutoAdd);
 	DDX_Text(pDX, IDC_MAXINLINE, m_nMaxInline);
 	DDX_Check(pDX, IDC_USERIBBONS, m_bUseRibbons);
-	DDX_Check(pDX, IDC_USETASKDIALOG, m_bUseTaskDialog);
 }
 
 void CSetMainPage::SaveData()
@@ -142,7 +139,6 @@ void CSetMainPage::SaveData()
 	m_regAutoAdd = m_bAutoAdd;
 	m_regMaxInline = m_nMaxInline;
 	m_regUseRibbons = m_bUseRibbons;
-	m_regUseTaskDialog = m_bUseTaskDialog;
 }
 
 BOOL CSetMainPage::OnApply()
@@ -181,16 +177,14 @@ BOOL CSetMainPage::OnInitDialog()
 	m_bAutoAdd = m_regAutoAdd;
 	m_nMaxInline = m_regMaxInline;
 	m_bUseRibbons = m_regUseRibbons;
-	m_bUseTaskDialog = CTaskDialog::IsSupported() && (DWORD)m_regUseTaskDialog;
 
 	DialogEnableWindow(IDC_FIRSTCONFLICTONLOAD, m_bFirstDiffOnLoad);
-	DialogEnableWindow(IDC_USETASKDIALOG, CTaskDialog::IsSupported());
 
 	CString temp;
 	int count = 0;
 	for (int i=6; i<32; i=i+2)
 	{
-		temp.Format(_T("%d"), i);
+		temp.Format(L"%d", i);
 		m_cFontSizes.AddString(temp);
 		m_cFontSizes.SetItemData(count++, i);
 	}
@@ -205,11 +199,13 @@ BOOL CSetMainPage::OnInitDialog()
 	}
 	if (!foundfont)
 	{
-		temp.Format(_T("%lu"), m_dwFontSize);
+		temp.Format(L"%lu", m_dwFontSize);
 		m_cFontSizes.SetWindowText(temp);
 	}
 	m_cFontNames.Setup(DEVICE_FONTTYPE|RASTER_FONTTYPE|TRUETYPE_FONTTYPE, 1, FIXED_PITCH);
 	m_cFontNames.SelectFont(m_sFontName);
+
+	m_cFontNames.SendMessage(CB_SETITEMHEIGHT, (WPARAM)-1, m_cFontSizes.GetItemHeight(-1));
 
 	UpdateData(FALSE);
 	return TRUE;  // return TRUE unless you set the focus to a control
@@ -228,14 +224,14 @@ BEGIN_MESSAGE_MAP(CSetMainPage, CPropertyPage)
 	ON_EN_CHANGE(IDC_TABSIZE, &CSetMainPage::OnModified)
 	ON_BN_CLICKED(IDC_ENABLEEDITORCONFIG, &CSetMainPage::OnModified)
 	ON_EN_CHANGE(IDC_CONTEXTLINES, &CSetMainPage::OnModified)
-	ON_CBN_SELCHANGE(IDC_FONTSIZES, &CSetMainPage::OnModified)
-	ON_CBN_SELCHANGE(IDC_FONTNAMES, &CSetMainPage::OnModified)
+	ON_CBN_SELCHANGE(IDC_FONTSIZES, &CSetMainPage::OnModifiedWithReload)
+	ON_CBN_SELCHANGE(IDC_FONTNAMES, &CSetMainPage::OnModifiedWithReload)
 	ON_BN_CLICKED(IDC_CASEINSENSITIVE, &CSetMainPage::OnModified)
 	ON_BN_CLICKED(IDC_UTF8DEFAULT, &CSetMainPage::OnModified)
 	ON_BN_CLICKED(IDC_AUTOADD, &CSetMainPage::OnModified)
 	ON_EN_CHANGE(IDC_MAXINLINE, &CSetMainPage::OnModifiedWithReload)
 	ON_BN_CLICKED(IDC_USERIBBONS, &CSetMainPage::OnModified)
-	ON_BN_CLICKED(IDC_USETASKDIALOG, &CSetMainPage::OnModified)
+	ON_WM_MEASUREITEM()
 END_MESSAGE_MAP()
 
 
@@ -263,7 +259,7 @@ void CSetMainPage::OnBnClickedWhitespace()
 BOOL CSetMainPage::DialogEnableWindow(UINT nID, BOOL bEnable)
 {
 	CWnd * pwndDlgItem = GetDlgItem(nID);
-	if (pwndDlgItem == NULL)
+	if (!pwndDlgItem)
 		return FALSE;
 	if (bEnable)
 		return pwndDlgItem->EnableWindow(bEnable);
@@ -272,4 +268,20 @@ BOOL CSetMainPage::DialogEnableWindow(UINT nID, BOOL bEnable)
 		SendMessage(WM_NEXTDLGCTL, 0, FALSE);
 	}
 	return pwndDlgItem->EnableWindow(bEnable);
+}
+
+void CSetMainPage::OnMeasureItem(int nIDCtl, LPMEASUREITEMSTRUCT lpMeasureItemStruct)
+{
+	CFont* pFont = GetFont();
+	if (pFont)
+	{
+		CDC* pDC = GetDC();
+		CFont* pFontPrev = pDC->SelectObject(pFont);
+		int iborder = ::GetSystemMetrics(SM_CYBORDER);
+		CSize sz = pDC->GetTextExtent(L"0");
+		lpMeasureItemStruct->itemHeight = sz.cy + 2 * iborder;
+		pDC->SelectObject(pFontPrev);
+		ReleaseDC(pDC);
+	}
+	CPropertyPage::OnMeasureItem(nIDCtl, lpMeasureItemStruct);
 }

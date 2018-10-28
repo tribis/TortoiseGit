@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2018 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -17,7 +17,6 @@
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 //
 #include "stdafx.h"
-#include "Command.h"
 #include "CreateRepositoryCommand.h"
 #include "ShellUpdater.h"
 #include "MessageBox.h"
@@ -32,7 +31,7 @@ static bool CheckSpecialFolder(CString &folder)
 		return true;
 
 	// UNC root
-	if (folder.GetLength() > 2 && folder.Left(2) == "\\\\")
+	if (folder.GetLength() > 2 && CStringUtils::StartsWith(folder, L"\\\\"))
 	{
 		int index = folder.Find('\\', 2);
 		if (index < 0)
@@ -45,7 +44,7 @@ static bool CheckSpecialFolder(CString &folder)
 	int code[] = { CSIDL_DESKTOPDIRECTORY, CSIDL_PROFILE, CSIDL_PERSONAL, CSIDL_WINDOWS, CSIDL_SYSTEM, CSIDL_PROGRAM_FILES, CSIDL_SYSTEMX86, CSIDL_PROGRAM_FILESX86 };
 	for (int i = 0; i < _countof(code); i++)
 	{
-		path[0] = '\0';
+		path[0] = L'\0';
 		if (SUCCEEDED(SHGetFolderPath(nullptr, code[i], nullptr, 0, path)))
 			if (folder == path)
 				return true;
@@ -65,7 +64,7 @@ bool CreateRepositoryCommand::Execute()
 	{
 		CString message;
 		message.Format(IDS_WARN_GITINIT_SPECIALFOLDER, (LPCTSTR)folder);
-		if (CMessageBox::Show(hwndExplorer, message, _T("TortoiseGit"), 1, IDI_ERROR, CString(MAKEINTRESOURCE(IDS_ABORTBUTTON)), CString(MAKEINTRESOURCE(IDS_PROCEEDBUTTON))) == 1)
+		if (CMessageBox::Show(GetExplorerHWND(), message, L"TortoiseGit", 1, IDI_ERROR, CString(MAKEINTRESOURCE(IDS_ABORTBUTTON)), CString(MAKEINTRESOURCE(IDS_PROCEEDBUTTON))) == 1)
 			return false;
 	}
 
@@ -75,10 +74,8 @@ bool CreateRepositoryCommand::Execute()
 	{
 		CString message;
 		message.Format(IDS_WARN_GITINIT_FOLDERNOTEMPTY, (LPCTSTR)folder);
-		if (dlg.m_bBare && PathIsDirectory(folder) && !PathIsDirectoryEmpty(folder) && CMessageBox::Show(hwndExplorer, message, _T("TortoiseGit"), 1, IDI_ERROR, CString(MAKEINTRESOURCE(IDS_ABORTBUTTON)), CString(MAKEINTRESOURCE(IDS_PROCEEDBUTTON))) == 1)
-		{
+		if (dlg.m_bBare && PathIsDirectory(folder) && !PathIsDirectoryEmpty(folder) && CMessageBox::Show(GetExplorerHWND(), message, L"TortoiseGit", 1, IDI_ERROR, CString(MAKEINTRESOURCE(IDS_ABORTBUTTON)), CString(MAKEINTRESOURCE(IDS_PROCEEDBUTTON))) == 1)
 			return false;
-		}
 
 		git_repository_init_options options = GIT_REPOSITORY_INIT_OPTIONS_INIT;
 		options.flags = GIT_REPOSITORY_INIT_MKPATH | GIT_REPOSITORY_INIT_EXTERNAL_TEMPLATE;
@@ -86,7 +83,7 @@ bool CreateRepositoryCommand::Execute()
 		CAutoRepository repo;
 		if (git_repository_init_ext(repo.GetPointer(), CUnicodeUtils::GetUTF8(folder), &options))
 		{
-			CMessageBox::Show(hwndExplorer, CGit::GetLibGit2LastErr(_T("Could not initialize a new repository.")), _T("TortoiseGit"), MB_OK | MB_ICONERROR);
+			CMessageBox::Show(GetExplorerHWND(), CGit::GetLibGit2LastErr(L"Could not initialize a new repository."), L"TortoiseGit", MB_OK | MB_ICONERROR);
 			return false;
 		}
 
@@ -94,7 +91,7 @@ bool CreateRepositoryCommand::Execute()
 			CShellUpdater::Instance().AddPathForUpdate(orgCmdLinePath);
 		CString str;
 		str.Format(IDS_PROC_REPOCREATED, (LPCTSTR)folder);
-		CMessageBox::Show(hwndExplorer, str, _T("TortoiseGit"), MB_OK | MB_ICONINFORMATION);
+		CMessageBox::Show(GetExplorerHWND(), str, L"TortoiseGit", MB_OK | MB_ICONINFORMATION);
 		return true;
 	}
 	return false;

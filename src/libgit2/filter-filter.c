@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2014 TortoiseGit
+// Copyright (C) 2014, 2016-2018 TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -34,7 +34,7 @@
 
 struct filter_filter {
 	git_filter	f;
-	LPWSTR		pEnv;
+	LPWSTR*		pEnv;
 	LPWSTR		shexepath;
 };
 
@@ -46,6 +46,9 @@ static int filter_check(
 {
 	GIT_UNUSED(self);
 	GIT_UNUSED(src);
+
+	if (!attr_values)
+		return GIT_PASSTHROUGH;
 
 	if (GIT_ATTR_UNSPECIFIED(attr_values[0]))
 		return GIT_PASSTHROUGH;
@@ -103,7 +106,7 @@ static int expandPerCentF(git_buf *buf, const char *replaceWith)
 			return -1;
 		}
 		git_buf_swap(buf, &expanded);
-		git_buf_free(&expanded);
+		git_buf_dispose(&expanded);
 	}
 	return 0;
 }
@@ -147,7 +150,7 @@ static int filter_apply(
 	}
 
 	error = git_config_get_bool(&isRequired, config, configKey.ptr);
-	git_buf_free(&configKey);
+	git_buf_dispose(&configKey);
 	if (error && error != GIT_ENOTFOUND)
 		return -1;
 
@@ -163,7 +166,7 @@ static int filter_apply(
 	}
 
 	error = git_config_get_string_buf(&cmd, config, configKey.ptr);
-	git_buf_free(&configKey);
+	git_buf_dispose(&configKey);
 	if (error && error != GIT_ENOTFOUND)
 		return -1;
 
@@ -183,21 +186,21 @@ static int filter_apply(
 		git_buf_text_puts_escaped(&shParams, cmd.ptr, "\"\\", "\\");
 		git_buf_puts(&shParams, "\"");
 		if (git_buf_oom(&shParams)) {
-			git_buf_free(&cmd);
+			git_buf_dispose(&cmd);
 			giterr_set_oom();
 			return -1;
 		}
 		git_buf_swap(&shParams, &cmd);
-		git_buf_free(&shParams);
+		git_buf_dispose(&shParams);
 	}
 
 	if (git__utf8_to_16_alloc(&wide_cmd, cmd.ptr) < 0)
 	{
-		git_buf_free(&cmd);
+		git_buf_dispose(&cmd);
 		giterr_set_oom();
 		return -1;
 	}
-	git_buf_free(&cmd);
+	git_buf_dispose(&cmd);
 
 	if (ffs->shexepath) {
 		// build cmd, i.e. shexepath + params
@@ -230,10 +233,10 @@ static int filter_apply(
 	}
 
 	if (command_write_gitbuf(&commandHandle, from)) {
-		DWORD exitCode = command_close(&commandHandle);
+		exitCode = command_close(&commandHandle);
 		if (exitCode)
 			setProcessError(exitCode, &errBuf);
-		git_buf_free(&errBuf);
+		git_buf_dispose(&errBuf);
 		if (isRequired)
 			return -1;
 		return GIT_PASSTHROUGH;
@@ -241,10 +244,10 @@ static int filter_apply(
 	command_close_stdin(&commandHandle);
 
 	if (command_wait_stdout_reading_thread(&commandHandle)) {
-		DWORD exitCode = command_close(&commandHandle);
+		exitCode = command_close(&commandHandle);
 		if (exitCode)
 			setProcessError(exitCode, &errBuf);
-		git_buf_free(&errBuf);
+		git_buf_dispose(&errBuf);
 		if (isRequired)
 			return -1;
 		return GIT_PASSTHROUGH;
@@ -254,14 +257,14 @@ static int filter_apply(
 	if (exitCode) {
 		if (isRequired) {
 			setProcessError(exitCode, &errBuf);
-			git_buf_free(&errBuf);
+			git_buf_dispose(&errBuf);
 			return -1;
 		}
-		git_buf_free(&errBuf);
+		git_buf_dispose(&errBuf);
 		return GIT_PASSTHROUGH;
 	}
 
-	git_buf_free(&errBuf);
+	git_buf_dispose(&errBuf);
 
 	return 0;
 }
@@ -278,15 +281,16 @@ static void filter_free(git_filter *self)
 {
 	struct filter_filter *ffs = (struct filter_filter *)self;
 
-	if (ffs->shexepath)
-		git__free(ffs->shexepath);
+	git__free(ffs->shexepath);
 
 	git__free(self);
 }
 
-git_filter *git_filter_filter_new(LPCWSTR shexepath, LPWSTR pEnv)
+git_filter *git_filter_filter_new(LPCWSTR shexepath, LPWSTR* pEnv)
 {
 	struct filter_filter *f = git__calloc(1, sizeof(struct filter_filter));
+	if (!f)
+		return NULL;
 
 	f->f.version	= GIT_FILTER_VERSION;
 	f->f.attributes	= "filter";
@@ -296,7 +300,7 @@ git_filter *git_filter_filter_new(LPCWSTR shexepath, LPWSTR pEnv)
 	f->f.apply		= filter_apply;
 	f->f.cleanup	= filter_cleanup;
 	f->shexepath	= NULL;
-	if (shexepath && wcslen(shexepath) > 0)
+	if (shexepath && shexepath[0])
 		f->shexepath = wcsdup(shexepath);
 	f->pEnv			= pEnv;
 

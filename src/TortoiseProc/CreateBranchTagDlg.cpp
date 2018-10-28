@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2016 - TortoiseGit
+// Copyright (C) 2008-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -29,15 +29,15 @@
 
 IMPLEMENT_DYNAMIC(CCreateBranchTagDlg, CResizableStandAloneDialog)
 
-CCreateBranchTagDlg::CCreateBranchTagDlg(CWnd* pParent /*=NULL*/)
+CCreateBranchTagDlg::CCreateBranchTagDlg(CWnd* pParent /*=nullptr*/)
 	: CResizableStandAloneDialog(CCreateBranchTagDlg::IDD, pParent)
 	, m_bForce(FALSE)
 	, CChooseVersion(this)
+	, m_bIsTag(0)
+	, m_bSwitch(BST_UNCHECKED)	// default switch to checkbox not selected
+	, m_bTrack(BST_INDETERMINATE)
+	, m_bSign(BST_UNCHECKED)
 {
-	m_bIsTag=0;
-	m_bSwitch = 0;	// default switch to checkbox not selected
-	m_bTrack=2;
-	m_bSign=0;
 }
 
 CCreateBranchTagDlg::~CCreateBranchTagDlg()
@@ -73,28 +73,6 @@ BOOL CCreateBranchTagDlg::OnInitDialog()
 	CResizableStandAloneDialog::OnInitDialog();
 	CAppUtils::MarkWindowAsUnpinnable(m_hWnd);
 
-	CHOOSE_VERSION_ADDANCHOR;
-
-	AddAnchor(IDC_GROUP_BRANCH, TOP_LEFT, TOP_RIGHT);
-
-	AddAnchor(IDC_GROUP_OPTION, TOP_LEFT, TOP_RIGHT);
-
-	AddAnchor(IDOK,BOTTOM_RIGHT);
-	AddAnchor(IDCANCEL,BOTTOM_RIGHT);
-	AddAnchor(IDHELP, BOTTOM_RIGHT);
-	AddAnchor(IDC_GROUP_MESSAGE,TOP_LEFT,BOTTOM_RIGHT);
-	AddAnchor(IDC_EDIT_MESSAGE,TOP_LEFT,BOTTOM_RIGHT);
-
-	this->AddOthersToAnchor();
-
-	AdjustControlSize(IDC_RADIO_BRANCH);
-	AdjustControlSize(IDC_RADIO_TAGS);
-	AdjustControlSize(IDC_RADIO_VERSION);
-	AdjustControlSize(IDC_CHECK_TRACK);
-	AdjustControlSize(IDC_CHECK_FORCE);
-	AdjustControlSize(IDC_CHECK_SWITCH);
-	AdjustControlSize(IDC_CHECK_SIGN);
-
 	this->SetDefaultChoose(IDC_RADIO_HEAD);
 
 	InitChooseVersion();
@@ -106,7 +84,7 @@ BOOL CCreateBranchTagDlg::OnInitDialog()
 	{
 		sWindowTitle = CString(MAKEINTRESOURCE(IDS_PROGS_TITLE_CREATETAG));
 		this->GetDlgItem(IDC_LABEL_BRANCH)->SetWindowText(CString(MAKEINTRESOURCE(IDS_PROC_TAG)));
-		this->GetDlgItem(IDC_CHECK_SIGN)->EnableWindow(!g_Git.GetConfigValue(_T("user.signingkey")).IsEmpty());
+		this->GetDlgItem(IDC_CHECK_SIGN)->EnableWindow(!g_Git.GetConfigValue(L"user.signingkey").IsEmpty());
 	}
 	else
 	{
@@ -124,8 +102,32 @@ BOOL CCreateBranchTagDlg::OnInitDialog()
 	CString HeadText;
 	pHead->GetWindowText( HeadText );
 	pHead->SetWindowText( HeadText + " (" + g_Git.GetCurrentBranch() + ")");
+
+	AdjustControlSize(IDC_RADIO_BRANCH);
+	AdjustControlSize(IDC_RADIO_TAGS);
+	AdjustControlSize(IDC_RADIO_VERSION);
+	AdjustControlSize(IDC_CHECK_TRACK);
+	AdjustControlSize(IDC_CHECK_FORCE);
+	AdjustControlSize(IDC_CHECK_SWITCH);
+	AdjustControlSize(IDC_CHECK_SIGN);
 	AdjustControlSize(IDC_RADIO_HEAD);
-	EnableSaveRestore(_T("BranchTagDlg"));
+
+	CHOOSE_VERSION_ADDANCHOR;
+
+	AddAnchor(IDC_BRANCH_TAG, TOP_LEFT, TOP_RIGHT);
+	AddAnchor(IDC_GROUP_BRANCH, TOP_LEFT, TOP_RIGHT);
+
+	AddAnchor(IDC_GROUP_OPTION, TOP_LEFT, TOP_RIGHT);
+
+	AddAnchor(IDOK, BOTTOM_RIGHT);
+	AddAnchor(IDCANCEL, BOTTOM_RIGHT);
+	AddAnchor(IDHELP, BOTTOM_RIGHT);
+	AddAnchor(IDC_GROUP_MESSAGE, TOP_LEFT, BOTTOM_RIGHT);
+	AddAnchor(IDC_EDIT_MESSAGE, TOP_LEFT, BOTTOM_RIGHT);
+
+	AddOthersToAnchor();
+
+	EnableSaveRestore(L"BranchTagDlg");
 
 	m_tooltips.AddTool(GetDlgItem(IDC_CHECK_FORCE), CString(MAKEINTRESOURCE(IDS_PROC_NEWBRANCHTAG_FORCE_TT)));
 	m_tooltips.AddTool(GetDlgItem(IDC_CHECK_SIGN), CString(MAKEINTRESOURCE(IDS_PROC_NEWBRANCHTAG_SIGN_TT)));
@@ -165,7 +167,7 @@ void CCreateBranchTagDlg::OnBnClickedOk()
 			msg.LoadString(IDS_T_EXISTS);
 		else
 			msg.LoadString(IDS_B_EXISTS);
-		ShowEditBalloon(IDC_BRANCH_TAG, msg + _T(" ") + CString(MAKEINTRESOURCE(IDS_B_T_DIFFERENTNAMEORFORCE)), CString(MAKEINTRESOURCE(IDS_WARN_WARNING)));
+		ShowEditBalloon(IDC_BRANCH_TAG, msg + L' ' + CString(MAKEINTRESOURCE(IDS_B_T_DIFFERENTNAMEORFORCE)), CString(MAKEINTRESOURCE(IDS_WARN_WARNING)));
 		return;
 	}
 	if (g_Git.BranchTagExists(m_BranchTagName, m_bIsTag == TRUE))
@@ -175,7 +177,7 @@ void CCreateBranchTagDlg::OnBnClickedOk()
 			msg.LoadString(IDS_T_SAMEBRANCHNAMEEXISTS);
 		else
 			msg.LoadString(IDS_B_SAMETAGNAMEEXISTS);
-		if (CMessageBox::Show(m_hWnd, msg, _T("TortoiseGit"), 2, IDI_EXCLAMATION, CString(MAKEINTRESOURCE(IDS_CONTINUEBUTTON)), CString(MAKEINTRESOURCE(IDS_ABORTBUTTON))) == 2)
+		if (CMessageBox::Show(GetSafeHwnd(), msg, L"TortoiseGit", 2, IDI_EXCLAMATION, CString(MAKEINTRESOURCE(IDS_CONTINUEBUTTON)), CString(MAKEINTRESOURCE(IDS_ABORTBUTTON))) == 2)
 			return;
 	}
 
@@ -185,13 +187,13 @@ void CCreateBranchTagDlg::OnBnClickedOk()
 
 void CCreateBranchTagDlg::OnCbnSelchangeComboboxexBranch()
 {
-	if (this->m_ChooseVersioinBranch.GetString().Left(8)==_T("remotes/") && !m_bIsTag)
+	if (CStringUtils::StartsWith(m_ChooseVersioinBranch.GetString(), L"remotes/") && !m_bIsTag)
 	{
 		bool isDefault = false;
 		this->UpdateData();
 
 		CString str = this->m_OldSelectBranch;
-		int start = str.ReverseFind(_T('/'));
+		int start = str.ReverseFind(L'/');
 		if(start>=0)
 			str=str.Mid(start+1);
 		if(str == m_BranchTagName)
@@ -202,7 +204,7 @@ void CCreateBranchTagDlg::OnCbnSelchangeComboboxexBranch()
 		if( m_BranchTagName.IsEmpty() ||  isDefault)
 		{
 			m_BranchTagName= m_ChooseVersioinBranch.GetString();
-			start = m_BranchTagName.Find(_T('/'), 9);
+			start = m_BranchTagName.Find(L'/', 9);
 			if(start>=0)
 				m_BranchTagName = m_BranchTagName.Mid(start+1);
 
@@ -225,9 +227,9 @@ void CCreateBranchTagDlg::OnEnChangeBranchTag()
 
 	CString name;
 	GetDlgItem(IDC_BRANCH_TAG)->GetWindowText(name);
-	name = _T("/") + name;
+	name = L'/' + name;
 	CString remoteName = m_ChooseVersioinBranch.GetString();
-	if (remoteName.Left(8) == _T("remotes/") && remoteName.Right(name.GetLength()) != name)		
+	if (CStringUtils::StartsWith(remoteName, L"remotes/") && remoteName.Right(name.GetLength()) != name)
 		((CButton *)GetDlgItem(IDC_CHECK_TRACK))->SetCheck(FALSE);
 }
 

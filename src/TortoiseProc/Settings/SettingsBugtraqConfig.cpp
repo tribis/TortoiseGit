@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2009-2014, 2016 - TortoiseGit
+// Copyright (C) 2009-2014, 2016-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -107,6 +107,14 @@ BOOL CSettingsBugtraqConfig::OnInitDialog()
 	AdjustControlSize(IDC_CHECK_INHERIT_BTPARAMS);
 	GITSETTINGS_ADJUSTCONTROLSIZE
 
+	m_tooltips.AddTool(IDC_CHECK_INHERIT_BTURL, IDS_SETTINGS_GITCONFIG_INHERIT_TT);
+	m_tooltips.AddTool(IDC_CHECK_INHERIT_BTMSG, IDS_SETTINGS_GITCONFIG_INHERIT_TT);
+	m_tooltips.AddTool(IDC_CHECK_INHERIT_BTLABEL, IDS_SETTINGS_GITCONFIG_INHERIT_TT);
+	m_tooltips.AddTool(IDC_CHECK_INHERIT_BTREGEXP, IDS_SETTINGS_GITCONFIG_INHERIT_TT);
+	m_tooltips.AddTool(IDC_CHECK_INHERIT_BTUUID32, IDS_SETTINGS_GITCONFIG_INHERIT_TT);
+	m_tooltips.AddTool(IDC_CHECK_INHERIT_BTUUID64, IDS_SETTINGS_GITCONFIG_INHERIT_TT);
+	m_tooltips.AddTool(IDC_CHECK_INHERIT_BTPARAMS, IDS_SETTINGS_GITCONFIG_INHERIT_TT);
+
 	AddTrueFalseToComboBox(m_cWarningifnoissue);
 	AddTrueFalseToComboBox(m_cAppend);
 	AddTrueFalseToComboBox(m_cNumber);
@@ -166,7 +174,7 @@ void CSettingsBugtraqConfig::LoadDataImpl(CAutoConfig& config)
 		ProjectProperties props;
 		props.ReadProps();
 		m_URL = props.sUrl;
-		m_Logregex = props.sCheckRe + _T("\n") + props.sBugIDRe;
+		m_Logregex = props.sCheckRe + L'\n' + props.sBugIDRe;
 		m_Label = props.sLabel;
 		m_Message = props.sMessage;
 		m_UUID32 = props.sProviderUuid;
@@ -226,7 +234,7 @@ void CSettingsBugtraqConfig::LoadDataImpl(CAutoConfig& config)
 	}
 
 	m_Logregex.Trim();
-	m_Logregex.Replace(_T("\n"), _T("\r\n"));
+	m_Logregex.Replace(L"\n", L"\r\n");
 
 	m_bNeedSave = false;
 	SetModified(FALSE);
@@ -273,7 +281,7 @@ BOOL CSettingsBugtraqConfig::SafeDataImpl(CAutoConfig& config)
 	}
 	{
 		CString value(m_Logregex);
-		value.Replace(_T("\r\n"),_T("\n"));
+		value.Replace(L"\r\n",L"\n");
 		if (!Save(config, BUGTRAQPROPNAME_LOGREGEX, value, m_bInheritLogregex == TRUE))
 			return FALSE;
 	}
@@ -299,7 +307,7 @@ void CSettingsBugtraqConfig::OnBnClickedTestbugtraqregexbutton()
 	CBugtraqRegexTestDlg dlg(this);
 	dlg.m_sBugtraqRegex2 = m_Logregex;
 	dlg.m_sBugtraqRegex2.Trim();
-	dlg.m_sBugtraqRegex2.Replace(_T("\r\n"), _T("\n"));
+	dlg.m_sBugtraqRegex2.Replace(L"\r\n", L"\n");
 	if (dlg.m_sBugtraqRegex2.Find('\n') >= 0)
 	{
 		dlg.m_sBugtraqRegex1 = dlg.m_sBugtraqRegex2.Mid(dlg.m_sBugtraqRegex2.Find('\n')).Trim();
@@ -307,9 +315,9 @@ void CSettingsBugtraqConfig::OnBnClickedTestbugtraqregexbutton()
 	}
 	if (dlg.DoModal() == IDOK)
 	{
-		m_Logregex = dlg.m_sBugtraqRegex2 + _T("\n") + dlg.m_sBugtraqRegex1;
+		m_Logregex = dlg.m_sBugtraqRegex2 + L'\n' + dlg.m_sBugtraqRegex1;
 		m_Logregex.Trim();
-		m_Logregex.Replace(_T("\n"), _T("\r\n"));
+		m_Logregex.Replace(L"\n", L"\r\n");
 		UpdateData(FALSE);
 	}
 }

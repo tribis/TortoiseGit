@@ -1,6 +1,6 @@
 // TortoiseGitMerge - a Diff/Patch program
 
-// Copyright (C) 2009-2013, 2015 - TortoiseGit
+// Copyright (C) 2009-2013, 2015-2018 - TortoiseGit
 // Copyright (C) 2012-2013 - Sven Strickroth <email@cs-ware.de>
 // Copyright (C) 2004-2009,2011-2014 - TortoiseSVN
 
@@ -25,6 +25,7 @@
 #include "TortoiseMerge.h"
 #include "GitAdminDir.h"
 #include "Patch.h"
+#include "StringUtils.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -65,8 +66,8 @@ BOOL CPatch::ParsePatchFile(CFileTextLines &PatchLines)
 
 	int state = 0;
 	int nIndex = 0;
-	Chunks * chunks = NULL;
-	Chunk * chunk = NULL;
+	Chunks* chunks = nullptr;
+	Chunk* chunk = nullptr;
 	int nAddLineCount = 0;
 	int nRemoveLineCount = 0;
 	int nContextLineCount = 0;
@@ -83,7 +84,7 @@ BOOL CPatch::ParsePatchFile(CFileTextLines &PatchLines)
 			case 0:
 			{
 				// diff
-				if (sLine.Find(_T("diff ")) == 0)
+				if (CStringUtils::StartsWith(sLine, L"diff "))
 				{
 					if (chunks)
 					{
@@ -103,9 +104,9 @@ BOOL CPatch::ParsePatchFile(CFileTextLines &PatchLines)
 			case 1:
 			{
 				//index
-				if( sLine.Find(_T("index"))==0 )
+				if (CStringUtils::StartsWith(sLine, L"index"))
 				{
-					int dotstart=sLine.Find(_T(".."));
+					int dotstart = sLine.Find(L"..");
 					if(dotstart>=0 && chunks)
 					{
 						chunks->sRevision = sLine.Mid(dotstart-7,7);
@@ -115,7 +116,7 @@ BOOL CPatch::ParsePatchFile(CFileTextLines &PatchLines)
 				}
 
 				//---
-				if (sLine.Find(_T("--- ")) == 0)
+				if (CStringUtils::StartsWith(sLine, L"--- "))
 				{
 					if (state == 0)
 					{
@@ -148,30 +149,28 @@ BOOL CPatch::ParsePatchFile(CFileTextLines &PatchLines)
 						chunks->sFilePath = sLine.Left(bracket-1).Trim();
 
 					if (chunks->sFilePath.Find('\t')>=0)
-					{
 						chunks->sFilePath = chunks->sFilePath.Left(chunks->sFilePath.Find('\t'));
-					}
-					if (chunks->sFilePath.Find(_T('"')) == 0 && chunks->sFilePath.ReverseFind(_T('"')) == chunks->sFilePath.GetLength() - 1)
+					if (CStringUtils::StartsWith(chunks->sFilePath, L"\"") && CStringUtils::EndsWith(chunks->sFilePath, L'"'))
 						chunks->sFilePath=chunks->sFilePath.Mid(1, chunks->sFilePath.GetLength() - 2);
-					if( chunks->sFilePath.Find(_T("a/")) == 0 )
+					if (CStringUtils::StartsWith(chunks->sFilePath, L"a/"))
 						chunks->sFilePath=chunks->sFilePath.Mid(2);
 
-					if( chunks->sFilePath.Find(_T("b/")) == 0 )
+					if (CStringUtils::StartsWith(chunks->sFilePath, L"b/"))
 						chunks->sFilePath=chunks->sFilePath.Mid(2);
 
 
-					chunks->sFilePath.Replace(_T('/'),_T('\\'));
+					chunks->sFilePath.Replace(L'/', L'\\');
 
-					if (chunks->sFilePath == _T("\\dev\\null") || chunks->sFilePath == _T("/dev/null"))
-						chunks->sFilePath  = _T("NUL");
+					if (chunks->sFilePath == L"\\dev\\null" || chunks->sFilePath == L"/dev/null")
+						chunks->sFilePath  = L"NUL";
 
 					state = 3;
 				}
 				if (state == 0)
 				{
-					if (sLine.Find(_T("@@")) == 0)
+					if (CStringUtils::StartsWith(sLine, L"@@"))
 					{
-						if (chunks != NULL)
+						if (chunks)
 						{
 							nIndex--;
 							state = 4;
@@ -186,7 +185,7 @@ BOOL CPatch::ParsePatchFile(CFileTextLines &PatchLines)
 			case 3:
 			{
 				// +++
-				if (sLine.Left(3).Compare(_T("+++")) != 0)
+				if (!CStringUtils::StartsWith(sLine, L"+++"))
 				{
 					// no starting "+++" found
 					m_sErrorMessage.Format(IDS_ERR_PATCH_NOADDFILELINE, nIndex);
@@ -206,21 +205,20 @@ BOOL CPatch::ParsePatchFile(CFileTextLines &PatchLines)
 				else
 					chunks->sFilePath2 = sLine.Left(bracket-1).Trim();
 				if (chunks->sFilePath2.Find('\t')>=0)
-				{
 					chunks->sFilePath2 = chunks->sFilePath2.Left(chunks->sFilePath2.Find('\t'));
-				}
-				if (chunks->sFilePath2.Find(_T('"')) == 0 && chunks->sFilePath2.ReverseFind(_T('"')) == chunks->sFilePath2.GetLength() - 1)
+				if (CStringUtils::StartsWith(chunks->sFilePath2, L"\"") && chunks->sFilePath2.ReverseFind(L'"') == chunks->sFilePath2.GetLength() - 1)
 					chunks->sFilePath2=chunks->sFilePath2.Mid(1, chunks->sFilePath2.GetLength() - 2);
-				if( chunks->sFilePath2.Find(_T("a/")) == 0 )
+				if (CStringUtils::StartsWith(chunks->sFilePath2, L"a/"))
 					chunks->sFilePath2=chunks->sFilePath2.Mid(2);
 
-				if( chunks->sFilePath2.Find(_T("b/")) == 0 )
+				if (CStringUtils::StartsWith(chunks->sFilePath2, L"b/"))
 					chunks->sFilePath2=chunks->sFilePath2.Mid(2);
 
-				chunks->sFilePath2.Replace(_T('/'),_T('\\'));
+				chunks->sFilePath2.Replace(L'/', L'\\');
+				chunks->sFilePath2.Replace(L'/', L'\\');
 
-				if (chunks->sFilePath2 == _T("\\dev\\null") || chunks->sFilePath2 == _T("/dev/null"))
-					chunks->sFilePath2  = _T("NUL");
+				if (chunks->sFilePath2 == L"\\dev\\null" || chunks->sFilePath2 == L"/dev/null")
+					chunks->sFilePath2  = L"NUL";
 
 				++state;
 			}
@@ -229,7 +227,7 @@ BOOL CPatch::ParsePatchFile(CFileTextLines &PatchLines)
 			case 4:
 			{
 				//start of a new chunk
-				if (sLine.Left(2).Compare(_T("@@")) != 0)
+				if (!CStringUtils::StartsWith(sLine, L"@@"))
 				{
 					//chunk doesn't start with "@@"
 					//so there's garbage in between two file diffs
@@ -258,27 +256,27 @@ BOOL CPatch::ParsePatchFile(CFileTextLines &PatchLines)
 				chunk = new Chunk();
 				CString sRemove = sLine.Left(sLine.Find(' '));
 				CString sAdd = sLine.Mid(sLine.Find(' '));
-				chunk->lRemoveStart = (-_ttol(sRemove));
+				chunk->lRemoveStart = abs(_wtol(sRemove));
 				if (sRemove.Find(',')>=0)
 				{
 					sRemove = sRemove.Mid(sRemove.Find(',')+1);
-					chunk->lRemoveLength = _ttol(sRemove);
+					chunk->lRemoveLength = _wtol(sRemove);
 				}
 				else
 				{
 					chunk->lRemoveStart = 0;
-					chunk->lRemoveLength = (-_ttol(sRemove));
+					chunk->lRemoveLength = (_wtol(sRemove));
 				}
-				chunk->lAddStart = _ttol(sAdd);
+				chunk->lAddStart = _wtol(sAdd);
 				if (sAdd.Find(',')>=0)
 				{
 					sAdd = sAdd.Mid(sAdd.Find(',')+1);
-					chunk->lAddLength = _ttol(sAdd);
+					chunk->lAddLength = _wtol(sAdd);
 				}
 				else
 				{
 					chunk->lAddStart = 1;
-					chunk->lAddLength = _ttol(sAdd);
+					chunk->lAddLength = _wtol(sAdd);
 				}
 				++state;
 			}
@@ -330,7 +328,7 @@ BOOL CPatch::ParsePatchFile(CFileTextLines &PatchLines)
 				else
 				{
 					//none of those lines! what the hell happened here?
-					m_sErrorMessage.Format(IDS_ERR_PATCH_UNKOWNLINETYPE, nIndex);
+					m_sErrorMessage.Format(IDS_ERR_PATCH_UNKNOWNLINETYPE, nIndex);
 					goto errorcleanup;
 				}
 				if ((chunk->lAddLength == (nAddLineCount + nContextLineCount)) &&
@@ -341,7 +339,7 @@ BOOL CPatch::ParsePatchFile(CFileTextLines &PatchLines)
 						chunks->chunks.Add(chunk);
 					else
 						delete chunk;
-					chunk = NULL;
+					chunk = nullptr;
 					nAddLineCount = 0;
 					nContextLineCount = 0;
 					nRemoveLineCount = 0;
@@ -363,7 +361,7 @@ BOOL CPatch::ParsePatchFile(CFileTextLines &PatchLines)
 
 	for (int i = 0; i < m_arFileDiffs.GetCount(); ++i)
 	{
-		if (filenamesToPatch[m_arFileDiffs.GetAt(i)->sFilePath] > 1 && m_arFileDiffs.GetAt(i)->sFilePath != _T("NUL"))
+		if (filenamesToPatch[m_arFileDiffs.GetAt(i)->sFilePath] > 1 && m_arFileDiffs.GetAt(i)->sFilePath != L"NUL")
 		{
 			m_sErrorMessage.Format(IDS_ERR_PATCH_FILENAMENOTUNIQUE, (LPCTSTR)m_arFileDiffs.GetAt(i)->sFilePath);
 			FreeMemory();
@@ -372,7 +370,7 @@ BOOL CPatch::ParsePatchFile(CFileTextLines &PatchLines)
 		++filenamesToPatch[m_arFileDiffs.GetAt(i)->sFilePath];
 		if (m_arFileDiffs.GetAt(i)->sFilePath != m_arFileDiffs.GetAt(i)->sFilePath2)
 		{
-			if (filenamesToPatch[m_arFileDiffs.GetAt(i)->sFilePath2] > 1 && m_arFileDiffs.GetAt(i)->sFilePath2 != _T("NUL"))
+			if (filenamesToPatch[m_arFileDiffs.GetAt(i)->sFilePath2] > 1 && m_arFileDiffs.GetAt(i)->sFilePath2 != L"NUL")
 			{
 				m_sErrorMessage.Format(IDS_ERR_PATCH_FILENAMENOTUNIQUE, (LPCTSTR)m_arFileDiffs.GetAt(i)->sFilePath);
 				FreeMemory();
@@ -402,7 +400,7 @@ errorcleanup:
 
 BOOL CPatch::OpenUnifiedDiffFile(const CString& filename)
 {
-	CCrashReport::Instance().AddFile2(filename, NULL, _T("unified diff file"), CR_AF_MAKE_FILE_COPY);
+	CCrashReport::Instance().AddFile2(filename, nullptr, L"unified diff file", CR_AF_MAKE_FILE_COPY);
 
 	CFileTextLines PatchLines;
 	if (!PatchLines.Load(filename))
@@ -420,14 +418,14 @@ BOOL CPatch::OpenUnifiedDiffFile(const CString& filename)
 CString CPatch::GetFilename(int nIndex)
 {
 	if (nIndex < 0)
-		return _T("");
+		return L"";
 	if (nIndex < m_arFileDiffs.GetCount())
 	{
 		Chunks * c = m_arFileDiffs.GetAt(nIndex);
 		CString filepath = Strip(c->sFilePath);
 		return filepath;
 	}
-	return _T("");
+	return L"";
 }
 
 CString CPatch::GetRevision(int nIndex)
@@ -445,14 +443,14 @@ CString CPatch::GetRevision(int nIndex)
 CString CPatch::GetFilename2(int nIndex)
 {
 	if (nIndex < 0)
-		return _T("");
+		return L"";
 	if (nIndex < m_arFileDiffs.GetCount())
 	{
 		Chunks * c = m_arFileDiffs.GetAt(nIndex);
 		CString filepath = Strip(c->sFilePath2);
 		return filepath;
 	}
-	return _T("");
+	return L"";
 }
 
 CString CPatch::GetRevision2(int nIndex)
@@ -482,17 +480,17 @@ int CPatch::PatchFile(const int strip, int nIndex, const CString& sPatchPath, co
 		return FALSE;
 	}
 
-	if (!force && sPath == _T("NUL") && PathFileExists(GetFullPath(sPatchPath, nIndex, 1)))
+	if (!force && sPath == L"NUL" && PathFileExists(GetFullPath(sPatchPath, nIndex, 1)))
 		return FALSE;
 
-	if (GetFullPath(sPatchPath, nIndex, 1) == _T("NUL") && !PathFileExists(sPath))
+	if (GetFullPath(sPatchPath, nIndex, 1) == L"NUL" && !PathFileExists(sPath))
 		return 2;
 
 	CString sLine;
 	CString sPatchFile = sBaseFile.IsEmpty() ? sPath : sBaseFile;
 	if (PathFileExists(sPatchFile))
 	{
-		CCrashReport::Instance().AddFile2(sPatchFile, NULL, _T("File to patch"), CR_AF_MAKE_FILE_COPY);
+		CCrashReport::Instance().AddFile2(sPatchFile, nullptr, L"File to patch", CR_AF_MAKE_FILE_COPY);
 	}
 	CFileTextLines PatchLines;
 	CFileTextLines PatchLinesResult;
@@ -526,19 +524,19 @@ int CPatch::PatchFile(const int strip, int nIndex, const CString& sPatchPath, co
 				{
 					if ((lAddLine > PatchLines.GetCount())||(PatchLines.GetCount()==0))
 					{
-						m_sErrorMessage.Format(IDS_ERR_PATCH_DOESNOTMATCH, _T(""), (LPCTSTR)sPatchLine);
+						m_sErrorMessage.FormatMessage(IDS_ERR_PATCH_DOESNOTMATCH, L"", (LPCTSTR)sPatchLine);
 						return FALSE;
 					}
 					if (lAddLine == 0)
 						lAddLine = 1;
 					if ((sPatchLine.Compare(PatchLines.GetAt(lAddLine-1))!=0)&&(!HasExpandedKeyWords(sPatchLine)))
 					{
-						m_sErrorMessage.Format(IDS_ERR_PATCH_DOESNOTMATCH, (LPCTSTR)sPatchLine, (LPCTSTR)PatchLines.GetAt(lAddLine-1));
+						m_sErrorMessage.FormatMessage(IDS_ERR_PATCH_DOESNOTMATCH, (LPCTSTR)sPatchLine, (LPCTSTR)PatchLines.GetAt(lAddLine-1));
 						return FALSE;
 					}
 					if (lAddLine > PatchLines.GetCount())
 					{
-						m_sErrorMessage.Format(IDS_ERR_PATCH_DOESNOTMATCH, (LPCTSTR)sPatchLine, _T(""));
+						m_sErrorMessage.FormatMessage(IDS_ERR_PATCH_DOESNOTMATCH, (LPCTSTR)sPatchLine, L"");
 						return FALSE;
 					}
 					PatchLines.RemoveAt(lAddLine-1);
@@ -570,7 +568,7 @@ int CPatch::PatchFile(const int strip, int nIndex, const CString& sPatchPath, co
 					{
 						if (k >= chunk->arLines.GetCount())
 							k = j;
-						m_sErrorMessage.Format(IDS_ERR_PATCH_DOESNOTMATCH, (LPCTSTR)PatchLines.GetAt(lAddLine - 1), (LPCTSTR)chunk->arLines.GetAt(k));
+						m_sErrorMessage.FormatMessage(IDS_ERR_PATCH_DOESNOTMATCH, (LPCTSTR)PatchLines.GetAt(lAddLine - 1), (LPCTSTR)chunk->arLines.GetAt(k));
 						return FALSE;
 					}
 				}
@@ -579,7 +577,7 @@ int CPatch::PatchFile(const int strip, int nIndex, const CString& sPatchPath, co
 				{
 					if (lAddLine > PatchLines.GetCount())
 					{
-						m_sErrorMessage.Format(IDS_ERR_PATCH_DOESNOTMATCH, _T(""), (LPCTSTR)sPatchLine);
+						m_sErrorMessage.FormatMessage(IDS_ERR_PATCH_DOESNOTMATCH, L"", (LPCTSTR)sPatchLine);
 						return FALSE;
 					}
 					if (lAddLine == 0)
@@ -599,7 +597,7 @@ int CPatch::PatchFile(const int strip, int nIndex, const CString& sPatchPath, co
 							++lRemoveLine;
 						else
 						{
-							m_sErrorMessage.Format(IDS_ERR_PATCH_DOESNOTMATCH, (LPCTSTR)sPatchLine, (LPCTSTR)PatchLines.GetAt(lAddLine-1));
+							m_sErrorMessage.FormatMessage(IDS_ERR_PATCH_DOESNOTMATCH, (LPCTSTR)sPatchLine, (LPCTSTR)PatchLines.GetAt(lAddLine-1));
 							return FALSE;
 						}
 					}
@@ -622,23 +620,23 @@ int CPatch::PatchFile(const int strip, int nIndex, const CString& sPatchPath, co
 
 BOOL CPatch::HasExpandedKeyWords(const CString& line) const
 {
-	if (line.Find(_T("$LastChangedDate"))>=0)
+	if (line.Find(L"$LastChangedDate") >= 0)
 		return TRUE;
-	if (line.Find(_T("$Date"))>=0)
+	if (line.Find(L"$Date") >= 0)
 		return TRUE;
-	if (line.Find(_T("$LastChangedRevision"))>=0)
+	if (line.Find(L"$LastChangedRevision") >= 0)
 		return TRUE;
-	if (line.Find(_T("$Rev"))>=0)
+	if (line.Find(L"$Rev") >= 0)
 		return TRUE;
-	if (line.Find(_T("$LastChangedBy"))>=0)
+	if (line.Find(L"$LastChangedBy") >= 0)
 		return TRUE;
-	if (line.Find(_T("$Author"))>=0)
+	if (line.Find(L"$Author") >= 0)
 		return TRUE;
-	if (line.Find(_T("$HeadURL"))>=0)
+	if (line.Find(L"$HeadURL") >= 0)
 		return TRUE;
-	if (line.Find(_T("$URL"))>=0)
+	if (line.Find(L"$URL") >= 0)
 		return TRUE;
-	if (line.Find(_T("$Id"))>=0)
+	if (line.Find(L"$Id") >= 0)
 		return TRUE;
 	return FALSE;
 }
@@ -693,7 +691,7 @@ int CPatch::CountMatches(const CString& path)
 		CString temp = GetFilename(i);
 		temp.Replace('/', '\\');
 		if (PathIsRelative(temp))
-			temp = path + _T("\\")+ temp;
+			temp = path + L'\\' + temp;
 		if (PathFileExists(temp))
 			++matches;
 	}
@@ -708,7 +706,7 @@ int CPatch::CountDirMatches(const CString& path)
 		CString temp = GetFilename(i);
 		temp.Replace('/', '\\');
 		if (PathIsRelative(temp))
-			temp = path + _T("\\")+ temp;
+			temp = path + L'\\' + temp;
 		// remove the filename
 		temp = temp.Left(temp.ReverseFind('\\'));
 		if (PathFileExists(temp))
@@ -761,7 +759,7 @@ CString	CPatch::Strip(const CString& filename) const
 			//       "ts/my-working-copy/dir/file.txt"
 			//          "my-working-copy/dir/file.txt"
 			//                          "dir/file.txt"
-			s = s.Mid(s.FindOneOf(_T("/\\"))+1);
+			s = s.Mid(s.FindOneOf(L"/\\") + 1);
 		}
 	}
 	return s;
@@ -776,13 +774,13 @@ CString CPatch::GetFullPath(const CString& sPath, int nIndex, int fileno /* = 0*
 		temp = GetFilename2(nIndex);
 
 	temp.Replace('/', '\\');
-	if(temp == _T("NUL"))
+	if(temp == L"NUL")
 		return temp;
 
 	if (PathIsRelative(temp))
 	{
-		if (sPath.Right(1).Compare(_T("\\")) != 0)
-			temp = sPath + _T("\\") + temp;
+		if (sPath.Right(1) != L"\\")
+			temp = sPath + L'\\' + temp;
 		else
 			temp = sPath + temp;
 	}

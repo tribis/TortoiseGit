@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2018 - TortoiseGit
 // Copyright (C) 2003-2008, 2014 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -20,10 +20,10 @@
 #pragma once
 #include "TGitPath.h"
 #include "GitStatus.h"
-#include "GitRev.h"
 #include "Colors.h"
-#include "LoglistCommonResource.h"
-#include "HintListCtrl.h"
+#include "ResizableColumnsListCtrl.h"
+#include "DragDropImpl.h"
+#include "ReaderWriterLock.h"
 
 #define GIT_WC_ENTRY_WORKING_SIZE_UNKNOWN (-1)
 
@@ -58,7 +58,6 @@
 #define GITSLC_SHOWINCOMPLETE	0x00000000
 #define GITSLC_SHOWINEXTERNALS	0x00000000
 #define GITSLC_SHOWREMOVEDANDPRESENT 0x00000000
-#define GITSLC_SHOWLOCKS		0x00000000
 #define GITSLC_SHOWDIRECTFILES	0x04000000
 #define GITSLC_SHOWDIRECTFOLDER 0x00000000
 #define GITSLC_SHOWEXTERNALFROMDIFFERENTREPO 0x00000000
@@ -121,306 +120,16 @@ GITSLC_SHOWINCOMPLETE|GITSLC_SHOWEXTERNAL|GITSLC_SHOWINEXTERNALS)
 #define GITSLC_POPASSUMEVALID			CGitStatusListCtrl::GetContextMenuBit(CGitStatusListCtrl::IDGITLC_ASSUMEVALID)
 #define GITSLC_POPSKIPWORKTREE			CGitStatusListCtrl::GetContextMenuBit(CGitStatusListCtrl::IDGITLC_SKIPWORKTREE)
 #define GITSLC_POPEXPORT				CGitStatusListCtrl::GetContextMenuBit(CGitStatusListCtrl::IDGITLC_EXPORT)
-#define GITLC_POPUNSETIGNORELOCALCHANGES CGitStatusListCtrl::GetContextMenuBit(CGitStatusListCtrl::IDGITLC_UNSETIGNORELOCALCHANGES)
-#define GITSLC_PREPAREDIFF				CGitStatusListCtrl::GetContextMenuBit(CGitStatusListCtrl::IDGITLC_PREPAREDIFF)
+#define GITSLC_POPUNSETIGNORELOCALCHANGES CGitStatusListCtrl::GetContextMenuBit(CGitStatusListCtrl::IDGITLC_UNSETIGNORELOCALCHANGES)
+#define GITSLC_POPPREPAREDIFF			CGitStatusListCtrl::GetContextMenuBit(CGitStatusListCtrl::IDGITLC_PREPAREDIFF)
 
-#define GITSLC_IGNORECHANGELIST			_T("ignore-on-commit")
-
-// This gives up to 64 standard properties and menu entries
-#define GITSLC_MAXCOLUMNCOUNT           0xff
+#define GITSLC_IGNORECHANGELIST			L"ignore-on-commit"
 
 #define OVL_RESTORE			1
 
 typedef int (__cdecl *GENERICCOMPAREFN)(const void * elem1, const void * elem2);
-typedef CComCritSecLock<CComCriticalSection> Locker;
 
 class CGitStatusListCtrlDropTarget;
-
-/**
-* \ingroup TortoiseProc
-* Helper class for CGitStatusListCtrl that represents
-* the columns visible and their order as well as
-* persisting that data in the registry.
-*
-* It assigns logical index values to the (potential) columns:
-* 0 .. GitSLC_NUMCOLUMNS-1 contain the standard attributes
-*
-* The column vector contains the columns that are actually
-* available in the control.
-*
-*/
-class ColumnManager
-{
-public:
-
-	/// construction / destruction
-
-	ColumnManager (CListCtrl* control) : control (control), m_dwDefaultColumns(0) {};
-	~ColumnManager() {};
-
-	DWORD m_dwDefaultColumns;
-	/// registry access
-
-	void ReadSettings (DWORD defaultColumns, DWORD hideColumns, const CString& containerName, int ReadSettings, int *withlist=NULL);
-	void WriteSettings() const;
-
-	/// read column definitions
-
-	int GetColumnCount() const;                     ///< total number of columns
-	bool IsVisible (int column) const;
-	int GetInvisibleCount() const;
-	bool IsRelevant (int column) const;
-	CString GetName (int column) const;
-	int SetNames(UINT * buff, int size);
-	int GetWidth (int column, bool useDefaults = false) const;
-	int GetVisibleWidth (int column, bool useDefaults) const;
-
-	/// switch columns on and off
-
-	void SetVisible (int column, bool visible);
-
-	/// tracking column modifications
-
-	void ColumnMoved (int column, int position);
-	void ColumnResized (int column);
-
-	/// call these to update the user-prop list
-	/// (will also auto-insert /-remove new list columns)
-
-	/// don't clutter the context menu with irrelevant prop info
-
-	void RemoveUnusedProps();
-
-	/// bring everything back to its "natural" order
-
-	void ResetColumns (DWORD defaultColumns);
-
-	void OnColumnResized(NMHDR *pNMHDR, LRESULT *pResult)
-	{
-		LPNMHEADER header = reinterpret_cast<LPNMHEADER>(pNMHDR);
-		if (   (header != NULL)
-			&& (header->iItem >= 0)
-			&& (header->iItem < GetColumnCount()))
-		{
-			ColumnResized (header->iItem);
-		}
-		*pResult = 0;
-	}
-
-	void OnColumnMoved(NMHDR *pNMHDR, LRESULT *pResult)
-	{
-		LPNMHEADER header = reinterpret_cast<LPNMHEADER>(pNMHDR);
-		*pResult = TRUE;
-		if (   (header != NULL)
-			&& (header->iItem >= 0)
-			&& (header->iItem < GetColumnCount())
-			// only allow the reordering if the column was not moved left of the first
-			// visible item - otherwise the 'invisible' columns are not at the far left
-			// anymore and we get all kinds of redrawing problems.
-			&& (header->pitem)
-			&& (header->pitem->iOrder >= GetInvisibleCount()))
-		{
-			ColumnMoved (header->iItem, header->pitem->iOrder);
-		}
-	}
-
-	void OnHdnBegintrack(NMHDR *pNMHDR, LRESULT *pResult)
-	{
-		LPNMHEADER phdr = reinterpret_cast<LPNMHEADER>(pNMHDR);
-		*pResult = 0;
-		if ((phdr->iItem < 0)||(phdr->iItem >= (int)itemName.size()))
-			return;
-
-		if (IsVisible (phdr->iItem))
-		{
-			return;
-		}
-		*pResult = 1;
-	}
-
-	int OnHdnItemchanging(NMHDR *pNMHDR, LRESULT *pResult)
-	{
-		LPNMHEADER phdr = reinterpret_cast<LPNMHEADER>(pNMHDR);
-		*pResult = 0;
-		if ((phdr->iItem < 0)||(phdr->iItem >= (int)itemName.size()))
-		{
-			return 0;
-		}
-
-		// visible columns may be modified
-
-		if (IsVisible (phdr->iItem))
-		{
-			return 0;
-		}
-
-		// columns already marked as "invisible" internally may be (re-)sized to 0
-
-		if (   (phdr->pitem != NULL)
-			&& (phdr->pitem->mask == HDI_WIDTH)
-			&& (phdr->pitem->cxy == 0))
-		{
-			return 0;
-		}
-
-		if (   (phdr->pitem != NULL)
-			&& (phdr->pitem->mask != HDI_WIDTH))
-		{
-			return 0;
-		}
-
-		*pResult = 1;
-		return 1;
-	}
-	void OnContextMenuHeader(CWnd * pWnd, CPoint point, bool isGroundEnable=false)
-	{
-		CHeaderCtrl * pHeaderCtrl = (CHeaderCtrl *)pWnd;
-		if ((point.x == -1) && (point.y == -1))
-		{
-			CRect rect;
-			pHeaderCtrl->GetItemRect(0, &rect);
-			pHeaderCtrl->ClientToScreen(&rect);
-			point = rect.CenterPoint();
-		}
-
-		CMenu popup;
-		if (popup.CreatePopupMenu())
-		{
-			int columnCount = GetColumnCount();
-
-			CString temp;
-			UINT uCheckedFlags = MF_STRING | MF_ENABLED | MF_CHECKED;
-			UINT uUnCheckedFlags = MF_STRING | MF_ENABLED;
-
-			// build control menu
-
-			//temp.LoadString(IDS_STATUSLIST_SHOWGROUPS);
-			//popup.AppendMenu(isGroundEnable? uCheckedFlags : uUnCheckedFlags, columnCount, temp);
-
-			temp.LoadString(IDS_STATUSLIST_RESETCOLUMNORDER);
-			popup.AppendMenu(uUnCheckedFlags, columnCount+2, temp);
-			popup.AppendMenu(MF_SEPARATOR);
-
-			// standard columns
-			AddMenuItem(&popup);
-
-			// user-prop columns:
-			// find relevant ones and sort 'em
-
-			std::map<CString, int> sortedProps;
-			for (int i = (int)itemName.size(); i < columnCount; ++i)
-			if (IsRelevant(i))
-				sortedProps[GetName(i)] = i;
-
-			if (!sortedProps.empty())
-			{
-				// add 'em to the menu
-
-				popup.AppendMenu(MF_SEPARATOR);
-
-				for (auto iter = sortedProps.cbegin(), end = sortedProps.cend()
-					; iter != end
-					; ++iter)
-				{
-					popup.AppendMenu ( IsVisible(iter->second)
-						? uCheckedFlags
-						: uUnCheckedFlags
-						, iter->second
-						, iter->first);
-				}
-			}
-
-			// show menu & let user pick an entry
-
-			int cmd = popup.TrackPopupMenu(TPM_RETURNCMD | TPM_LEFTALIGN | TPM_NONOTIFY, point.x, point.y, pWnd, 0);
-			if ((cmd >= 1)&&(cmd < columnCount))
-			{
-				SetVisible (cmd, !IsVisible(cmd));
-			}
-			else if (cmd == columnCount)
-			{
-				pWnd->GetParent()->SendMessage(LVM_ENABLEGROUPVIEW, !isGroundEnable, NULL);
-				//EnableGroupView(!isGroundEnable);
-			}
-			else if (cmd == columnCount+1)
-			{
-				RemoveUnusedProps();
-			}
-			else if (cmd == columnCount+2)
-			{
-				temp.LoadString(IDS_CONFIRMRESETCOLUMNORDER);
-				if (MessageBox(pWnd->m_hWnd, temp, _T("TortoiseGit"), MB_YESNO | MB_ICONQUESTION) == IDYES)
-					ResetColumns (m_dwDefaultColumns);
-			}
-		}
-	}
-
-	void AddMenuItem(CMenu *pop)
-	{
-		UINT uCheckedFlags = MF_STRING | MF_ENABLED | MF_CHECKED;
-		UINT uUnCheckedFlags = MF_STRING | MF_ENABLED;
-
-		for (int i = 1; i < (int)itemName.size(); ++i)
-		{
-			if(IsRelevant(i))
-				pop->AppendMenu ( IsVisible(i)
-					? uCheckedFlags
-					: uUnCheckedFlags
-					, i
-					, GetName(i));
-		}
-	}
-private:
-
-	/// initialization utilities
-
-	void ParseWidths (const CString& widths);
-	void SetStandardColumnVisibility (DWORD visibility);
-	void ParseColumnOrder (const CString& widths);
-
-	/// map internal column order onto visible column order
-	/// (all invisibles in front)
-
-	std::vector<int> GetGridColumnOrder() const;
-	void ApplyColumnOrder();
-
-	/// utilities used when writing data to the registry
-
-	DWORD GetSelectedStandardColumns() const;
-	CString GetWidthString() const;
-	CString GetColumnOrderString() const;
-
-	/// our parent control and its data
-
-	CListCtrl* control;
-
-	/// where to store in the registry
-
-	CString registryPrefix;
-
-	/// all columns in their "natural" order
-
-	struct ColumnInfo
-	{
-		int index;          ///< is a user prop when < GitSLC_USERPROPCOLOFFSET
-		int width;
-		bool visible;
-		bool relevant;      ///< set to @a visible, if no *shown* item has that property
-	};
-
-	std::vector<ColumnInfo> columns;
-
-	/// user-defined properties
-
-	std::set<CString> itemProps;
-
-	/// global column ordering including unused user props
-
-	std::vector<int> columnOrder;
-
-	std::vector<int> itemName;
-
-};
 
 /**
 * \ingroup TortoiseProc
@@ -439,10 +148,10 @@ public:
 
 	static int A2L(const CString &str)
 	{
-		if(str==_T("-"))
+		if (str == L"-")
 			return -1;
-		else
-			return _ttol(str);
+
+		return _wtol(str);
 	}
 
 private:
@@ -450,6 +159,7 @@ private:
 	ColumnManager* columnManager;
 	int sortedColumn;
 	bool ascending;
+	bool s_bSortLogical;
 };
 
 /**
@@ -462,7 +172,7 @@ private:
  * work on.
  */
 class CGitStatusListCtrl :
-	public CListCtrl
+	public CResizableColumnsListCtrl<CListCtrl>
 {
 public:
 	enum
@@ -489,7 +199,7 @@ public:
 		IDGITLC_RESOLVEMINE		,
 		IDGITLC_REMOVE			,
 		IDGITLC_COMMIT			,
-		IDGITLC_COPY			,
+		IDGITLC_COPYRELPATHS	,
 		IDGITLC_COPYEXT			,
 		IDGITLC_REMOVEFROMCS	,
 		IDGITLC_CREATECS		,
@@ -519,10 +229,14 @@ public:
 		IDGITLC_UNSETIGNORELOCALCHANGES,
 		IDGITLC_PREPAREDIFF		,
 		IDGITLC_PREPAREDIFF_COMPARE,
+		IDGITLC_COPYCOL			,
+		IDGITLC_COPYFULL		,
+		IDGITLC_COPYFILENAMES	,
 // the IDSVNLC_MOVETOCS *must* be the last index, because it contains a dynamic submenu where
 // the submenu items get command ID's sequent to this number
 		IDGITLC_MOVETOCS		,
 	};
+	static_assert(IDGITLC_MOVETOCS < 64, "IDs must be <64 in order to be usable in a bitfield");
 	int GetColumnIndex(int colmask);
 	static inline unsigned __int64 GetContextMenuBit(int i){ return ((unsigned __int64 )0x1)<<i ;}
 	/**
@@ -555,6 +269,8 @@ public:
 
 	CGitStatusListCtrl(void);
 	~CGitStatusListCtrl(void);
+
+	HWND GetParentHWND();
 
 	CString m_Rev1;
 	CString m_Rev2;
@@ -590,9 +306,7 @@ public:
 			, Revision(GIT_REV_ZERO)
 			, isConflicted(false)
 //			, present_props()
-			, needslock(false)
 ///			, working_size(SVN_WC_ENTRY_WORKING_SIZE_UNKNOWN)
-			, keeplocal(false)
 //			, depth(git_depth_unknown)
 		{
 		}
@@ -610,14 +324,6 @@ public:
 				return path.GetGitPathString();
 			return path.GetGitPathString().Mid(basepath.GetGitPathString().GetLength()+1);
 		}
-//		const bool IsLocked() const
-//		{
-//			return !(lock_token.IsEmpty() && lock_remotetoken.IsEmpty());
-//		}
-//		const bool HasNeedsLock() const
-//		{
-//			return needslock;
-//		}
 		const bool IsFolder() const
 		{
 			return isfolder;
@@ -681,10 +387,8 @@ public:
 		bool					isfolder;				///< TRUE if entry refers to a folder
 		bool					isNested;				///< TRUE if the folder from a different repository and/or path
 		bool					isConflicted;			///< TRUE if a file entry is conflicted, i.e. if it has the conflicted paths set
-		bool					needslock;				///< TRUE if the Git:needs-lock property is set
 		git_revnum_t			Revision;				///< the base revision
 //		PropertyList			present_props;			///< cacheable properties present in BASE
-		bool					keeplocal;				///< Whether a local copy of this entry should be kept in the working copy after a deletion has been committed
 		git_depth_t				depth;					///< the depth of this entry
 		friend class CGitStatusListCtrl;
 		friend class CGitStatusListCtrlDropTarget;
@@ -712,6 +416,9 @@ public:
 	 * \param nID the resource ID of the bitmap to use as the background
 	 */
 	bool SetBackgroundImage(UINT nID);
+private:
+	UINT m_nBackgroundImageID;
+public:
 	/**
 	 * Makes the 'ignore' context menu only ignore the files and not add the
 	 * folder which gets the Git:ignore property changed to the list.
@@ -732,7 +439,7 @@ public:
 	 * \param bUpdate TRUE if the remote status is requested too.
 	 * \return TRUE on success.
 	 */
-	BOOL GetStatus ( const CTGitPathList* pathList=NULL
+	BOOL GetStatus (const CTGitPathList* pathList = nullptr
 				   , bool bUpdate = false
 				   , bool bShowIgnores = false
 				   , bool bShowUnRev = false
@@ -744,14 +451,13 @@ public:
 	 * \param dwCheck mask of file types to check. Use GitLC_SHOWxxx defines. Default (0) means 'use the entry's stored check status'
 	 */
 	void Show(unsigned int dwShow, unsigned int dwCheck = 0, bool bShowFolders = true,BOOL updateStatusList=FALSE, bool UseStoredCheckStatus=false);
-	void Show(unsigned int dwShow, const CTGitPathList& checkedList, bool bShowFolders = true);
 
 	/**
 	 * Copies the selected entries in the control to the clipboard. The entries
 	 * are separated by newlines.
 	 * \param dwCols the columns to copy. Each column is separated by a tab.
 	 */
-	bool CopySelectedEntriesToClipboard(DWORD dwCols);
+	bool CopySelectedEntriesToClipboard(DWORD dwCols, int cmd);
 
 	/**
 	 * If during the call to GetStatus() some Git:externals are found from different
@@ -770,11 +476,6 @@ public:
 	BOOL HasUnversionedItems() {return m_bHasUnversionedItems;}
 
 	/**
-	 * If there are any locks in the working copy, TRUE is returned
-	 */
-	BOOL HasLocks() const {return m_bHasLocks;}
-
-	/**
 	 * If there are any change lists defined in the working copy, TRUE is returned
 	 */
 	BOOL HasChangeLists() const {return m_bHasChangeLists;}
@@ -782,19 +483,13 @@ public:
 	/**
 	 * Returns the file entry data for the list control index.
 	 */
-	//CGitStatusListCtrl::FileEntry * GetListEntry(UINT_PTR index);
+	CTGitPath* GetListEntry(int index);
 
 	/**
 	 * Returns the file entry data for the specified path.
 	 * \note The entry might not be shown in the list control.
 	 */
 	//CGitStatusListCtrl::FileEntry * GetListEntry(const CTGitPath& path);
-
-	/**
-	 * Returns the index of the list control entry with the specified path,
-	 * or -1 if the path is not in the list control.
-	 */
-	int GetIndex(const CTGitPath& path);
 
 	/**
 	 * Returns the file entry data for the specified path in the list control.
@@ -844,19 +539,11 @@ public:
 	 */
 	void SetEntryCheck(CTGitPath* pEntry, int listboxIndex, bool bCheck);
 
+	void ResetChecked(const CTGitPath& entry);
+
 	/** Write a list of the checked items' paths into a path list
 	 */
 	void WriteCheckedNamesToPathList(CTGitPathList& pathList);
-
-	/** fills in \a lMin and \a lMax with the lowest/highest revision of all
-	 * files/folders in the working copy.
-	 * \param bShownOnly if true, the min/max revisions are calculated only for shown items
-	 * \param bCheckedOnly if true, the min/max revisions are calculated only for items
-	 *                   which are checked.
-	 * \remark Since an item can only be checked if it is visible/shown in the list control
-	 *         bShownOnly is automatically set to true if bCheckedOnly is true
-	 */
-	void GetMinMaxRevisions(git_revnum_t& rMin, git_revnum_t& rMax, bool bShownOnly, bool bCheckedOnly);
 
 	/**
 	 * Returns the parent directory of all entries in the control.
@@ -864,13 +551,6 @@ public:
 	 * to fetch the status (in GetStatus()) are used if possible.
 	 */
 	CString GetCommonDirectory(bool bStrict);
-
-	/**
-	 * Returns the parent url of all entries in the control.
-	 * if \a bStrict is set to false, then the paths passed to the control
-	 * to fetch the status (in GetStatus()) are used if possible.
-	 */
-	CTGitPath GetCommonURL(bool bStrict);
 
 	/**
 	 * Sets a pointer to a boolean variable which is checked periodically
@@ -909,10 +589,7 @@ public:
 	 * Checks if the path already exists in the list.
 	 */
 	bool HasPath(const CTGitPath& path);
-	/**
-	 * Checks if the path is shown/visible in the list control.
-	 */
-	bool IsPathShown(const CTGitPath& path);
+
 	/**
 	 * Forces the children to be checked when the parent folder is checked,
 	 * and the parent folder to be unchecked if one of its children is unchecked.
@@ -932,7 +609,7 @@ public:
 public:
 	CString GetLastErrorMessage() {return m_sLastError;}
 
-	void Block(BOOL block, BOOL blockUI) {m_bBlock = block; m_bBlockUI = blockUI;}
+	void BusyCursor(bool bBusy) { m_bWaitCursor = bBusy; }
 
 	LONG GetUnversionedCount() { return m_nShownUnversioned; }
 	LONG GetModifiedCount() { return m_nShownModified; }
@@ -942,11 +619,12 @@ public:
 	LONG GetFileCount() { return m_nShownFiles; }
 	LONG GetSubmoduleCount() { return m_nShownSubmodules; }
 
+	CAutoReadLock AcquireReadLock() { return CAutoReadLock(m_guard); }
+	CAutoReadWeakLock AcquireReadWeakLock(DWORD timeout) { return CAutoReadWeakLock(m_guard, timeout); }
+
 	LONG						m_nTargetCount;		///< number of targets in the file passed to GetStatus()
 
 	CString						m_sURL;				///< the URL of the target or "(multiple targets)"
-
-	GitRev						m_HeadRev;			///< the HEAD revision of the repository if bUpdate was TRUE
 
 	bool						m_amend;			///< if true show the changes to the revision before the last commit
 
@@ -973,10 +651,10 @@ public:
 	}
 
 private:
-	void SaveColumnWidths(bool bSaveToRegistry = false);
+	CString GetCellText(int listIndex, int column);    ///< get the text for a certain grid cell
 	//void AddEntry(FileEntry * entry, WORD langID, int listIndex);	///< add an entry to the control
 	void RemoveListEntry(int index);	///< removes an entry from the listcontrol and both arrays
-	bool BuildStatistics();	///< build the statistics and correct the case of files/folders
+	void BuildStatistics();	///< build the statistics and correct the case of files/folders
 	void StartDiff(int fileindex);	///< start the external diff program
 	void StartDiffWC(int fileindex);	///< start the external diff program
 	void StartDiffTwo(int fileindex);
@@ -1032,41 +710,33 @@ private:
 
 	/// sends an GitSLNM_CHECKCHANGED notification to the parent
 	void NotifyCheck();
-	CWnd * GetLogicalParent() { return m_hwndLogicalParent != NULL ? m_hwndLogicalParent : this->GetParent(); }
+	CWnd* GetLogicalParent() { return m_hwndLogicalParent ? m_hwndLogicalParent : this->GetParent(); }
 
 	void OnContextMenuList(CWnd * pWnd, CPoint point);
 	void OnContextMenuGroup(CWnd * pWnd, CPoint point);
-	void OnContextMenuHeader(CWnd * pWnd, CPoint point);
 	bool CheckMultipleDiffs();
 
 	void DeleteSelectedFiles();
 
-	virtual void PreSubclassWindow();
-	virtual BOOL PreTranslateMessage(MSG* pMsg);
-	virtual BOOL OnWndMsg(UINT message, WPARAM wParam, LPARAM lParam, LRESULT* pResult);
+	virtual void PreSubclassWindow() override;
+	virtual BOOL PreTranslateMessage(MSG* pMsg) override;
+	virtual BOOL OnWndMsg(UINT message, WPARAM wParam, LPARAM lParam, LRESULT* pResult) override;
+	virtual ULONG GetGestureStatus(CPoint ptTouch) override;
+	afx_msg void OnSysColorChange();
 	afx_msg void OnBeginDrag(NMHDR* pNMHDR, LRESULT* pResult);
-	afx_msg BOOL OnToolTipText(UINT id, NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void OnHdnItemclick(NMHDR *pNMHDR, LRESULT *pResult);
-	afx_msg void OnLvnItemchanging(NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg BOOL OnLvnItemchanged(NMHDR *pNMHDR, LRESULT *pResult);
-	afx_msg void OnColumnResized(NMHDR *pNMHDR, LRESULT *pResult);
-	afx_msg void OnColumnMoved(NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void OnContextMenu(CWnd* pWnd, CPoint point);
-
-	void CreateChangeList(const CString& name);
 
 	afx_msg void OnNMDblclk(NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void OnLvnGetInfoTip(NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void OnNMCustomdraw(NMHDR *pNMHDR, LRESULT *pResult);
+	afx_msg void OnLvnGetdispinfo(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg BOOL OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message);
 	afx_msg UINT OnGetDlgCode();
 	afx_msg void OnNMReturn(NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags);
 	afx_msg void OnPaint();
-	afx_msg void OnHdnBegintrack(NMHDR *pNMHDR, LRESULT *pResult);
-	afx_msg void OnHdnItemchanging(NMHDR *pNMHDR, LRESULT *pResult);
-	afx_msg void OnDestroy();
-
 
 	void FilesExport();
 	void FileSaveAs(CTGitPath *path);
@@ -1082,20 +752,17 @@ private:
 	bool						m_bHasExternalsFromDifferentRepos;
 	bool						m_bHasExternals;
 	BOOL						m_bHasUnversionedItems;
-	bool						m_bHasLocks;
 	bool						m_bHasChangeLists;
 	//typedef std::vector<FileEntry*> FileEntryVector;
 	//FileEntryVector				m_arStatusArray;
-	std::vector<CTGitPath*>		m_arStatusArray;
+	std::vector<const CTGitPath*>	m_arStatusArray;
 	std::vector<size_t>			m_arListArray;
 	std::map<CString, int>	    m_changelists;
 	bool						m_bHasIgnoreGroup;
-	//CTGitPathList				m_ConflictFileList;
 	CTGitPathList				m_StatusFileList;
 	CTGitPathList				m_UnRevFileList;
 	CTGitPathList				m_IgnoreFileList;
 	CTGitPathList				m_LocalChangesIgnoredFileList; // assume valid & skip worktree
-	//CTGitPathList				m_StatusUrlList;
 	CString						m_sLastError;
 
 	LONG						m_nUnversioned;
@@ -1124,9 +791,8 @@ private:
 	bool						m_bShowIgnores;
 	bool						m_bUpdate;
 	unsigned __int64			m_dwContextMenus;
-	BOOL						m_bBlock;
-	BOOL						m_bBlockUI;
 	bool						m_bBusy;
+	bool						m_bWaitCursor;
 	bool						m_bEmpty;
 	bool						m_bIgnoreRemoveOnly;
 	bool						m_bCheckIfGroupsExist;
@@ -1143,15 +809,12 @@ private:
 
 	CString						m_sEmpty;
 	CString						m_sBusy;
-	CString						m_sNoPropValueText;
 
 	bool						m_bCheckChildrenWithParent;
-	CGitStatusListCtrlDropTarget * m_pDropTarget;
-
-	ColumnManager				m_ColumnManager;
-
+	std::unique_ptr<CGitStatusListCtrlDropTarget> m_pDropTarget;
+	volatile LONG				m_nBlockItemChangeHandler;
 	std::map<CString,bool>		m_mapFilenameToChecked; ///< Remember de-/selected items
-	std::map<CString,bool>		m_mapDirectFiles;
+	std::set<CString>			m_setDirectFiles;
 	CComCriticalSection			m_critSec;
 
 	friend class CGitStatusListCtrlDropTarget;
@@ -1164,37 +827,63 @@ public:
 		FILELIST_LOCALCHANGESIGNORED = 0x8, // assume valid & skip worktree files
 	};
 private:
-	int UpdateFileList(CTGitPathList *List = NULL);
+	int UpdateFileList(const CTGitPathList* list = nullptr);
 public:
-	int UpdateFileList(int mask, bool once=true,CTGitPathList *List=NULL);
+	int UpdateFileList(int mask, bool once = true, const CTGitPathList* list = nullptr);
 	int UpdateUnRevFileList(CTGitPathList &list);
-	int UpdateUnRevFileList(CTGitPathList *List=NULL);
-	int UpdateIgnoreFileList(CTGitPathList *List=NULL);
-	int UpdateLocalChangesIgnoredFileList(CTGitPathList* list = nullptr);
+	int UpdateUnRevFileList(const CTGitPathList* list = nullptr);
+	int UpdateIgnoreFileList(const CTGitPathList* list = nullptr);
+	int UpdateLocalChangesIgnoredFileList(const CTGitPathList* list = nullptr);
 
 	int UpdateWithGitPathList(CTGitPathList &list);
 
-	void AddEntry(CTGitPath* path, WORD langID, int ListIndex);
+	void AddEntry(size_t arStatusArrayIndex, CTGitPath* path, WORD langID, int ListIndex);
 	void Clear();
 	int m_FileLoaded;
-	git_revnum_t m_CurrentVersion;
+	CString m_CurrentVersion;
 	bool m_bDoNotAutoselectSubmodules;
 	bool m_bNoAutoselectMissing;
 	std::map<CString, CString>	m_restorepaths;
+	mutable CReaderWriterLock	m_guard;
+
+	HFONT			m_uiFont;
 
 	HMENU			m_hShellMenu;
 	LPCONTEXTMENU	m_pContextMenu;
+
+	void			StoreScrollPos();
+
+private:
+	void			RestoreScrollPos();
+	struct ScrollPos
+	{
+		bool enabled = false;
+		int nTopIndex;
+		int selMark;
+		int nSelectedEntry;
+	} m_sScrollPos;
 };
 
-#if 0
 class CGitStatusListCtrlDropTarget : public CIDropTarget
 {
 public:
-	CGitStatusListCtrlDropTarget(CGitStatusListCtrl * pGitStatusListCtrl):CIDropTarget(pGitStatusListCtrl->m_hWnd){m_pGitStatusListCtrl = pGitStatusListCtrl;}
+	CGitStatusListCtrlDropTarget(CGitStatusListCtrl* pGitStatusListCtrl) : CIDropTarget(pGitStatusListCtrl->m_hWnd) { m_pGitStatusListCtrl = pGitStatusListCtrl; }
 
-	virtual bool OnDrop(FORMATETC* pFmtEtc, STGMEDIUM& medium, DWORD * /*pdwEffect*/, POINTL pt);
-	virtual HRESULT STDMETHODCALLTYPE DragOver(DWORD grfKeyState, POINTL pt, DWORD __RPC_FAR *pdwEffect);
+	virtual bool OnDrop(FORMATETC* pFmtEtc, STGMEDIUM& medium, DWORD* pdwEffect, POINTL pt) override;
+	virtual HRESULT STDMETHODCALLTYPE DragOver(DWORD grfKeyState, POINTL pt, DWORD __RPC_FAR* pdwEffect) override;
 private:
-	CGitStatusListCtrl * m_pGitStatusListCtrl;
+	CGitStatusListCtrl* m_pGitStatusListCtrl;
 };
-#endif
+
+class ScopedInDecrement
+{
+public:
+	ScopedInDecrement(volatile LONG& counter) : m_counter(counter) { InterlockedIncrement(&m_counter); }
+	~ScopedInDecrement() { InterlockedDecrement(&m_counter); }
+
+	ScopedInDecrement(const ScopedInDecrement&) = delete;
+	void operator=(const ScopedInDecrement&) = delete;
+
+private:
+	volatile LONG& m_counter;
+};

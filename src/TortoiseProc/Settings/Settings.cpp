@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2018 - TortoiseGit
 // Copyright (C) 2003-2008 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -20,16 +20,17 @@
 #include "stdafx.h"
 #include "TortoiseProc.h"
 #include "Settings.h"
+#include "Git.h"
 #include "MessageBox.h"
-#include "..\..\TGitCache\CacheInterface.h"
+#include "../../TGitCache\CacheInterface.h"
 #include "GitAdminDir.h"
 #include "AppUtils.h"
 
-IMPLEMENT_DYNAMIC(CSettings, CTreePropSheet)
+IMPLEMENT_DYNAMIC(CSettings, CStandAloneDialogTmpl<CTreePropSheet>)
 CSettings::CSettings(UINT nIDCaption, CTGitPath * /*cmdPath*/, CWnd* pParentWnd, UINT iSelectPage)
-	:CTreePropSheet(nIDCaption, pParentWnd, iSelectPage)
+: CStandAloneDialogTmpl<CTreePropSheet>(nIDCaption, pParentWnd)
 {
-	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
+	SetActivePage(iSelectPage);
 	AddPropPages();
 }
 
@@ -168,7 +169,6 @@ void CSettings::RemovePropPages()
 	delete m_pBugtraqConfig;
 	delete m_pExtMenu;
 	delete m_pAdvanced;
-
 }
 
 void CSettings::HandleRestart()
@@ -206,7 +206,7 @@ void CSettings::HandleRestart()
 	{
 		DWORD_PTR res = 0;
 		::SendMessageTimeout(HWND_BROADCAST, WM_SETTINGCHANGE, 0, 0, SMTO_ABORTIFHUNG, 20, &res);
-		CMessageBox::Show(NULL, IDS_SETTINGS_RESTARTSYSTEM, IDS_APPNAME, MB_ICONINFORMATION);
+		CMessageBox::Show(GetSafeHwnd(), IDS_SETTINGS_RESTARTSYSTEM, IDS_APPNAME, MB_ICONINFORMATION);
 	}
 	if (restart & ISettingsPropPage::Restart_Cache)
 	{
@@ -218,153 +218,73 @@ void CSettings::HandleRestart()
 	}
 }
 
-BEGIN_MESSAGE_MAP(CSettings, CTreePropSheet)
-	ON_WM_QUERYDRAGICON()
-	ON_WM_PAINT()
+BEGIN_MESSAGE_MAP(CSettings, CStandAloneDialogTmpl<CTreePropSheet>)
 END_MESSAGE_MAP()
 
 BOOL CSettings::OnInitDialog()
 {
-	BOOL bResult = CTreePropSheet::OnInitDialog();
+	BOOL bResult = __super::OnInitDialog();
 	CAppUtils::MarkWindowAsUnpinnable(m_hWnd);
 
-	SetIcon(m_hIcon, TRUE);			// Set big icon
-	SetIcon(m_hIcon, FALSE);		// Set small icon
 	if (GitAdminDir::IsWorkingTreeOrBareRepo(g_Git.m_CurrentDir))
 	{
 		CString title;
 		GetWindowText(title);
-		SetWindowText(g_Git.m_CurrentDir + _T(" - ") + title);
+		SetWindowText(g_Git.m_CurrentDir + L" - " + title);
 	}
 
-	CenterWindow(CWnd::FromHandle(hWndExplorer));
+	CenterWindow(CWnd::FromHandle(GetExplorerHWND()));
 
-	if (this->m_DefaultPage == _T("gitremote"))
+	if (this->m_DefaultPage == L"gitremote")
 	{
 		this->SetActivePage(this->m_pGitRemote);
 		this->m_pGitRemote->m_bNoFetch = true;
 	}
-	else if (this->m_DefaultPage == _T("gitconfig"))
-	{
+	else if (this->m_DefaultPage == L"gitconfig")
 		this->SetActivePage(this->m_pGitConfig);
-	}
-	else if (this->m_DefaultPage == _T("gitcredential"))
-	{
+	else if (this->m_DefaultPage == L"gitcredential")
 		this->SetActivePage(this->m_pGitCredential);
-	}
-	else if (this->m_DefaultPage == _T("main"))
-	{
+	else if (this->m_DefaultPage == L"main")
 		this->SetActivePage(this->m_pMainPage);
-	}
-	else if (this->m_DefaultPage == _T("overlay"))
-	{
+	else if (this->m_DefaultPage == L"overlay")
 		this->SetActivePage(this->m_pOverlayPage);
-	}
-	else if (this->m_DefaultPage == _T("overlays"))
-	{
+	else if (this->m_DefaultPage == L"overlays")
 		this->SetActivePage(this->m_pOverlaysPage);
-	}
-	else if (this->m_DefaultPage == _T("overlayshandlers"))
-	{
+	else if (this->m_DefaultPage == L"overlayshandlers")
 		this->SetActivePage(this->m_pOverlayHandlersPage);
-	}
-	else if (this->m_DefaultPage == _T("proxy"))
-	{
+	else if (this->m_DefaultPage == L"proxy")
 		this->SetActivePage(this->m_pProxyPage);
-	}
-	else if (this->m_DefaultPage == _T("smtp"))
-	{
+	else if (this->m_DefaultPage == L"smtp")
 		this->SetActivePage(this->m_pSMTPPage);
-	}
-	else if (this->m_DefaultPage == _T("diff"))
-	{
+	else if (this->m_DefaultPage == L"diff")
 		this->SetActivePage(this->m_pProgsDiffPage);
-	}
-	else if (this->m_DefaultPage == _T("merge"))
-	{
+	else if (this->m_DefaultPage == L"merge")
 		this->SetActivePage(this->m_pProgsMergePage);
-	}
-	else if (this->m_DefaultPage == _T("alternativeeditor"))
-	{
+	else if (this->m_DefaultPage == L"alternativeeditor")
 		this->SetActivePage(this->m_pProgsAlternativeEditor);
-	}
-	else if (this->m_DefaultPage == _T("look"))
-	{
+	else if (this->m_DefaultPage == L"look")
 		this->SetActivePage(this->m_pLookAndFeelPage);
-	}
-	else if (this->m_DefaultPage == _T("dialog"))
-	{
+	else if (this->m_DefaultPage == L"dialog")
 		this->SetActivePage(this->m_pDialogsPage);
-	}
-	else if (this->m_DefaultPage == _T("dialog2"))
-	{
+	else if (this->m_DefaultPage == L"dialog2")
 		this->SetActivePage(this->m_pDialogsPage2);
-	}
-	else if (this->m_DefaultPage == _T("dialog3"))
-	{
+	else if (this->m_DefaultPage == L"dialog3")
 		this->SetActivePage(this->m_pDialogsPage3);
-	}
-	else if (this->m_DefaultPage == _T("color1"))
-	{
+	else if (this->m_DefaultPage == L"color1")
 		this->SetActivePage(this->m_pColorsPage);
-	}
-	else if (this->m_DefaultPage == _T("color2"))
-	{
+	else if (this->m_DefaultPage == L"color2")
 		this->SetActivePage(this->m_pColorsPage2);
-	}
-	else if (this->m_DefaultPage == _T("color3"))
-	{
+	else if (this->m_DefaultPage == L"color3")
 		this->SetActivePage(this->m_pColorsPage3);
-	}
-	else if (this->m_DefaultPage == _T("save"))
-	{
+	else if (this->m_DefaultPage == L"save")
 		this->SetActivePage(this->m_pSavedPage);
-	}
-	else if (this->m_DefaultPage == _T("advanced"))
-	{
+	else if (this->m_DefaultPage == L"advanced")
 		this->SetActivePage(this->m_pAdvanced);
-	}
-	else if (this->m_DefaultPage == _T("blame"))
-	{
+	else if (this->m_DefaultPage == L"blame")
 		this->SetActivePage(this->m_pTBlamePage);
-	}
-	else if (this->m_DefaultPage == _T("udiff"))
-	{
+	else if (this->m_DefaultPage == L"udiff")
 		this->SetActivePage(this->m_pUDiffPage);
-	}
 	else if (GitAdminDir::IsWorkingTreeOrBareRepo(g_Git.m_CurrentDir))
-	{
 		this->SetActivePage(this->m_pGitConfig);
-	}
 	return bResult;
-}
-
-void CSettings::OnPaint()
-{
-	if (IsIconic())
-	{
-		CPaintDC dc(this); // device context for painting
-
-		SendMessage(WM_ICONERASEBKGND, reinterpret_cast<WPARAM>(dc.GetSafeHdc()), 0);
-
-		// Center icon in client rectangle
-		int cxIcon = GetSystemMetrics(SM_CXICON);
-		int cyIcon = GetSystemMetrics(SM_CYICON);
-		CRect rect;
-		GetClientRect(&rect);
-		int x = (rect.Width() - cxIcon + 1) / 2;
-		int y = (rect.Height() - cyIcon + 1) / 2;
-
-		// Draw the icon
-		dc.DrawIcon(x, y, m_hIcon);
-	}
-	else
-	{
-		CTreePropSheet::OnPaint();
-	}
-}
-
-HCURSOR CSettings::OnQueryDragIcon()
-{
-	return static_cast<HCURSOR>(m_hIcon);
 }

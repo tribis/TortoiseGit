@@ -63,7 +63,7 @@ BOOL CPropPageFrameDefault::Create(DWORD dwWindowStyle, const RECT &rect, CWnd *
 {
 	return CWnd::Create(
 		AfxRegisterWndClass(CS_HREDRAW|CS_VREDRAW, AfxGetApp()->LoadStandardCursor(IDC_ARROW), GetSysColorBrush(COLOR_3DFACE)),
-		_T("Page Frame"),
+		L"Page Frame",
 		dwWindowStyle, rect, pwndParent, nID);
 }
 
@@ -74,7 +74,7 @@ CWnd* CPropPageFrameDefault::GetWnd()
 }
 
 
-void CPropPageFrameDefault::SetCaption(LPCTSTR lpszCaption, HICON hIcon /*= NULL*/)
+void CPropPageFrameDefault::SetCaption(LPCTSTR lpszCaption, HICON hIcon /*= nullptr*/)
 {
 	CPropPageFrame::SetCaption(lpszCaption, hIcon);
 
@@ -170,26 +170,40 @@ void CPropPageFrameDefault::DrawCaption(CDC *pDc, CRect rect, LPCTSTR lpszCaptio
 	COLORREF	clrRight = pDc->GetPixel(rect.right-1, rect.top);
 	FillGradientRectH(pDc, rect, clrLeft, clrRight);
 
+	double hScale = 1.0;
+	double vScale = 1.0;
+
 	// draw icon
 	if (hIcon && m_Images.GetSafeHandle() && m_Images.GetImageCount() == 1)
 	{
 		IMAGEINFO	ii;
 		m_Images.GetImageInfo(0, &ii);
-		CPoint		pt(6, rect.CenterPoint().y - (ii.rcImage.bottom-ii.rcImage.top)/2);
-		m_Images.Draw(pDc, 0, pt, ILD_TRANSPARENT);
-		rect.left+= (ii.rcImage.right-ii.rcImage.left) + 6;
+		const RECT& rcImage = ii.rcImage;
+		SIZE sz;
+		sz.cx = rcImage.right - rcImage.left;
+		sz.cy = rcImage.bottom - rcImage.top;
+		hScale = vScale = max(1.0, rect.Height() / sz.cy * 0.7);
+		sz.cx = (LONG)(sz.cx * hScale + 0.5);
+		sz.cy = (LONG)(sz.cy * vScale + 0.5);
+		LONG xOffset = (LONG)(6 * hScale + 0.5);
+		CPoint pt(xOffset, rect.CenterPoint().y - (sz.cy / 2));
+		m_Images.DrawEx(pDc, 0, pt, sz, CLR_DEFAULT, CLR_DEFAULT, ILD_TRANSPARENT | ILD_SCALE);
+		rect.left += sz.cx + xOffset;
 	}
 
 	// draw text
-	rect.left+= 2;
+	rect.left += (LONG)(2 * hScale + 0.5);
 
 	COLORREF	clrPrev = pDc->SetTextColor(GetSysColor(COLOR_CAPTIONTEXT));
 	int				nBkStyle = pDc->SetBkMode(TRANSPARENT);
-	CFont			*pFont = (CFont*)pDc->SelectStockObject(SYSTEM_FONT);
 
-	//pDc->DrawText(lpszCaption, rect, DT_LEFT|DT_VCENTER|DT_SINGLELINE|DT_END_ELLIPSIS);
+	LOGFONT lf;
+	SystemParametersInfo(SPI_GETICONTITLELOGFONT, sizeof(LOGFONT), &lf, 0);
+	CFont font;
+	font.CreateFontIndirect(&lf);
+	CFont* pFont = pDc->SelectObject(&font);
 
-	TextOutTryFL(pDc->GetSafeHdc(), rect.left, rect.top, lpszCaption, (int)_tcslen(lpszCaption));
+	pDc->DrawText(lpszCaption, rect, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 
 	pDc->SetTextColor(clrPrev);
 	pDc->SetBkMode(nBkStyle);
@@ -216,7 +230,7 @@ void CPropPageFrameDefault::FillGradientRectH(CDC *pDc, const RECT &rect, COLORR
 	double	dG = (double)GetGValue(clrLeft);
 	double	dB = (double)GetBValue(clrLeft);
 
-	CPen	*pPrevPen = NULL;
+	CPen* pPrevPen = nullptr;
 	for (int x = rect.left; x <= rect.right; ++x)
 	{
 		CPen	Pen(PS_SOLID, 1, RGB((BYTE)dR, (BYTE)dG, (BYTE)dB));
@@ -251,7 +265,7 @@ BOOL CPropPageFrameDefault::OnEraseBkgnd(CDC* pDC)
 		{
 			CRect	rect;
 			GetClientRect(rect);
-			DrawThemeBackground(hTheme, pDC->m_hDC, 0, 0, rect, NULL);
+			DrawThemeBackground(hTheme, pDC->m_hDC, 0, 0, rect, nullptr);
 			CloseThemeData(hTheme);
 		}
 		return TRUE;

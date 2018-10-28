@@ -1,6 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2011 - Sven Strickroth <email@cs-ware.de>
+// Copyright (C) 2016-2017 - TortoiseGit
+// Copyright (C) 2011, 2016 - Sven Strickroth <email@cs-ware.de>
 
 //based on:
 // Copyright (C) 2003-2007 - TortoiseSVN
@@ -44,8 +45,7 @@ public:
 	 * \return the index of the inserted item. This index is
 	 * returned in GetCurrentEntry().
 	 */
-	INT_PTR AddEntry(const CString& sEntry);
-	INT_PTR AddEntry(UINT iconId, const CString& sEntry);
+	INT_PTR AddEntry(const CString& sEntry, UINT uIcon = 0U);
 
 	/**
 	 * Inserts an array of strings to be shown in the
@@ -78,12 +78,19 @@ public:
 
 	bool	m_bMarkDefault;
 
+	/** Don't show text on Button */
+	bool	m_bShowCurrentItem;
+
+	bool	m_bAlwaysShowArrow;
+
 protected:
-	virtual BOOL PreTranslateMessage(MSG* pMsg);
+	virtual BOOL PreTranslateMessage(MSG* pMsg) override;
 
 	bool	m_bRealMenuIsActive;
-	virtual void OnShowMenu();
+	virtual void OnShowMenu() override;
 	afx_msg void OnDraw(CDC* pDC, const CRect& rect, UINT uiState);
+	afx_msg void OnSysColorChange();
+	afx_msg LRESULT OnThemeChanged();
 
 	afx_msg BOOL OnClicked();
 	afx_msg void OnDestroy();

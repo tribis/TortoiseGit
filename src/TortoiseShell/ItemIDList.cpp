@@ -20,7 +20,7 @@
 #include "stdafx.h"
 #include "ShellExt.h"
 #include "ItemIDList.h"
-
+#include "StringUtils.h"
 
 ItemIDList::ItemIDList(PCUITEMID_CHILD item, PCUIDLIST_RELATIVE parent)
 	: item_ (item)
@@ -48,7 +48,7 @@ int ItemIDList::size() const
 		if (item_)
 		{
 			LPCSHITEMID ptr = &item_->mkid;
-			while (ptr != 0 && ptr->cb != 0)
+			while (ptr && ptr->cb != 0)
 			{
 				++count_;
 				LPBYTE byte = (LPBYTE) ptr;
@@ -64,11 +64,11 @@ LPCSHITEMID ItemIDList::get(int index) const
 {
 	int count = 0;
 
-	if (item_ == NULL)
-		return NULL;
+	if (!item_)
+		return nullptr;
 	LPCSHITEMID ptr = &item_->mkid;
-	if (ptr == NULL)
-		return NULL;
+	if (!ptr)
+		return nullptr;
 	while (ptr->cb != 0)
 	{
 		if (count == index)
@@ -80,7 +80,6 @@ LPCSHITEMID ItemIDList::get(int index) const
 		ptr = (LPCSHITEMID) byte;
 	}
 	return ptr;
-
 }
 
 tstring ItemIDList::toString(bool resolveLibraries /*= true*/)
@@ -96,7 +95,7 @@ tstring ItemIDList::toString(bool resolveLibraries /*= true*/)
 
 	STRRET name;
 	TCHAR* szDisplayName = nullptr;
-	if ((parentFolder != 0)&&(item_ != 0))
+	if (parentFolder && item_ != 0)
 	{
 		if (FAILED(parentFolder->GetDisplayNameOf(item_, SHGDN_NORMAL | SHGDN_FORPARSING, &name)))
 			return ret;
@@ -108,7 +107,7 @@ tstring ItemIDList::toString(bool resolveLibraries /*= true*/)
 	ret = szDisplayName;
 	CoTaskMemFree(szDisplayName);
 
-	if (!((resolveLibraries) && (_tcsncmp(ret.c_str(), _T("::{"), 3) == 0)))
+	if (!((resolveLibraries) && (CStringUtils::StartsWith(ret.c_str(), L"::{"))))
 		return ret;
 
 	CComPtr<IShellLibrary> plib;

@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2013-2015 - TortoiseGit
+// Copyright (C) 2013-2016 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -42,35 +42,29 @@ int RemoteProgressCommand::RemoteCompletionCallback(git_remote_completion_type /
 int RemoteProgressCommand::RemoteUpdatetipsCallback(const char* refname, const git_oid* oldOid, const git_oid* newOid, void* data)
 {
 	auto ptr = (CGitProgressList::Payload*)data;
-	bool nonff = false;
+	/*bool nonff = false;
 	if (!git_oid_iszero(oldOid) && !git_oid_iszero(newOid))
 	{
 		git_oid baseOid = { 0 };
 		if (!git_merge_base(&baseOid, ptr->repo, newOid, oldOid))
 			if (!git_oid_equal(oldOid, &baseOid))
 				nonff = true;
-	}
+	}*/
 
 	CString change;
 	if (!git_oid_iszero(oldOid) && !git_oid_iszero(newOid))
 	{
 		if (git_oid_equal(oldOid, newOid))
-		{
 			change.LoadString(IDS_SAME);
-		}
 		else
 		{
 			size_t ahead = 0, behind = 0;
 			if (!git_graph_ahead_behind(&ahead, &behind, ptr->repo, newOid, oldOid))
 			{
 				if (ahead > 0 && behind == 0)
-				{
 					change.Format(IDS_FORWARDN, ahead);
-				}
 				else if (ahead == 0 && behind > 0)
-				{
 					change.Format(IDS_REWINDN, behind);
-				}
 				else
 				{
 					git_commit* oldCommit, * newCommit;
@@ -105,19 +99,19 @@ RemoteProgressCommand::RefUpdateNotificationData::RefUpdateNotificationData(cons
 	m_NewHash = newOid->id;
 	m_OldHash = oldOid->id;
 	sActionColumnText.LoadString(IDS_GITACTION_UPDATE_REF);
-	sPathColumnText.Format(_T("%s\t %s -> %s (%s)"), (LPCTSTR)str, (LPCTSTR)m_OldHash.ToString().Left(g_Git.GetShortHASHLength()), (LPCTSTR)m_NewHash.ToString().Left(g_Git.GetShortHASHLength()), (LPCTSTR)change);
+	sPathColumnText.Format(L"%s\t %s -> %s (%s)", (LPCTSTR)str, (LPCTSTR)m_OldHash.ToString().Left(g_Git.GetShortHASHLength()), (LPCTSTR)m_NewHash.ToString().Left(g_Git.GetShortHASHLength()), (LPCTSTR)change);
 }
 
 void RemoteProgressCommand::RefUpdateNotificationData::GetContextMenu(CIconMenu& popup, CGitProgressList::ContextMenuActionList& actions)
 {
 	actions.push_back([&]()
 	{
-		CString cmd = _T("/command:log");
-		cmd += _T(" /path:\"") + g_Git.m_CurrentDir + _T("\"");
+		CString cmd = L"/command:log";
+		cmd += L" /path:\"" + g_Git.m_CurrentDir + L'"';
 		if (!m_OldHash.IsEmpty())
-			cmd += _T(" /startrev:") + m_OldHash.ToString();
+			cmd += L" /startrev:" + m_OldHash.ToString();
 		if (!m_NewHash.IsEmpty())
-			cmd += _T(" /endrev:") + m_NewHash.ToString();
+			cmd += L" /endrev:" + m_NewHash.ToString();
 		CAppUtils::RunTortoiseGitProc(cmd);
 	});
 	popup.AppendMenuIcon(actions.size(), IDS_MENULOG, IDI_LOG);

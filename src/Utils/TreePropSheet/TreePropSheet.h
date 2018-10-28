@@ -42,9 +42,9 @@ you can specify the path of the pages in the tree, by their name:
 The names of the pages can contain
 double colons ("::"), which will specify the path of that page in the
 tree control. I.e. if you have three pages with the following names:
-1. _T("Appearance::Toolbars")
-2. _T("Appearance::Menus")
-3. _T("Directories")
+1. L"Appearance::Toolbars"
+2. L"Appearance::Menus"
+3. L"Directories"
 the tree would look as follow:
 \verbatim
 Appearance
@@ -56,7 +56,7 @@ Appearance
 Directories
 \endverbatim
 If you would like to use a double colon, which should not be
-interpreted as a path seperator, prefix it with a backslash ("\\::").
+interpreted as a path separator, prefix it with a backslash ("\\::").
 
 To disable tree view mode and use the standard tabbed mode, call
 the SetTreeViewMode() method. This also allows you, to enable page
@@ -81,8 +81,8 @@ class /*AFX_EXT_CLASS*/ CTreePropSheet : public CPropertySheet
 // Construction/Destruction
 public:
 	CTreePropSheet();
-	CTreePropSheet(UINT nIDCaption, CWnd* pParentWnd = NULL, UINT iSelectPage = 0);
-	CTreePropSheet(LPCTSTR pszCaption, CWnd* pParentWnd = NULL, UINT iSelectPage = 0);
+	CTreePropSheet(UINT nIDCaption, CWnd* pParentWnd = nullptr, UINT iSelectPage = 0);
+	CTreePropSheet(LPCTSTR pszCaption, CWnd* pParentWnd = nullptr, UINT iSelectPage = 0);
 	virtual ~CTreePropSheet();
 
 // Operations
@@ -192,7 +192,7 @@ public:
 
 	/**
 	Returns a pointer to the tree control, when the sheet is in
-	tree view mode, NULL otherwise.
+	tree view mode, nullptr otherwise.
 	*/
 	CTreeCtrl* GetPageTreeControl();
 
@@ -231,7 +231,7 @@ public:
 		as an icon.
 
 	@return
-		TRUE on success, FALSE if an error occured.
+		TRUE on success, FALSE if an error occurred.
 	*/
 	static BOOL SetPageIcon(CPropertyPage *pPage, HICON hIcon);
 	static BOOL SetPageIcon(CPropertyPage *pPage, UINT unIconId);
@@ -251,7 +251,7 @@ public:
 
 	@return
 		TRUE on success, FALSE if the PSP_USEHICON flag was not set or
-		if the icon handle was NULL.
+		if the icon handle was nullptr.
 	*/
 	static BOOL DestroyPageIcon(CPropertyPage *pPage);
 
@@ -337,7 +337,7 @@ protected:
 	CString SplitPageTreePath(CString &strRest);
 
 	/**
-	Tries to deactivate the current page, and hides it if successfull,
+	Tries to deactivate the current page, and hides it if successful,
 	so that an empty page becomes visible.
 
 	@return
@@ -348,7 +348,7 @@ protected:
 
 	/**
 	Returns the page tree item, that representates the specified page
-	or NULL, if no such icon exists.
+	or nullptr, if no such icon exists.
 
 	@param nPage
 		Zero based page index, for which the item to retrieve.
@@ -407,6 +407,36 @@ protected:
 	//{{AFX_VIRTUAL(CTreePropSheet)
 	public:
 	virtual BOOL OnInitDialog();
+	void BuildPropPageArray() override
+	{
+		CPropertySheet::BuildPropPageArray();
+
+		// create a copy of existing PROPSHEETPAGE array which can be modified
+		int nPages = static_cast<int>(m_pages.GetSize());
+		int nBytes = 0;
+		for (decltype(nPages) i = 0; i < nPages; ++i)
+		{
+			auto pPage = GetPage(i);
+			nBytes += pPage->m_psp.dwSize;
+		}
+		auto ppsp0 = static_cast<LPPROPSHEETPAGE>(malloc(nBytes));
+		Checked::memcpy_s(ppsp0, nBytes, m_psh.ppsp, nBytes);
+		auto ppsp = ppsp0;
+		for (decltype(nPages) i = 0; i < nPages; ++i)
+		{
+			const DLGTEMPLATE* pResource = ppsp->pResource;
+			CDialogTemplate dlgTemplate(pResource);
+			dlgTemplate.SetFont(L"MS Shell Dlg 2", 9);
+			HGLOBAL hNew = GlobalAlloc(GPTR, dlgTemplate.m_dwTemplateSize);
+			ppsp->pResource = (DLGTEMPLATE*)GlobalLock(hNew);
+			Checked::memcpy_s((void*)ppsp->pResource, dlgTemplate.m_dwTemplateSize, dlgTemplate.m_hTemplate, dlgTemplate.m_dwTemplateSize);
+			GlobalUnlock(hNew);
+			(BYTE*&)ppsp += ppsp->dwSize;
+		}
+		// free existing PROPSHEETPAGE array and assign the new one
+		free((void*)m_psh.ppsp);
+		m_psh.ppsp = ppsp0;
+	}
 	//}}AFX_VIRTUAL
 
 // Message handlers
@@ -475,6 +505,6 @@ private:
 /////////////////////////////////////////////////////////////////////////////
 
 //{{AFX_INSERT_LOCATION}}
-// Microsoft Visual C++ fügt unmittelbar vor der vorhergehenden Zeile zusätzliche Deklarationen ein.
+// Microsoft Visual C++ fÃ¼gt unmittelbar vor der vorhergehenden Zeile zusÃ¤tzliche Deklarationen ein.
 
 #endif // AFX_TREEPROPSHEET_H__50695CFB_FCE4_4188_ADB4_BF05A5488E41__INCLUDED_

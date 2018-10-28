@@ -25,6 +25,12 @@
 		you can always choose to call a script which is itself under version control.
 	</para>
 	<para>
+		One application for such hooks might be to call a program like
+		<literal>GitWCRev.exe</literal> (<xref linkend="tgit-gitwcrev"/>)
+		to update version numbers after a commit,
+		and perhaps to trigger a rebuild.
+	</para>
+	<para>
 		<figure id="tgit-dug-settings-dia-hook-edit">
 			<title>The Settings Dialog, Configure Hook Scripts</title>
 			<graphic fileref="../images/SettingsHookEdit.png"/>
@@ -58,16 +64,14 @@
 					</para>
 				</listitem>
 			</varlistentry>
-			<!--
 			<varlistentry>
 				<term>Post-commit</term>
 				<listitem>
 					<para>
-						Called after the commit finishes (whether successful or not).
+						Called after the commit finished successfully.
 					</para>
 				</listitem>
 			</varlistentry>
-			-->
 			<varlistentry>
 				<term>Pre-push</term>
 				<listitem>
@@ -84,12 +88,21 @@
 					</para>
 				</listitem>
 			</varlistentry>
+			<varlistentry>
+				<term>Pre-rebase</term>
+				<listitem>
+					<para>
+						Called before rebasing starts (after clicking on Start or autostart).
+					</para>
+				</listitem>
+			</varlistentry>
 		</variablelist>
 	</para>
 	<para>
 		A hook is defined for a particular working tree path. You only need to
 		specify the top level path; if you perform an operation in a sub-folder,
 		TortoiseGit will automatically search upwards for a matching path.
+		Use <literal>*</literal> for matching all working trees.
 	</para>
 	<para>
 		Next you must specify the command line to execute, starting with the path
@@ -122,20 +135,15 @@
 					</para>
 				</listitem>
 			</varlistentry>
-			<!--
 			<varlistentry>
 				<term>Post-commit</term>
 				<listitem condition="pot">
 					<para>
-						<literal>PATH</literal>
-						<literal>MESSAGEFILE</literal>
-						<literal>REVISION</literal>
-						<literal>ERROR</literal>
 						<literal>CWD</literal>
+						<literal>(commit was amend (true or false))</literal>
 					</para>
 				</listitem>
 			</varlistentry>
-			-->
 			<varlistentry>
 				<term>Pre-push</term>
 				<listitem condition="pot">
@@ -149,6 +157,17 @@
 				<term>Post-push</term>
 				<listitem condition="pot">
 					<para>
+						<literal>ERROR</literal>
+						<literal>CWD</literal>
+					</para>
+				</listitem>
+			</varlistentry>
+			<varlistentry>
+				<term>Pre-rebase</term>
+				<listitem condition="pot">
+					<para>
+						<literal>(upstream branch)</literal>
+						<literal>(rebased branch)</literal>
 						<literal>ERROR</literal>
 						<literal>CWD</literal>
 					</para>
@@ -269,7 +288,7 @@
 		</para>
 		<important>
 			<para>
-				If you have problems entering/storing data please see <xref linkend="tgit-dug-settings-hierachical"/>.
+				If you have problems entering/storing data please see <xref linkend="tgit-dug-settings-hierarchical"/>.
 			</para>
 		</important>
 	</sect3>

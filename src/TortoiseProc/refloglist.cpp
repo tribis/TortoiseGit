@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2009-2011,2013,2015-2016 TortoiseGit
+// Copyright (C) 2009-2011, 2013, 2015-2018 TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -18,8 +18,6 @@
 //
 #include "stdafx.h"
 #include "resource.h"
-#include "RefLogDlg.h"
-#include "Git.h"
 #include "refloglist.h"
 #include "LoglistUtils.h"
 
@@ -27,19 +25,17 @@ IMPLEMENT_DYNAMIC(CRefLogList, CGitLogList)
 
 CRefLogList::CRefLogList()
 {
-	m_ColumnRegKey=_T("reflog");
+	m_ColumnRegKey = L"reflog";
 	this->m_ContextMenuMask |= this->GetContextMenuBit(ID_LOG);
+	this->m_ContextMenuMask &= ~GetContextMenuBit(ID_COMPARETWOCOMMITCHANGES);
 }
 
 void CRefLogList::InsertRefLogColumn()
 {
 	CString temp;
 
-	CRegDWORD regFullRowSelect(_T("Software\\TortoiseGit\\FullRowSelect"), TRUE);
-	DWORD exStyle = LVS_EX_HEADERDRAGDROP | LVS_EX_DOUBLEBUFFER | LVS_EX_INFOTIP | LVS_EX_SUBITEMIMAGES;
-	if (DWORD(regFullRowSelect))
-		exStyle |= LVS_EX_FULLROWSELECT;
-	SetExtendedStyle(exStyle);
+	Init();
+	SetStyle();
 
 	static UINT normal[] =
 	{
@@ -63,10 +59,9 @@ void CRefLogList::InsertRefLogColumn()
 	SetRedraw(false);
 
 	m_ColumnManager.SetNames(normal, _countof(normal));
-	m_ColumnManager.ReadSettings(m_dwDefaultColumns,0, m_ColumnRegKey+_T("loglist"), _countof(normal), with);
+	m_ColumnManager.ReadSettings(m_dwDefaultColumns, 0, m_ColumnRegKey + L"loglist", _countof(normal), with);
 
 	SetRedraw(true);
-
 }
 
 void CRefLogList::OnLvnGetdispinfoLoglist(NMHDR *pNMHDR, LRESULT *pResult)
@@ -81,7 +76,7 @@ void CRefLogList::OnLvnGetdispinfoLoglist(NMHDR *pNMHDR, LRESULT *pResult)
 		return;
 
 	// By default, clear text buffer.
-	lstrcpyn(pItem->pszText, _T(""), pItem->cchTextMax);
+	lstrcpyn(pItem->pszText, L"", pItem->cchTextMax);
 
 	bool bOutOfRange = pItem->iItem >= ShownCountWithStopped();
 
@@ -129,4 +124,9 @@ void CRefLogList::OnNMCustomdrawLoglist(NMHDR * /*pNMHDR*/, LRESULT *pResult)
 {
 	// Take the default processing unless we set this to something else below.
 	*pResult = CDRF_DODEFAULT;
+}
+
+BOOL CRefLogList::OnToolTipText(UINT /*id*/, NMHDR* /*pNMHDR*/, LRESULT* /*pResult*/)
+{
+	return FALSE;
 }

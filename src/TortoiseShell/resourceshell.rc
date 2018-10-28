@@ -26,9 +26,9 @@ LANGUAGE LANG_NEUTRAL, SUBLANG_NEUTRAL
 
 // Icon with lowest ID value placed first to ensure application icon
 // remains consistent on all systems.
-IDI_PULL                ICON                    "..\\resources\\update1.ico"
+IDI_PULL                ICON                    "..\\resources\\pull1.ico"
 IDI_APP                 ICON                    "..\\Resources\\Tortoise.ico"
-IDI_CHECKOUT            ICON                    "..\\Resources\\menucheckout.ico"
+// for fetch use IDI_UPDATE
 IDI_UPDATE              ICON                    "..\\Resources\\menuupdate.ico"
 IDI_COMMIT              ICON                    "..\\Resources\\menucommit.ico"
 IDI_ADD                 ICON                    "..\\Resources\\menuadd.ico"
@@ -37,7 +37,6 @@ IDI_CLEANUP             ICON                    "..\\Resources\\menucleanup.ico"
 IDI_RESOLVE             ICON                    "..\\Resources\\menuresolve.ico"
 IDI_SWITCH              ICON                    "..\\Resources\\menuswitch.ico"
 IDI_MERGE               ICON                    "..\\Resources\\menumerge.ico"
-IDI_IMPORT              ICON                    "..\\Resources\\menuimport.ico"
 IDI_EXPORT              ICON                    "..\\Resources\\menuexport.ico"
 IDI_COPY                ICON                    "..\\Resources\\menucopy.ico"
 IDI_DELETE              ICON                    "..\\Resources\\menudelete.ico"
@@ -53,18 +52,17 @@ IDI_HELP                ICON                    "..\\Resources\\menuhelp.ico"
 IDI_SHOWCHANGED         ICON                    "..\\Resources\\menushowchanged.ico"
 IDI_IGNORE              ICON                    "..\\Resources\\menuignore.ico"
 IDI_REPOBROWSE          ICON                    "..\\Resources\\menurepobrowse.ico"
-IDI_BLAME               ICON                    "..\\Resources\\menublame.ico"
+IDI_BLAME               ICON                    "..\\Resources\\TortoiseGitBlame.ico"
 IDI_PATCH               ICON                    "..\\Resources\\menupatch.ico"
 IDI_CREATEPATCH         ICON                    "..\\Resources\\menudiff.ico"
 IDI_MENUFILE            ICON                    "..\\Resources\\tsvnmenufile.ico"
 IDI_MENUFOLDER          ICON                    "..\\Resources\\tsvnmenufolder.ico"
 IDI_MENULINK            ICON                    "..\\Resources\\tsvnmenulink.ico"
 IDI_MENUMULTIPLE        ICON                    "..\\Resources\\tsvnmenumultiple.ico"
-IDI_PROPERTIES          ICON                    "..\\Resources\\menuproperties.ico"
 IDI_APPSMALL            ICON                    "..\\Resources\\TortoiseSmall.ico"
 IDI_CLIPPASTE           ICON                    "..\\Resources\\clippaste.ico"
 IDI_PUSH                ICON                    "..\\resources\\Push.ico"
-IDI_CLONE               ICON                    "..\\resources\\checkout.ico"
+IDI_CLONE               ICON                    "..\\resources\\menucheckout.ico"
 IDI_TAG                 ICON                    "..\\resources\\Tag.ico"
 IDI_REBASE              ICON                    "..\\resources\\menurebase.ico"
 IDI_COMBINE             ICON                    "..\\resources\\menucombine.ico"
@@ -81,6 +79,8 @@ IDI_DAEMON              ICON                    "..\\Resources\\menudaemon.ico"
 IDI_MERGEABORT          ICON                    "..\\Resources\\menumergeabort.ico"
 IDI_BISECT              ICON                    "..\\Resources\\menubisect.ico"
 IDI_BISECT_RESET        ICON                    "..\\Resources\\menubisectreset.ico"
+IDI_SHELVE              ICON                    "..\\Resources\\menushelve.ico"
+IDI_UNSHELVE            ICON                    "..\\Resources\\menuunshelve.ico"
 #endif    // Neutral resources
 /////////////////////////////////////////////////////////////////////////////
 
@@ -109,7 +109,7 @@ IDI_MENUSENDMAIL        ICON                    "..\\resources\\menusendmail.ico
 IDD_PROPPAGE DIALOGEX 0, 0, 247, 277
 STYLE DS_SETFONT | DS_3DLOOK | DS_FIXEDSYS | WS_CHILD | WS_VISIBLE | WS_CAPTION
 CAPTION "Property Page"
-FONT 8, "MS Shell Dlg", 0, 0, 0x1
+FONT 9, "MS Shell Dlg 2", 400, 0, 0x1
 BEGIN
     LTEXT           "Current Branch:",IDC_STATIC,4,9,59,8
     EDITTEXT        IDC_SHELL_CURRENT_BRANCH,91,9,142,12,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER,WS_EX_TRANSPARENT
@@ -269,14 +269,12 @@ END
 
 STRINGTABLE
 BEGIN
-    IDS_git_DEPTH_UNKNOWN   "Unknown depth"
-    IDS_git_DEPTH_WORKING   "Working Tree"
     IDS_MENUTAG             "Create &Tag..."
     IDS_MENUFORMATPATCH     "Create Patch Serial..."
     IDS_MENUIMPORTPATCH     "Apply Patch Serial..."
     IDS_MENUFETCH           "F&etch..."
     IDS_MENUREBASE          "Rebase..."
-    IDS_MENUSTASHSAVE       "Stash Save"
+    IDS_MENUSTASHSAVE       "Stash changes"
     IDS_MENUSTASHAPPLY      "Stash Apply"
     IDS_MENUSUBADD          "Submodule Add..."
     IDS_MENUSUBSYNC         "Submodule Sync"
@@ -329,6 +327,8 @@ BEGIN
     IDS_MENUDESCREMOVE      "Deletes files/folders from version control"
     IDS_MENUUPDATEEXT       "Submodule &Update..."
     IDS_MENUBISECTRESET     "Bisect reset"
+    IDS_MENUBISECTSKIP      "Bisect skip"
+    IDS_MENUDESCBISECTSKIP  "Skip current revision in bisecting process"
 END
 
 STRINGTABLE
@@ -359,7 +359,6 @@ BEGIN
     IDS_MENUREPOBROWSE      "&Repo-browser"
     IDS_MENUDESCREPOBROWSE  "Opens the repository browser"
     IDS_MENUDESCMERGEABORT  "Aborts a running merge."
-    IDS_ERR_PROPNOTONFILE   "This property is only allowed on folders, not files."
     IDS_MENUIGNOREMULTIPLE  "&Ignore %d items by name"
     IDS_MENUDIFFLATER       "Diff later"
     IDS_MENUDESCDIFFLATER   "Stores the path of the file to be used for a diff on a later right-click. Hold down the Ctrl key to remove the last saved path."
@@ -422,14 +421,11 @@ BEGIN
     IDS_MENUDESCREMOVEKEEP  "Deletes files/folders from version control but keeps the file"
     IDS_YES                 "yes"
     IDS_NO                  "no"
-END
-
-STRINGTABLE
-BEGIN
-    IDS_git_DEPTH_INFINITE  "Fully recursive"
-    IDS_git_DEPTH_IMMEDIATE "Immediate children, including folders"
-    IDS_git_DEPTH_FILES     "Only file children"
-    IDS_git_DEPTH_EMPTY     "Only this item"
+    IDS_MENUIGNOREMULTIPLEMASK2 "Ignore multiple items by &extension"
+    IDS_MENUIGNOREMULTIPLE2 "&Ignore multiple items by name"
+    IDS_MENUDELETEIGNOREMULTIPLE2 "Delete and &ignore multiple items by name"
+    IDS_MENUDELETEIGNOREMULTIPLEMASK2 
+                            "Delete and ignore multiple items by &extension"
 END
 
 #endif    // Englisch (USA) resources

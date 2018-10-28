@@ -29,15 +29,15 @@ class CSVNDCommitDlg : public CStandAloneDialog
 	DECLARE_DYNAMIC(CSVNDCommitDlg)
 
 public:
-	CSVNDCommitDlg(CWnd* pParent = NULL);   // standard constructor
+	CSVNDCommitDlg(CWnd* pParent = nullptr);   // standard constructor
 	virtual ~CSVNDCommitDlg();
 
 // Dialog Data
 	enum { IDD = IDD_SVNDCOMMITTYPE };
 
 protected:
-	virtual BOOL OnInitDialog();
-	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
+	virtual BOOL OnInitDialog() override;
+	virtual void DoDataExchange(CDataExchange* pDX) override;    // DDX/DDV support
 
 	DECLARE_MESSAGE_MAP()
 

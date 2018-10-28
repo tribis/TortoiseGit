@@ -1,5 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
+// Copyright (C) 2016 - TortoiseGit
 // Copyright (C) 2008 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -53,7 +54,7 @@ BOOL CSetBugTraq::OnInitDialog()
 
 	m_associations.Load();
 
-	m_cBugTraqList.SetExtendedStyle(LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_INFOTIP);
+	m_cBugTraqList.SetExtendedStyle((CRegDWORD(L"Software\\TortoiseGit\\FullRowSelect", TRUE) ? LVS_EX_FULLROWSELECT : 0) | LVS_EX_DOUBLEBUFFER | LVS_EX_INFOTIP | LVS_EX_CHECKBOXES);
 
 	// clear all previously set header columns
 	m_cBugTraqList.DeleteAllItems();
@@ -71,7 +72,7 @@ BOOL CSetBugTraq::OnInitDialog()
 	temp.LoadString(IDS_SETTINGS_BUGTRAQ_PARAMETERSCOL);
 	m_cBugTraqList.InsertColumn(2, temp);
 
-	SetWindowTheme(m_hWnd, L"Explorer", NULL);
+	SetWindowTheme(m_hWnd, L"Explorer", nullptr);
 
 	RebuildBugTraqList();
 
@@ -87,6 +88,7 @@ void CSetBugTraq::RebuildBugTraqList()
 	for (CBugTraqAssociations::const_iterator it = m_associations.begin(); it != m_associations.end(); ++it)
 	{
 		int pos = m_cBugTraqList.InsertItem(m_cBugTraqList.GetItemCount(), (*it)->GetPath().GetWinPathString());
+		m_cBugTraqList.SetCheck(pos, (*it)->IsEnabled());
 		m_cBugTraqList.SetItemText(pos, 1, (*it)->GetProviderName());
 		m_cBugTraqList.SetItemText(pos, 2, (*it)->GetParameters());
 		m_cBugTraqList.SetItemData(pos, (DWORD_PTR)*it);
@@ -94,9 +96,7 @@ void CSetBugTraq::RebuildBugTraqList()
 
 	int maxcol = m_cBugTraqList.GetHeaderCtrl()->GetItemCount() - 1;
 	for (int col = 0; col <= maxcol; col++)
-	{
 		m_cBugTraqList.SetColumnWidth(col, LVSCW_AUTOSIZE_USEHEADER);
-	}
 	m_cBugTraqList.SetRedraw(true);
 }
 
@@ -108,9 +108,14 @@ void CSetBugTraq::OnBnClickedRemovebutton()
 	{
 		if (m_cBugTraqList.GetItemState(index, LVIS_SELECTED) & LVIS_SELECTED)
 		{
-			CTGitPath path = CTGitPath(m_cBugTraqList.GetItemText(index, 0));
+			auto assoc = reinterpret_cast<CBugTraqAssociation*>(m_cBugTraqList.GetItemData(index));
+			if (!assoc)
+			{
+				RebuildBugTraqList();
+				return;
+			}
 			m_cBugTraqList.DeleteItem(index);
-			m_associations.RemoveByPath(path);
+			m_associations.Remove(assoc);
 			SetModified();
 		}
 		index--;
@@ -126,14 +131,14 @@ void CSetBugTraq::OnBnClickedEditbutton()
 	if (index == -1)
 		return;
 
-	CBugTraqAssociation *assoc = (CBugTraqAssociation *)m_cBugTraqList.GetItemData(index);
+	auto assoc = reinterpret_cast<CBugTraqAssociation*>(m_cBugTraqList.GetItemData(index));
 	if (!assoc)
 		return;
 
 	CSetBugTraqAdv dlg(*assoc);
 	if (dlg.DoModal() == IDOK)
 	{
-		m_associations.RemoveByPath(assoc->GetPath());
+		m_associations.Remove(assoc);
 		m_associations.Add(dlg.GetAssociation());
 		RebuildBugTraqList();
 		SetModified();
@@ -151,13 +156,23 @@ void CSetBugTraq::OnBnClickedAddbutton()
 	}
 }
 
-void CSetBugTraq::OnLvnItemchangedBugTraqlist(NMHDR * /*pNMHDR*/, LRESULT *pResult)
+void CSetBugTraq::OnLvnItemchangedBugTraqlist(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	UINT count = m_cBugTraqList.GetSelectedCount();
 	GetDlgItem(IDC_BUGTRAQREMOVEBUTTON)->EnableWindow(count > 0);
 	GetDlgItem(IDC_BUGTRAQEDITBUTTON)->EnableWindow(count == 1);
 	GetDlgItem(IDC_BUGTRAQCOPYBUTTON)->EnableWindow(count == 1);
 	*pResult = 0;
+
+	LPNMLISTVIEW pNMLV = reinterpret_cast<LPNMLISTVIEW>(pNMHDR);
+	if ((pNMLV->uOldState == 0) || (pNMLV->uNewState == 0) || (pNMLV->uNewState & LVIS_SELECTED) || (pNMLV->uNewState & LVIS_FOCUSED) || pNMLV->iItem < 0)
+		return;
+
+	auto assoc = reinterpret_cast<CBugTraqAssociation*>(m_cBugTraqList.GetItemData(pNMLV->iItem));
+	if (!assoc)
+		return;
+	if (assoc->SetEnabled(m_cBugTraqList.GetCheck(pNMLV->iItem) == BST_CHECKED))
+		SetModified();
 }
 
 void CSetBugTraq::OnNMDblclkBugTraqlist(NMHDR * /*pNMHDR*/, LRESULT *pResult)
@@ -183,7 +198,7 @@ void CSetBugTraq::OnBnClickedBugTraqcopybutton()
 	if (index == -1)
 		return;
 
-	CBugTraqAssociation *assoc = (CBugTraqAssociation *)m_cBugTraqList.GetItemData(index);
+	auto assoc = reinterpret_cast<CBugTraqAssociation*>(m_cBugTraqList.GetItemData(index));
 	if (!assoc)
 		return;
 

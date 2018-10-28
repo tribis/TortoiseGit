@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2011, 2015 - TortoiseGit
+// Copyright (C) 2008-2012, 2015-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -25,8 +25,6 @@
 #include "SciEdit.h"
 #include "SplitterControl.h"
 #include "HistoryCombo.h"
-#include "Tooltip.h"
-#include "Win7.h"
 
 #define MSG_REBASE_UPDATE_UI	(WM_USER+151)
 
@@ -37,7 +35,7 @@ class CImportPatchDlg : public CResizableStandAloneDialog
 	DECLARE_DYNAMIC(CImportPatchDlg)
 
 public:
-	CImportPatchDlg(CWnd* pParent = NULL);   // standard constructor
+	CImportPatchDlg(CWnd* pParent = nullptr);   // standard constructor
 	virtual ~CImportPatchDlg();
 
 	// Dialog Data
@@ -55,28 +53,28 @@ protected:
 
 	static UINT ThreadEntry(LPVOID pVoid)
 	{
-		return ((CImportPatchDlg*)pVoid)->PatchThread();
+		return reinterpret_cast<CImportPatchDlg*>(pVoid)->PatchThread();
 	}
 
 	UINT PatchThread();
 
 	void SafeTerminateThread()
 	{
-		if(m_LoadingThread!=NULL)
+		if (m_LoadingThread)
 		{
 			InterlockedExchange(&m_bExitThread,TRUE);
 			DWORD ret =::WaitForSingleObject(m_LoadingThread->m_hThread,20000);
 			if(ret == WAIT_TIMEOUT)
 				::TerminateThread(m_LoadingThread,0);
-			m_LoadingThread = NULL;
+			m_LoadingThread = nullptr;
 			InterlockedExchange(&m_bThreadRunning, FALSE);
 		}
 	};
 
 	void AddLogString(CString str);
 
-	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
-	virtual BOOL OnInitDialog();
+	virtual void DoDataExchange(CDataExchange* pDX) override;    // DDX/DDV support
+	virtual BOOL OnInitDialog() override;
 
 	CMFCTabCtrl m_ctrlTabCtrl;
 
@@ -113,18 +111,18 @@ protected:
 	afx_msg void OnBnClickedButtonDown();
 	afx_msg void OnBnClickedButtonRemove();
 	afx_msg void OnBnClickedOk();
+	afx_msg void OnSysColorChange();
+	afx_msg LRESULT OnThemeChanged();
 
 	void EnableInputCtrl(BOOL b);
 	void UpdateOkCancelText();
 
 	afx_msg void OnSize(UINT nType, int cx, int cy);
-	virtual LRESULT DefWindowProc(UINT message, WPARAM wParam, LPARAM lParam);
+	virtual LRESULT DefWindowProc(UINT message, WPARAM wParam, LPARAM lParam) override;
 
 	afx_msg LRESULT	OnTaskbarBtnCreated(WPARAM wParam, LPARAM lParam);
 	CComPtr<ITaskbarList3>	m_pTaskbarList;
 	afx_msg void OnBnClickedCancel();
-	virtual BOOL PreTranslateMessage(MSG* pMsg);
-	afx_msg void OnHdnItemclickListPatch(NMHDR *pNMHDR, LRESULT *pResult);
-	afx_msg void OnHdnItemchangingListPatch(NMHDR *pNMHDR, LRESULT *pResult);
+	virtual BOOL PreTranslateMessage(MSG* pMsg) override;
 	afx_msg void OnHdnItemchangedListPatch(NMHDR *pNMHDR, LRESULT *pResult);
 };

@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2009-2014 - TortoiseGit
+// Copyright (C) 2009-2014, 2016 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -20,11 +20,14 @@
 #include "RevertProgressCommand.h"
 #include "ShellUpdater.h"
 #include "AppUtils.h"
+#include "../TGitCache/CacheInterface.h"
 
 bool RevertProgressCommand::Run(CGitProgressList* list, CString& sWindowTitle, int& m_itemCountTotal, int& m_itemCount)
 {
 	list->SetWindowTitle(IDS_PROGRS_TITLE_REVERT, g_Git.CombinePath(m_targetPathList.GetCommonRoot().GetUIPathString()), sWindowTitle);
 	list->SetBackgroundImage(IDI_REVERT_BKG);
+
+	CBlockCacheForPath block(g_Git.m_CurrentDir);
 
 	m_itemCountTotal = 2 * m_targetPathList.GetCount();
 	CTGitPathList delList;
@@ -39,16 +42,16 @@ bool RevertProgressCommand::Run(CGitProgressList* list, CString& sWindowTitle, i
 			(!(action & CTGitPath::LOGACTIONS_REPLACED)))
 			delList.AddPath(path);
 	}
-	if (DWORD(CRegDWORD(_T("Software\\TortoiseGit\\RevertWithRecycleBin"), TRUE)))
+	if (DWORD(CRegDWORD(L"Software\\TortoiseGit\\RevertWithRecycleBin", TRUE)))
 		delList.DeleteAllFiles(true);
 
 	list->ReportCmd(CString(MAKEINTRESOURCE(IDS_PROGRS_CMD_REVERT)));
 	for (int i = 0; i < m_targetPathList.GetCount(); ++i)
 	{
 		CString err;
-		if (g_Git.Revert(_T("HEAD"), (CTGitPath&)m_targetPathList[i], err))
+		if (g_Git.Revert(L"HEAD", (CTGitPath&)m_targetPathList[i], err))
 		{
-			list->ReportError(_T("Revert failed:\n") + err);
+			list->ReportError(L"Revert failed:\n" + err);
 			return false;
 		}
 		list->AddNotify(new CGitProgressList::WC_File_NotificationData(m_targetPathList[i], CGitProgressList::WC_File_NotificationData::git_wc_notify_revert));

@@ -1,7 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2009-2014 - TortoiseGit
-// Copyright (C) 2003-2014 - TortoiseSVN
+// Copyright (C) 2009-2014, 2016-2017 - TortoiseGit
+// Copyright (C) 2003-2014, 2017 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -27,14 +27,7 @@
 
 CRemoteCacheLink::CRemoteCacheLink(void)
 {
-	SecureZeroMemory(&m_dummyStatus, sizeof(m_dummyStatus));
 	SecureZeroMemory(&m_Overlapped, sizeof(m_Overlapped));
-//	m_dummyStatus.node_status = git_wc_status_none;
-	m_dummyStatus.text_status = git_wc_status_none;
-	m_dummyStatus.prop_status = git_wc_status_none;
-//	m_dummyStatus.repos_text_status = git_wc_status_none;
-//	m_dummyStatus.repos_prop_status = git_wc_status_none;
-//	m_dummyStatus.repos_node_status = git_wc_status_none;
 	m_lastTimeout = 0;
 	m_critSec.Init();
 }
@@ -46,8 +39,7 @@ CRemoteCacheLink::~CRemoteCacheLink(void)
 	m_critSec.Term();
 }
 
-bool CRemoteCacheLink::InternalEnsurePipeOpen ( CAutoFile& hPipe
-											  , const CString& pipeName) const
+bool CRemoteCacheLink::InternalEnsurePipeOpen(CAutoFile& hPipe, const CString& pipeName, bool overlapped) const
 {
 	if (hPipe)
 		return true;
@@ -56,25 +48,22 @@ bool CRemoteCacheLink::InternalEnsurePipeOpen ( CAutoFile& hPipe
 
 	while (!hPipe && tryleft--)
 	{
-
 		hPipe = CreateFile(
 							pipeName,                       // pipe name
 							GENERIC_READ |                  // read and write access
 							GENERIC_WRITE,
 							0,                              // no sharing
-							NULL,                           // default security attributes
+							nullptr,                        // default security attributes
 							OPEN_EXISTING,                  // opens existing pipe
-							FILE_FLAG_OVERLAPPED,           // default attributes
-							NULL);                          // no template file
+							overlapped ? FILE_FLAG_OVERLAPPED : 0, // default attributes
+							nullptr);                       // no template file
 		if ((!hPipe) && (GetLastError() == ERROR_PIPE_BUSY))
 		{
 			// TGitCache is running but is busy connecting a different client.
 			// Do not give up immediately but wait for a few milliseconds until
 			// the server has created the next pipe instance
 			if (!WaitNamedPipe (pipeName, 50))
-			{
 				continue;
-			}
 		}
 	}
 
@@ -87,8 +76,8 @@ bool CRemoteCacheLink::InternalEnsurePipeOpen ( CAutoFile& hPipe
 		if(!SetNamedPipeHandleState(
 			hPipe,    // pipe handle
 			&dwMode,  // new pipe mode
-			NULL,     // don't set maximum bytes
-			NULL))    // don't set maximum time
+			nullptr,  // don't set maximum bytes
+			nullptr)) // don't set maximum time
 		{
 			CTraceToOutputDebugString::Instance()(__FUNCTION__ ": SetNamedPipeHandleState failed");
 			hPipe.CloseHandle();
@@ -102,13 +91,13 @@ bool CRemoteCacheLink::EnsurePipeOpen()
 {
 	AutoLocker lock(m_critSec);
 
-	if (InternalEnsurePipeOpen (m_hPipe, GetCachePipeName()))
+	if (InternalEnsurePipeOpen(m_hPipe, GetCachePipeName(), true))
 	{
 		// create an unnamed (=local) manual reset event for use in the overlapped structure
 		if (m_hEvent)
 			return true;
 
-		m_hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+		m_hEvent = CreateEvent(nullptr, TRUE, FALSE, nullptr);
 		if (m_hEvent)
 			return true;
 
@@ -121,8 +110,7 @@ bool CRemoteCacheLink::EnsurePipeOpen()
 
 bool CRemoteCacheLink::EnsureCommandPipeOpen()
 {
-	AutoLocker lock(m_critSec);
-	return InternalEnsurePipeOpen (m_hCommandPipe, GetCacheCommandPipeName());
+	return InternalEnsurePipeOpen(m_hCommandPipe, GetCacheCommandPipeName(), false);
 }
 
 void CRemoteCacheLink::ClosePipe()
@@ -148,7 +136,7 @@ void CRemoteCacheLink::CloseCommandPipe()
 			&cmd,           // buffer to write from
 			sizeof(cmd),    // number of bytes to write
 			&cbWritten,     // number of bytes written
-			NULL);          // not overlapped I/O
+			nullptr);       // not overlapped I/O
 		DisconnectNamedPipe(m_hCommandPipe);
 		m_hCommandPipe.CloseHandle();
 	}
@@ -194,9 +182,7 @@ bool CRemoteCacheLink::GetStatusFromRemoteCache(const CTGitPath& Path, TGITCache
 	TGITCacheRequest request;
 	request.flags = TGITCACHE_FLAGS_NONOTIFICATIONS;
 	if(bRecursive)
-	{
 		request.flags |= TGITCACHE_FLAGS_RECUSIVE_STATUS;
-	}
 	wcsncpy_s(request.path, Path.GetWinPath(), _countof(request.path) - 1);
 	SecureZeroMemory(&m_Overlapped, sizeof(OVERLAPPED));
 	m_Overlapped.hEvent = m_hEvent;
@@ -232,9 +218,7 @@ bool CRemoteCacheLink::GetStatusFromRemoteCache(const CTGitPath& Path, TGITCache
 		// Wait for it to finish
 		DWORD dwWait = WaitForSingleObject(m_hEvent, 10000);
 		if (dwWait == WAIT_OBJECT_0)
-		{
 			fSuccess = GetOverlappedResult(m_hPipe, &m_Overlapped, &nBytesRead, FALSE);
-		}
 		else
 		{
 			// the cache didn't respond!
@@ -243,15 +227,14 @@ bool CRemoteCacheLink::GetStatusFromRemoteCache(const CTGitPath& Path, TGITCache
 	}
 
 	if (fSuccess)
-	{
 		return true;
-	}
 	ClosePipe();
 	return false;
 }
 
 bool CRemoteCacheLink::ReleaseLockForPath(const CTGitPath& path)
 {
+	AutoLocker lock(m_critSec);
 	EnsureCommandPipeOpen();
 	if (m_hCommandPipe)
 	{
@@ -264,7 +247,7 @@ bool CRemoteCacheLink::ReleaseLockForPath(const CTGitPath& path)
 			&cmd,           // buffer to write from
 			sizeof(cmd),    // number of bytes to write
 			&cbWritten,     // number of bytes written
-			NULL);          // not overlapped I/O
+			nullptr);       // not overlapped I/O
 		if (! fSuccess || sizeof(cmd) != cbWritten)
 		{
 			CloseCommandPipe();
@@ -287,14 +270,14 @@ DWORD CRemoteCacheLink::GetProcessIntegrityLevel() const
 		// Get the Integrity level.
 		DWORD dwLengthNeeded;
 		if (!GetTokenInformation(hToken, TokenIntegrityLevel,
-			NULL, 0, &dwLengthNeeded))
+			nullptr, 0, &dwLengthNeeded))
 		{
 			DWORD dwError = GetLastError();
 			if (dwError == ERROR_INSUFFICIENT_BUFFER)
 			{
 				PTOKEN_MANDATORY_LABEL pTIL =
 					(PTOKEN_MANDATORY_LABEL)LocalAlloc(0, dwLengthNeeded);
-				if (pTIL != NULL)
+				if (pTIL)
 				{
 					if (GetTokenInformation(hToken, TokenIntegrityLevel,
 						pTIL, dwLengthNeeded, &dwLengthNeeded))
@@ -314,7 +297,7 @@ DWORD CRemoteCacheLink::GetProcessIntegrityLevel() const
 bool CRemoteCacheLink::RunTGitCacheProcess()
 {
 	const CString sCachePath = GetTGitCachePath();
-	if (!CCreateProcessHelper::CreateProcessDetached(sCachePath, NULL))
+	if (!CCreateProcessHelper::CreateProcessDetached(sCachePath, (LPTSTR)nullptr))
 	{
 		// It's not appropriate to do a message box here, because there may be hundreds of calls
 		CTraceToOutputDebugString::Instance()(__FUNCTION__ ": Failed to start cache\n");
@@ -325,6 +308,6 @@ bool CRemoteCacheLink::RunTGitCacheProcess()
 
 CString CRemoteCacheLink::GetTGitCachePath() const
 {
-	CString sCachePath = CPathUtils::GetAppDirectory(g_hmodThisDll) + _T("TGitCache.exe");
+	CString sCachePath = CPathUtils::GetAppDirectory(g_hmodThisDll) + L"TGitCache.exe";
 	return sCachePath;
 }

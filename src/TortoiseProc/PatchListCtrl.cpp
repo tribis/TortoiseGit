@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2009-2013, 2015-2016 - TortoiseGit
+// Copyright (C) 2009-2013, 2015-2016, 2018 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -31,21 +31,26 @@
 IMPLEMENT_DYNAMIC(CPatchListCtrl, CListCtrl)
 
 CPatchListCtrl::CPatchListCtrl()
+: m_ContextMenuMask(0xFFFFFFFF)
 {
-	m_ContextMenuMask=0xFFFFFFFF;
-
-	HFONT hFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
-	LOGFONT lf = {0};
-	GetObject(hFont, sizeof(LOGFONT), &lf);
-	lf.lfWeight = FW_BOLD;
-	m_boldFont.CreateFontIndirect(&lf);
-
 }
 
 CPatchListCtrl::~CPatchListCtrl()
 {
 }
 
+void CPatchListCtrl::PreSubclassWindow()
+{
+	__super::PreSubclassWindow();
+
+	// use the default font, create a copy of it and
+	// change the copy to BOLD (leave the rest of the font
+	// the same)
+	LOGFONT lf = { 0 };
+	GetFont()->GetLogFont(&lf);
+	lf.lfWeight = FW_BOLD;
+	m_boldFont.CreateFontIndirect(&lf);
+}
 
 BEGIN_MESSAGE_MAP(CPatchListCtrl, CListCtrl)
 	ON_NOTIFY_REFLECT(NM_DBLCLK, &CPatchListCtrl::OnNMDblclk)
@@ -68,7 +73,7 @@ void CPatchListCtrl::OnNMDblclk(NMHDR *pNMHDR, LRESULT *pResult)
 	CTGitPath gitpath;
 	gitpath.SetFromWin(path);
 
-	CAppUtils::StartUnifiedDiffViewer(path,gitpath.GetFilename());
+	CAppUtils::StartUnifiedDiffViewer(path, gitpath.GetFilename(), 0, !!(GetAsyncKeyState(VK_SHIFT) & 0x8000));
 
 	*pResult = 0;
 }
@@ -102,18 +107,17 @@ void CPatchListCtrl::OnContextMenu(CWnd* /*pWnd*/, CPoint point)
 				popup.AppendMenuIcon(MENU_APPLY, IDS_MENU_APPLY, 0);
 		}
 
-		int cmd = popup.TrackPopupMenu(TPM_RETURNCMD | TPM_LEFTALIGN | TPM_NONOTIFY, point.x, point.y, this, 0);
+		int cmd = popup.TrackPopupMenu(TPM_RETURNCMD | TPM_LEFTALIGN | TPM_NONOTIFY, point.x, point.y, this);
 
 		switch (cmd)
 		{
 		case MENU_VIEWPATCH:
 			{
-
 				CString path=GetItemText(index,0);
 				CTGitPath gitpath;
 				gitpath.SetFromWin(path);
 
-				CAppUtils::StartUnifiedDiffViewer(path,gitpath.GetFilename());
+				CAppUtils::StartUnifiedDiffViewer(path, gitpath.GetFilename(), 0, !!(GetAsyncKeyState(VK_SHIFT) & 0x8000));
 				break;
 			}
 		case MENU_VIEWWITHMERGE:
@@ -130,12 +134,12 @@ void CPatchListCtrl::OnContextMenu(CWnd* /*pWnd*/, CPoint point)
 			}
 		case MENU_SENDMAIL:
 			{
-				LaunchProc(_T("sendmail"));
+				LaunchProc(L"sendmail");
 				break;
 			}
 		case MENU_APPLY:
 			{
-				LaunchProc(_T("importpatch"));
+				LaunchProc(L"importpatch");
 
 				break;
 			}
@@ -157,16 +161,16 @@ int CPatchListCtrl::LaunchProc(const CString& command)
 		int index = this->GetNextSelectedItem(pos);
 		CString one=this->GetItemText(index,0);
 		file.Write((LPCTSTR)one, sizeof(TCHAR) * one.GetLength());
-		file.Write(_T("\n"),sizeof(TCHAR)*1);
+		file.Write(L"\n", sizeof(TCHAR) * 1);
 	}
 
 	file.Close();
 
-	CString cmd = _T("/command:");
+	CString cmd = L"/command:";
 	cmd += command;
-	cmd +=_T(" /pathfile:\"");
+	cmd += L" /pathfile:\"";
 	cmd += tempfile;
-	cmd += _T("\" /deletepathfile");
+	cmd += L"\" /deletepathfile";
 	CAppUtils::RunTortoiseGitProc(cmd);
 	return 0;
 }
@@ -176,7 +180,6 @@ void CPatchListCtrl::OnNMCustomdraw(NMHDR *pNMHDR, LRESULT *pResult)
 	NMLVCUSTOMDRAW *pNMCD = reinterpret_cast<NMLVCUSTOMDRAW*>(pNMHDR);
 
 	*pResult = 0;
-
 
 	switch (pNMCD->nmcd.dwDrawStage)
 	{
@@ -196,9 +199,7 @@ void CPatchListCtrl::OnNMCustomdraw(NMHDR *pNMHDR, LRESULT *pResult)
 
 			DWORD_PTR data = this->GetItemData((int)pNMCD->nmcd.dwItemSpec);
 			if(data & (STATUS_APPLY_FAIL | STATUS_APPLY_SUCCESS | STATUS_APPLY_SKIP))
-			{
 				pNMCD->clrTextBk = RGB(200,200,200);
-			}
 
 			switch(data & STATUS_MASK)
 			{
@@ -231,8 +232,7 @@ void CPatchListCtrl::OnDropFiles(HDROP hDropInfo)
 	for (UINT i = 0; i < nNumFiles; ++i)
 	{
 		CString file;
-		DragQueryFile(hDropInfo, i, file.GetBufferSetLength(MAX_PATH), MAX_PATH);
-		file.ReleaseBuffer();
+		DragQueryFile(hDropInfo, i, CStrBuf(file, MAX_PATH), MAX_PATH);
 		if (PathIsDirectory(file))
 			continue;
 

@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2011,2014-2015 - TortoiseGit
+// Copyright (C) 2008-2011, 2014-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -28,12 +28,12 @@ public:
 };
 
 // CPatchViewDlg dialog
-class CPatchViewDlg : public CDialog
+class CPatchViewDlg : public CDialog, public CSciEditContextMenuInterface
 {
 	DECLARE_DYNAMIC(CPatchViewDlg)
 
 public:
-	CPatchViewDlg(CWnd* pParent = NULL);   // standard constructor
+	CPatchViewDlg(CWnd* pParent = nullptr);   // standard constructor
 	virtual ~CPatchViewDlg();
 	IHasPatchView	*m_ParentDlg;
 	void SetText(const CString& text);
@@ -43,8 +43,8 @@ public:
 	enum { IDD = IDD_PATCH_VIEW };
 
 protected:
-	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
-	virtual BOOL PreTranslateMessage(MSG* pMsg);
+	virtual void DoDataExchange(CDataExchange* pDX) override;    // DDX/DDV support
+	virtual BOOL PreTranslateMessage(MSG* pMsg) override;
 
 public:
 	CSciEdit			m_ctrlPatchView;
@@ -52,10 +52,12 @@ public:
 protected:
 	DECLARE_MESSAGE_MAP()
 
-	virtual BOOL OnInitDialog();
+	virtual BOOL OnInitDialog() override;
 	afx_msg void OnSize(UINT nType, int cx, int cy);
 	afx_msg void OnMoving(UINT fwSide, LPRECT pRect);
+	afx_msg void OnSysColorChange();
 	afx_msg void OnClose();
+	afx_msg void OnDestroy();
 
 	afx_msg void OnShowFindBar();
 	afx_msg void OnFindNext();
@@ -72,4 +74,9 @@ protected:
 	bool                m_bShowFindBar;
 
 	HACCEL				m_hAccel;
+
+	// CSciEditContextMenuInterface
+	virtual void		InsertMenuItems(CMenu& mPopup, int& nCmd) override;
+	virtual bool		HandleMenuItemClick(int cmd, CSciEdit* pSciEdit) override;
+	int					m_nPopupSave;
 };

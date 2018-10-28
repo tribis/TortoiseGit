@@ -30,9 +30,9 @@ public:
 	/**
 	 * Executes the command.
 	 */
-	virtual bool			Execute()
+	virtual bool			Execute() override
 	{
-		return ((INT_PTR)ShellExecute(hwndExplorer, _T("open"), theApp.m_pszHelpFilePath, NULL, NULL, SW_SHOWNORMAL) > 32);
+		return ((INT_PTR)ShellExecute(GetExplorerHWND(), L"open", theApp.m_pszHelpFilePath, nullptr, nullptr, SW_SHOWNORMAL) > 32);
 	}
 };
 

@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2009-2016 - TortoiseGit
+// Copyright (C) 2009-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -33,12 +33,11 @@ IMPLEMENT_DYNAMIC(CRefLogDlg, CResizableStandAloneDialog)
 
 UINT CRefLogDlg::m_FindDialogMessage = ::RegisterWindowMessage(FINDMSGSTRING);
 
-CRefLogDlg::CRefLogDlg(CWnd* pParent /*=NULL*/)
+CRefLogDlg::CRefLogDlg(CWnd* pParent /*=nullptr*/)
 	: CResizableStandAloneDialog(CRefLogDlg::IDD, pParent)
-	, m_pFindDialog(NULL)
+	, m_pFindDialog(nullptr)
 	, m_nSearchLine(0)
 {
-
 }
 
 CRefLogDlg::~CRefLogDlg()
@@ -59,6 +58,7 @@ BEGIN_MESSAGE_MAP(CRefLogDlg, CResizableStandAloneDialog)
 	ON_CBN_SELCHANGE(IDC_COMBOBOXEX_REF,   &CRefLogDlg::OnCbnSelchangeRef)
 	ON_MESSAGE(MSG_REFLOG_CHANGED,OnRefLogChanged)
 	ON_REGISTERED_MESSAGE(m_FindDialogMessage, OnFindDialogMessage)
+	ON_BN_CLICKED(IDC_SEARCH, OnFind)
 END_MESSAGE_MAP()
 
 LRESULT CRefLogDlg::OnRefLogChanged(WPARAM /*wParam*/, LPARAM /*lParam*/)
@@ -76,12 +76,13 @@ BOOL CRefLogDlg::OnInitDialog()
 	AddAnchor(IDOK,BOTTOM_RIGHT);
 	AddAnchor(IDCANCEL,BOTTOM_RIGHT);
 	AddAnchor(IDC_REFLOG_BUTTONCLEARSTASH, BOTTOM_LEFT);
+	AddAnchor(IDC_SEARCH, BOTTOM_LEFT);
 	AddAnchor(IDC_REFLOG_LIST,TOP_LEFT,BOTTOM_RIGHT);
 	AddAnchor(IDHELP, BOTTOM_RIGHT);
 	AddAnchor(IDC_COMBOBOXEX_REF, TOP_LEFT, TOP_RIGHT);
 
 	AddOthersToAnchor();
-	this->EnableSaveRestore(_T("RefLogDlg"));
+	this->EnableSaveRestore(L"RefLogDlg");
 
 	CString sWindowTitle;
 	GetWindowText(sWindowTitle);
@@ -122,12 +123,12 @@ void CRefLogDlg::OnBnClickedClearStash()
 	size_t count = m_RefList.m_arShownList.size();
 	CString msg;
 	msg.Format(IDS_PROC_DELETEALLSTASH, count);
-	if (CMessageBox::Show(this->GetSafeHwnd(), msg, _T("TortoiseGit"), 2, IDI_QUESTION, CString(MAKEINTRESOURCE(IDS_DELETEBUTTON)), CString(MAKEINTRESOURCE(IDS_ABORTBUTTON))) == 1)
+	if (CMessageBox::Show(this->GetSafeHwnd(), msg, L"TortoiseGit", 2, IDI_QUESTION, CString(MAKEINTRESOURCE(IDS_DELETEBUTTON)), CString(MAKEINTRESOURCE(IDS_ABORTBUTTON))) == 1)
 	{
 		CString cmdOut;
-		if (g_Git.Run(_T("git.exe stash clear"), &cmdOut, CP_UTF8))
+		if (g_Git.Run(L"git.exe stash clear", &cmdOut, CP_UTF8))
 		{
-			MessageBox(cmdOut, _T("TortoiseGit"), MB_ICONERROR);
+			MessageBox(cmdOut, L"TortoiseGit", MB_ICONERROR);
 			return;
 		}
 
@@ -146,7 +147,7 @@ void CRefLogDlg::OnCbnSelchangeRef()
 
 	CString err;
 	if (GitRevLoglist::GetRefLog(ref, m_RefList.m_RevCache, err))
-		MessageBox(_T("Error while loading reflog.\n") + err, _T("TortoiseGit"), MB_ICONERROR);
+		MessageBox(L"Error while loading reflog.\n" + err, L"TortoiseGit", MB_ICONERROR);
 
 	m_RefList.SetItemCountEx((int)m_RefList.m_RevCache.size());
 
@@ -163,7 +164,7 @@ void CRefLogDlg::OnCbnSelchangeRef()
 
 	m_RefList.Invalidate();
 
-	if (ref == _T("refs/stash"))
+	if (ref == L"refs/stash")
 	{
 		GetDlgItem(IDC_REFLOG_BUTTONCLEARSTASH)->ShowWindow(SW_SHOW);
 		BOOL enabled = !m_RefList.m_arShownList.empty();
@@ -188,15 +189,15 @@ BOOL CRefLogDlg::PreTranslateMessage(MSG* pMsg)
 void CRefLogDlg::Refresh()
 {
 	STRING_VECTOR list;
-	list.push_back(_T("HEAD"));
+	list.push_back(L"HEAD");
 	if (g_Git.GetRefList(list))
-		MessageBox(g_Git.GetGitLastErr(_T("Could not get all refs.")), _T("TortoiseGit"), MB_ICONERROR);
+		MessageBox(g_Git.GetGitLastErr(L"Could not get all refs."), L"TortoiseGit", MB_ICONERROR);
 
 	m_ChooseRef.SetList(list);
 
 	if (m_CurrentBranch.IsEmpty())
 	{
-		m_CurrentBranch.Format(_T("refs/heads/%s"), (LPCTSTR)g_Git.GetCurrentBranch());
+		m_CurrentBranch.Format(L"refs/heads/%s", (LPCTSTR)g_Git.GetCurrentBranch());
 		m_ChooseRef.SetCurSel(0); /* Choose HEAD */
 	}
 	else
@@ -224,12 +225,12 @@ void CRefLogDlg::OnFind()
 {
 	m_nSearchLine = 0;
 	m_pFindDialog = new CFindReplaceDialog();
-	m_pFindDialog->Create(TRUE, _T(""), NULL, FR_DOWN | FR_HIDEWHOLEWORD | FR_HIDEUPDOWN, this);
+	m_pFindDialog->Create(TRUE, L"", nullptr, FR_DOWN | FR_HIDEWHOLEWORD | FR_HIDEUPDOWN, this);
 }
 
 LRESULT CRefLogDlg::OnFindDialogMessage(WPARAM /*wParam*/, LPARAM /*lParam*/)
 {
-	ASSERT(m_pFindDialog != NULL);
+	ASSERT(m_pFindDialog);
 
 	if (m_RefList.m_arShownList.empty())
 		return 0;
@@ -238,7 +239,7 @@ LRESULT CRefLogDlg::OnFindDialogMessage(WPARAM /*wParam*/, LPARAM /*lParam*/)
 	// invalidate the handle identifying the dialog box.
 	if (m_pFindDialog->IsTerminating())
 	{
-			m_pFindDialog = NULL;
+			m_pFindDialog = nullptr;
 			return 0;
 	}
 
@@ -251,14 +252,17 @@ LRESULT CRefLogDlg::OnFindDialogMessage(WPARAM /*wParam*/, LPARAM /*lParam*/)
 		CString findString = m_pFindDialog->GetFindString();
 
 		bool bFound = false;
-		bool bCaseSensitive = !!(m_pFindDialog->m_nFlags & FR_MATCHCASE);
+		bool bCaseSensitive = !!(m_pFindDialog->MatchCase());
 
 		if (!bCaseSensitive)
 			findString.MakeLower();
 
 		size_t i = m_nSearchLine;
 		if (i >= m_RefList.m_arShownList.size())
+		{
 			i = 0;
+			m_pFindDialog->FlashWindowEx(FLASHW_ALL, 2, 100);
+		}
 
 		do
 		{
@@ -266,15 +270,15 @@ LRESULT CRefLogDlg::OnFindDialogMessage(WPARAM /*wParam*/, LPARAM /*lParam*/)
 
 			CString str;
 			str += data->m_Ref;
-			str += _T("\n");
+			str += L'\n';
 			str += data->m_RefAction;
-			str += _T("\n");
+			str += L'\n';
 			str += data->m_CommitHash.ToString();
-			str += _T("\n");
+			str += L'\n';
 			str += data->GetSubject();
-			str += _T("\n");
+			str += L'\n';
 			str += data->GetBody();
-			str += _T("\n");
+			str += L'\n';
 
 			if (!bCaseSensitive)
 				str.MakeLower();
@@ -294,7 +298,7 @@ LRESULT CRefLogDlg::OnFindDialogMessage(WPARAM /*wParam*/, LPARAM /*lParam*/)
 			m_nSearchLine = i;
 		}
 		else
-			MessageBox(_T("\"") + findString + _T("\" ") + CString(MAKEINTRESOURCE(IDS_NOTFOUND)), _T("TortoiseGit"), MB_ICONINFORMATION);
+			MessageBox(L'"' + findString + L"\" " + CString(MAKEINTRESOURCE(IDS_NOTFOUND)), L"TortoiseGit", MB_ICONINFORMATION);
 	}
 
 	return 0;

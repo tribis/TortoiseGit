@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -30,12 +30,11 @@
 
 IMPLEMENT_DYNAMIC(CResetDlg, CHorizontalResizableStandAloneDialog)
 
-CResetDlg::CResetDlg(CWnd* pParent /*=NULL*/)
+CResetDlg::CResetDlg(CWnd* pParent /*=nullptr*/)
 	: CHorizontalResizableStandAloneDialog(CResetDlg::IDD, pParent)
 	, CChooseVersion(this)
 	, m_ResetType(1)
 {
-
 }
 
 CResetDlg::~CResetDlg()
@@ -48,19 +47,24 @@ void CResetDlg::DoDataExchange(CDataExchange* pDX)
 	CHOOSE_VERSION_DDX;
 }
 
-
 BEGIN_MESSAGE_MAP(CResetDlg, CHorizontalResizableStandAloneDialog)
 	CHOOSE_VERSION_EVENT
 	ON_BN_CLICKED(IDC_SHOW_MODIFIED_FILES, &CResetDlg::OnBnClickedShowModifiedFiles)
 	ON_WM_DESTROY()
 END_MESSAGE_MAP()
 
-
 // CResetDlg message handlers
 BOOL CResetDlg::OnInitDialog()
 {
 	CHorizontalResizableStandAloneDialog::OnInitDialog();
 	CAppUtils::MarkWindowAsUnpinnable(m_hWnd);
+
+	AdjustControlSize(IDC_RADIO_BRANCH);
+	AdjustControlSize(IDC_RADIO_TAGS);
+	AdjustControlSize(IDC_RADIO_VERSION);
+	AdjustControlSize(IDC_RADIO_RESET_SOFT);
+	AdjustControlSize(IDC_RADIO_RESET_MIXED);
+	AdjustControlSize(IDC_RADIO_RESET_HARD);
 
 	AddAnchor(IDC_SHOW_MODIFIED_FILES, TOP_LEFT, TOP_RIGHT);
 	AddAnchor(IDC_GROUP_RESET_TYPE, TOP_LEFT, TOP_RIGHT);
@@ -71,14 +75,7 @@ BOOL CResetDlg::OnInitDialog()
 	CHOOSE_VERSION_ADDANCHOR;
 	this->AddOthersToAnchor();
 
-	AdjustControlSize(IDC_RADIO_BRANCH);
-	AdjustControlSize(IDC_RADIO_TAGS);
-	AdjustControlSize(IDC_RADIO_VERSION);
-	AdjustControlSize(IDC_RADIO_RESET_SOFT);
-	AdjustControlSize(IDC_RADIO_RESET_MIXED);
-	AdjustControlSize(IDC_RADIO_RESET_HARD);
-
-	EnableSaveRestore(_T("ResetDlg"));
+	EnableSaveRestore(L"ResetDlg");
 
 	CString resetTo;
 	CString currentBranch = g_Git.GetCurrentBranch();
@@ -130,8 +127,8 @@ void CResetDlg::OnBnClickedShowModifiedFiles()
 {
 		CFileDiffDlg dlg;
 
-		dlg.m_strRev1 = _T("0000000000000000000000000000000000000000");
-		dlg.m_strRev2 = _T("HEAD");
+		dlg.m_strRev1 = L"HEAD";
+		dlg.m_strRev2 = GIT_REV_ZERO;
 
 		dlg.DoModal();
 }

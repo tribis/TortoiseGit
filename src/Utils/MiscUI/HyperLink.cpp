@@ -1,6 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2003-2006,2008, 2011 - TortoiseSVN
+// Copyright (C) 2012-2016 - TortoiseGit
+// Copyright (C) 2003-2006,2008, 2011, 2018 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -30,14 +31,13 @@ static char THIS_FILE[] = __FILE__;
 
 
 CHyperLink::CHyperLink()
+	: m_hLinkCursor(nullptr)
+	, m_crLinkColor(GetSysColor(COLOR_HOTLIGHT))
+	, m_crHoverColor(RGB(255, 0, 0)) // Red
+	, m_bOverControl(FALSE)
+	, m_nUnderline(ulHover)
+	, m_nTimerID(100)
 {
-	m_hLinkCursor		= NULL;					// No cursor as	yet
-	m_crLinkColor		= RGB(	0,	 0,	238);	// Blue
-	m_crHoverColor		= RGB(255,	 0,	  0);	// Red
-	m_bOverControl		= FALSE;				// Cursor not yet over control
-	m_nUnderline		= ulHover;				// Underline the link?
-	m_strURL.Empty();
-	m_nTimerID			= 100;
 }
 
 CHyperLink::~CHyperLink()
@@ -75,19 +75,17 @@ void CHyperLink::PreSubclassWindow()
 		SetWindowText(m_strURL);
 	}
 
-	CFont* pFont = GetFont();
-	if (!pFont)
-	{
-		HFONT hFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
-		if (hFont == NULL)
-			hFont = (HFONT) GetStockObject(ANSI_VAR_FONT);
-		if (hFont)
-			pFont = CFont::FromHandle(hFont);
-	}
-	ASSERT(pFont && pFont->GetSafeHandle());
-
 	LOGFONT lf;
-	pFont->GetLogFont(&lf);
+	CFont* pFont = GetFont();
+	if (pFont)
+		pFont->GetObject(sizeof(lf), &lf);
+	else
+	{
+		NONCLIENTMETRICS metrics = { 0 };
+		metrics.cbSize = sizeof(NONCLIENTMETRICS);
+		SystemParametersInfo(SPI_GETNONCLIENTMETRICS, 0, &metrics, FALSE);
+		memcpy_s(&lf, sizeof(LOGFONT), &metrics.lfMessageFont, sizeof(LOGFONT));
+	}
 	m_StdFont.CreateFontIndirect(&lf);
 	lf.lfUnderline = (BYTE) TRUE;
 	m_UnderlineFont.CreateFontIndirect(&lf);
@@ -110,6 +108,7 @@ BEGIN_MESSAGE_MAP(CHyperLink, CStatic)
 	ON_WM_TIMER()
 	ON_WM_ERASEBKGND()
 	ON_CONTROL_REFLECT(STN_CLICKED, OnClicked)
+	ON_WM_SYSCOLORCHANGE()
 END_MESSAGE_MAP()
 
 
@@ -147,7 +146,7 @@ void CHyperLink::OnMouseMove(UINT nFlags, CPoint point)
 			SetFont(&m_UnderlineFont);
 		Invalidate();
 
-		SetTimer(m_nTimerID, 100, NULL);
+		SetTimer(m_nTimerID, 100, nullptr);
 	}
 	CStatic::OnMouseMove(nFlags, point);
 }
@@ -257,13 +256,13 @@ int CHyperLink::GetUnderline() const
 // It loads a "hand" cursor from the winhlp32.exe module
 void CHyperLink::SetDefaultCursor()
 {
-	if (m_hLinkCursor == NULL)
+	if (!m_hLinkCursor)
 	{
 		// first try the windows hand cursor (not available on NT4)
 #ifndef OCR_HAND
 #	define OCR_HAND 32649
 #endif
-		HCURSOR hHandCursor = (HCURSOR)::LoadImage(NULL, MAKEINTRESOURCE(OCR_HAND), IMAGE_CURSOR, 0, 0, LR_DEFAULTSIZE | LR_SHARED);
+		HCURSOR hHandCursor = (HCURSOR)::LoadImage(nullptr, MAKEINTRESOURCE(OCR_HAND), IMAGE_CURSOR, 0, 0, LR_DEFAULTSIZE | LR_SHARED);
 		if (hHandCursor)
 		{
 			m_hLinkCursor = hHandCursor;
@@ -271,10 +270,8 @@ void CHyperLink::SetDefaultCursor()
 		}
 		// windows cursor not available, so try to load it from winhlp32.exe
 		CString strWndDir;
-		GetWindowsDirectory(strWndDir.GetBuffer(MAX_PATH), MAX_PATH);	// Explorer can't handle paths longer than MAX_PATH.
-		strWndDir.ReleaseBuffer();
-
-		strWndDir += _T("\\winhlp32.exe");
+		GetWindowsDirectory(CStrBuf(strWndDir, MAX_PATH), MAX_PATH);	// Explorer can't handle paths longer than MAX_PATH.
+		strWndDir += L"\\winhlp32.exe";
 		// This retrieves cursor #106 from winhlp32.exe, which is a hand pointer
 		CAutoLibrary hModule = LoadLibrary(strWndDir);
 		if (hModule) {
@@ -287,5 +284,12 @@ void CHyperLink::SetDefaultCursor()
 
 HINSTANCE CHyperLink::GotoURL(LPCTSTR url)
 {
-	return ShellExecute(NULL, _T("open"), url, NULL,NULL, SW_SHOW);
+	return ShellExecute(nullptr, L"open", url, nullptr, nullptr, SW_SHOW);
+}
+
+void CHyperLink::OnSysColorChange()
+{
+	__super::OnSysColorChange();
+	m_crLinkColor = GetSysColor(COLOR_HOTLIGHT);
+	Invalidate();
 }

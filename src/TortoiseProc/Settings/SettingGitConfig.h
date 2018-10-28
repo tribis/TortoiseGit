@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -20,7 +20,6 @@
 
 #include "SettingsPropPage.h"
 #include "registry.h"
-#include "Git.h"
 #include "GitSettings.h"
 
 // CSettingGitConfig dialog
@@ -32,18 +31,19 @@ class CSettingGitConfig : public ISettingsPropPage, public CGitSettings
 public:
 	CSettingGitConfig();
 	virtual ~CSettingGitConfig();
-	UINT GetIconID() {return IDI_GITCONFIG;}
+	UINT GetIconID() override { return IDI_GITCONFIG; }
 // Dialog Data
 	enum { IDD = IDD_SETTINGIT_CONFIG };
 
 protected:
-	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
-	BOOL OnInitDialog();
-	BOOL OnApply();
+	virtual void DoDataExchange(CDataExchange* pDX) override;    // DDX/DDV support
+	virtual BOOL OnInitDialog() override;
+	virtual BOOL OnApply() override;
 
-	virtual void LoadDataImpl(CAutoConfig& config);
-	virtual BOOL SafeDataImpl(CAutoConfig& config);
-	virtual void EnDisableControls();
+	virtual void LoadDataImpl(CAutoConfig& config) override;
+	virtual BOOL SafeDataImpl(CAutoConfig& config) override;
+	virtual void EnDisableControls() override;
+	virtual HWND GetDialogHwnd() const override { return GetSafeHwnd(); }
 
 	DECLARE_MESSAGE_MAP()
 

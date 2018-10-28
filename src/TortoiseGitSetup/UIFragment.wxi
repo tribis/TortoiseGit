@@ -2,7 +2,7 @@
 <Include>
 	<UI>
 		<!-- Add/Remove Programs (ARP) related properties ................................ -->
-		<Property Id="ARPCOMMENTS">$(var.PackageComments)</Property>
+		<Property Id="ARPCOMMENTS">$(var.PackageDescription)</Property>
 		<Property Id="ARPCONTACT">$(var.PackageManufacturer)</Property>
 		<Property Id="ARPHELPLINK">$(var.TortoiseGitOrg)</Property>
 		<Property Id="ARPPRODUCTICON">TGITIcon</Property>
@@ -155,7 +155,7 @@
 			<Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="[ButtonText_Cancel]">
 				<Publish Event="SpawnDialog" Value="CancelPopup">1</Publish>
 			</Control>
-			<Control Id="BackgroundBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="234" TabSkip="no" Text="[DialogBitmap]" />
+			<Control Id="BackgroundBitmap" Type="Bitmap" X="0" Y="0" Width="123" Height="234" TabSkip="no" Text="[DialogBitmap]" />
 			<Control Id="Title" Type="Text" X="135" Y="20" Width="220" Height="60" Transparent="yes" NoPrefix="yes">
 				<Text>{\VerdanaBold13}Welcome to the [ProductName] [Wizard]</Text>
 			</Control>
@@ -188,7 +188,7 @@
 			</Control>
 			<Control Id="Buttons" Type="RadioButtonGroup" X="10" Y="60" Width="330" Height="150" Property="SSHTOOL" />
 			<Control Id="SSHToolChangeInfo" Type="Text" X="10" Y="200" Width="330" Height="15" Transparent="yes" NoPrefix="yes">
-				<Text>This setting can be changed in TortoiseGit settings on the &quot;Network&quot; page lateron.</Text>
+				<Text>This setting can be changed in TortoiseGit settings on the &quot;Network&quot; page later on.</Text>
 			</Control>
 			<Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
 		</Dialog>
@@ -353,23 +353,24 @@
 
 		<Dialog Id="ExitDlg" Width="370" Height="270" Title="[ProductName] [Setup]" NoMinimize="yes">
 			<Control Id="Finish" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Cancel="yes" Text="[ButtonText_Finish]">
-				<Publish Event="DoAction" Value="ShowChangelogAction">(NOT Installed) AND (ShowChangelogCheck = 1)</Publish>
+				<Publish Event="DoAction" Value="ShowChangelogAction">(NOT Installed OR PATCH) AND (SHOWCHANGELOG = 1) AND (NOT ACTION="ADMIN")</Publish>
+				<Publish Event="DoAction" Value="FirstStartWizardAction">(NOT Installed OR InstallMode = "Repair" OR PATCH) AND (FIRSTSTARTWIZARD = 1) AND (NOT ACTION="ADMIN")</Publish>
+				<Publish Event="DoAction" Value="RestartExplorer">NOT ACTION="ADMIN"</Publish>
 				<Publish Event="EndDialog" Value="Return">1</Publish>
 			</Control>
 			<Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Disabled="yes" Text="[ButtonText_Back]" />
 			<Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Disabled="yes" Text="[ButtonText_Cancel]" />
-			<Control Id="BackgroundBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="234" TabSkip="no" Text="[DialogBitmap]" />
+			<Control Id="BackgroundBitmap" Type="Bitmap" X="0" Y="0" Width="123" Height="234" TabSkip="no" Text="[DialogBitmap]" />
 			<Control Id="Title" Type="Text" X="135" Y="20" Width="220" Height="60" Transparent="yes" NoPrefix="yes">
 				<Text>{\VerdanaBold13}Completing the [ProductName] [Wizard]</Text>
 			</Control>
-			<!-- Since Checkboxes aren't transparent, reduce the checkbox control to the actual box alone, and add
-					 a normal text control adjacent to it, with the text control being transparent -->
-			<Control Id="ChangeLog" Type="CheckBox" X="135" Y="120" Width="12" Height="12" Property='ShowChangelogCheck' CheckBoxValue='1'>
-				<Condition Action="hide">(Installed)</Condition>
-			</Control>
-			<Control Id="Changelogtext" Type="Text" X="150" Y="120" Width="150" Height="20" Transparent="yes" NoPrefix="yes">
+			<Control Id="ChangeLog" Type="CheckBox" X="135" Y="100" Width="200" Height="12" Property='SHOWCHANGELOG' CheckBoxValue='1'>
 				<Text>Show Changelog</Text>
-				<Condition Action="hide">(Installed)</Condition>
+				<Condition Action="hide">(Installed AND NOT PATCH) OR ACTION="ADMIN"</Condition>
+			</Control>
+			<Control Id="FirstSTart" Type="CheckBox" X="135" Y="116" Width="200" Height="12" Property='FIRSTSTARTWIZARD' CheckBoxValue='1'>
+				<Text>Run first start wizard</Text>
+				<Condition Action="hide">(Installed AND NOT InstallMode = "Repair" AND NOT PATCH) OR ACTION="ADMIN"</Condition>
 			</Control>
 			<Control Id="DialogDescription" Type="Text" X="135" Y="70" Width="220" Height="20" Transparent="yes" NoPrefix="yes">
 				<Text>Click the Finish button to exit the [Wizard].</Text>
@@ -385,6 +386,7 @@
 
 		<Dialog Id="FatalErrorDlg" Width="370" Height="270" Title="[ProductName] [Setup]" NoMinimize="yes">
 			<Control Id="Finish" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Cancel="yes" Text="[ButtonText_Finish]">
+				<Publish Event="DoAction" Value="RestartExplorer">NOT ACTION="ADMIN"</Publish>
 				<Publish Event="EndDialog" Value="Exit">1</Publish>
 			</Control>
 			<Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Disabled="yes" Text="[ButtonText_Back]" />
@@ -395,7 +397,7 @@
 			<Control Id="Description2" Type="Text" X="135" Y="115" Width="220" Height="20" Transparent="yes" NoPrefix="yes">
 				<Text>Click the Finish button to exit the [Wizard].</Text>
 			</Control>
-			<Control Id="BackgroundBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="234" TabSkip="no" Text="[DialogBitmap]" />
+			<Control Id="BackgroundBitmap" Type="Bitmap" X="0" Y="0" Width="123" Height="234" TabSkip="no" Text="[DialogBitmap]" />
 			<Control Id="Title" Type="Text" X="135" Y="20" Width="220" Height="60" Transparent="yes" NoPrefix="yes">
 				<Text>{\VerdanaBold13}[ProductName] [Wizard] ended prematurely</Text>
 			</Control>
@@ -545,7 +547,7 @@
 			<Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="[ButtonText_Cancel]">
 				<Publish Event="SpawnDialog" Value="CancelPopup">1</Publish>
 			</Control>
-			<Control Id="BackgroundBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="234" TabSkip="no" Text="[DialogBitmap]" />
+			<Control Id="BackgroundBitmap" Type="Bitmap" X="0" Y="0" Width="123" Height="234" TabSkip="no" Text="[DialogBitmap]" />
 			<Control Id="Title" Type="Text" X="135" Y="20" Width="220" Height="60" Transparent="yes" NoPrefix="yes">
 				<Text>{\VerdanaBold13}Welcome to the [ProductName] [Wizard]</Text>
 			</Control>
@@ -554,6 +556,25 @@
 			</Control>
 			<Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
 		</Dialog>
+
+		<Dialog Id="PatchWelcomeDlg" Width="370" Height="270" Title="[PATCHNEWSUMMARYCOMMENTS] [Setup]" NoMinimize="yes">
+		<Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="[ButtonText_Next]">
+			<Publish Event="SpawnWaitDialog" Value="WaitForCostingPopup">CostingComplete = 1</Publish>
+			<Publish Event="NewDialog" Value="ProgressDlg">1</Publish>
+		</Control>
+		<Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Disabled="yes" Text="[ButtonText_Back]" />
+		<Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="[ButtonText_Cancel]">
+			<Publish Event="SpawnDialog" Value="CancelPopup">1</Publish>
+		</Control>
+		<Control Id="BackgroundBitmap" Type="Bitmap" X="0" Y="0" Width="123" Height="234" TabSkip="no" Text="[DialogBitmap]" />
+		<Control Id="Title" Type="Text" X="135" Y="20" Width="220" Height="60" Transparent="yes" NoPrefix="yes">
+			<Text>{\VerdanaBold13}Welcome to the [PATCHNEWSUMMARYCOMMENTS] [Wizard]</Text>
+		</Control>
+		<Control Id="DialogDescription" Type="Text" X="135" Y="70" Width="220" Height="60" Transparent="yes" NoPrefix="yes">
+			<Text>The [Wizard] will allow you to update [ProductName] to [PATCHNEWSUMMARYCOMMENTS]. Click Next to continue or Cancel to exit the [Wizard].</Text>
+		</Control>
+		<Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+	</Dialog>
 
 		<Dialog Id="OutOfDiskDlg" Width="370" Height="270" Title="[ProductName] [Setup]" NoMinimize="yes">
 			<Control Id="OK" Type="PushButton" X="304" Y="243" Width="56" Height="17" Default="yes" Cancel="yes" Text="[ButtonText_OK]">
@@ -616,7 +637,7 @@
 			<Control Id="ActionData" Type="Text" X="135" Y="125" Width="220" Height="30" Transparent="yes" NoPrefix="yes">
 				<Subscribe Event="ActionData" Attribute="Text" />
 			</Control>
-			<Control Id="BackgroundBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="234" TabSkip="no" Text="[DialogBitmap]" />
+			<Control Id="BackgroundBitmap" Type="Bitmap" X="0" Y="0" Width="123" Height="234" TabSkip="no" Text="[DialogBitmap]" />
 			<Control Id="Title" Type="Text" X="135" Y="20" Width="220" Height="60" Transparent="yes" NoPrefix="yes">
 				<Text>{\VerdanaBold13}Welcome to the [ProductName] [Wizard]</Text>
 			</Control>
@@ -669,7 +690,7 @@
 			<Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="[ButtonText_Cancel]">
 				<Publish Event="SpawnDialog" Value="CancelPopup">1</Publish>
 			</Control>
-			<Control Id="BackgroundBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="234" TabSkip="no" Text="[DialogBitmap]" />
+			<Control Id="BackgroundBitmap" Type="Bitmap" X="0" Y="0" Width="123" Height="234" TabSkip="no" Text="[DialogBitmap]" />
 			<Control Id="Title" Type="Text" X="135" Y="20" Width="220" Height="60" Transparent="yes" NoPrefix="yes">
 				<Text>{\VerdanaBold13}Resuming the [ProductName] [Wizard]</Text>
 			</Control>
@@ -681,6 +702,7 @@
 
 		<Dialog Id="UserExit" Width="370" Height="270" Title="[ProductName] [Setup]" NoMinimize="yes">
 			<Control Id="Finish" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Cancel="yes" Text="[ButtonText_Finish]">
+				<Publish Event="DoAction" Value="RestartExplorer">NOT ACTION="ADMIN"</Publish>
 				<Publish Event="EndDialog" Value="Exit">1</Publish>
 			</Control>
 			<Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Disabled="yes" Text="[ButtonText_Back]" />
@@ -691,7 +713,7 @@
 			<Control Id="Description2" Type="Text" X="135" Y="115" Width="220" Height="20" Transparent="yes" NoPrefix="yes">
 				<Text>Click the Finish button to exit the [Wizard].</Text>
 			</Control>
-			<Control Id="BackgroundBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="234" TabSkip="no" Text="[DialogBitmap]" />
+			<Control Id="BackgroundBitmap" Type="Bitmap" X="0" Y="0" Width="123" Height="234" TabSkip="no" Text="[DialogBitmap]" />
 			<Control Id="Title" Type="Text" X="135" Y="20" Width="220" Height="60" Transparent="yes" NoPrefix="yes">
 				<Text>{\VerdanaBold13}[ProductName] [Wizard] was interrupted</Text>
 			</Control>
@@ -805,7 +827,7 @@
 			<Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="[ButtonText_Cancel]">
 				<Publish Event="SpawnDialog" Value="CancelPopup">1</Publish>
 			</Control>
-			<Control Id="BackgroundBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="234" TabSkip="no" Text="[DialogBitmap]" />
+			<Control Id="BackgroundBitmap" Type="Bitmap" X="0" Y="0" Width="123" Height="234" TabSkip="no" Text="[DialogBitmap]" />
 			<Control Id="Title" Type="Text" X="135" Y="20" Width="220" Height="60" Transparent="yes" NoPrefix="yes">
 				<Text>{\VerdanaBold13}Welcome to the [ProductName] [Wizard]</Text>
 			</Control>
@@ -1101,6 +1123,6 @@
 		<Error Id="1932">The Windows Installer service cannot update the protected Windows file [2]. {{Package version: [3], OS Protected version: [4], SFP Error: [5]}}</Error>
 		<Error Id="1933">The Windows Installer service cannot update one or more protected Windows files. {{SFP Error: [2].  List of protected files:\r\n[3]}}</Error>
 		<Error Id="1934">User installations are disabled via policy on the machine.</Error>
-		<Error Id="1935">An error occured during the installation of assembly component [2]. HRESULT: [3]. {{assembly interface: [4], function: [5], assembly name: [6]}}</Error>
+		<Error Id="1935">An error occurred during the installation of assembly component [2]. HRESULT: [3]. {{assembly interface: [4], function: [5], assembly name: [6]}}</Error>
 	</UI>
 </Include>

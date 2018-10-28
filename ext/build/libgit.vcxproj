@@ -46,15 +46,21 @@
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\tgit\apply.c" />
+    <ClCompile Include="..\tgit\builtin\am.c" />
     <ClCompile Include="..\tgit\builtin\check-mailmap.c" />
     <ClCompile Include="..\tgit\builtin\get-tar-commit-id.c" />
     <ClCompile Include="..\tgit\builtin\interpret-trailers.c" />
+    <ClCompile Include="..\tgit\builtin\pull.c" />
     <ClCompile Include="..\tgit\builtin\repack.c" />
     <ClCompile Include="..\tgit\builtin\verify-commit.c" />
-    <ClCompile Include="..\tgit\builtin\worktree.c" />
+    <ClCompile Include="..\tgit\builtin\worktree.c">
+      <ObjectFileName>$(IntDir)BuildIn%(Filename).obj</ObjectFileName>
+    </ClCompile>
     <ClCompile Include="..\tgit\compat\msvc.c" />
     <ClCompile Include="..\tgit\block-sha1\sha1.c" />
     <ClCompile Include="..\tgit\compat\basename.c" />
+    <ClCompile Include="..\tgit\compat\qsort_s.c" />
     <ClCompile Include="..\tgit\compat\win32\dirent.c" />
     <ClCompile Include="..\tgit\compat\fopen.c" />
     <ClCompile Include="..\tgit\compat\memmem.c" />
@@ -71,7 +77,6 @@
     <ClCompile Include="..\tgit\compat\strtoimax.c" />
     <ClCompile Include="..\tgit\compat\strtoumax.c" />
     <ClCompile Include="..\tgit\compat\win32mmap.c" />
-    <ClCompile Include="..\tgit\compat\winansi.c" />
     <ClCompile Include="..\tgit\abspath.c" />
     <ClCompile Include="..\tgit\advice.c" />
     <ClCompile Include="..\tgit\alias.c" />
@@ -92,6 +97,7 @@
     <ClCompile Include="..\tgit\column.c" />
     <ClCompile Include="..\tgit\combine-diff.c" />
     <ClCompile Include="..\tgit\commit.c" />
+    <ClCompile Include="..\tgit\compat\winansi.c" />
     <ClCompile Include="..\tgit\config.c" />
     <ClCompile Include="..\tgit\connect.c" />
     <ClCompile Include="..\tgit\connected.c" />
@@ -110,6 +116,7 @@
     <ClCompile Include="..\tgit\diffcore-order.c" />
     <ClCompile Include="..\tgit\diffcore-pickaxe.c" />
     <ClCompile Include="..\tgit\diffcore-rename.c" />
+    <ClCompile Include="..\tgit\dir-iterator.c" />
     <ClCompile Include="..\tgit\dir.c" />
     <ClCompile Include="..\tgit\editor.c" />
     <ClCompile Include="..\tgit\entry.c" />
@@ -142,18 +149,22 @@
     <ClCompile Include="..\tgit\merge-recursive.c" />
     <ClCompile Include="..\tgit\merge.c" />
     <ClCompile Include="..\tgit\mergesort.c" />
+    <ClCompile Include="..\tgit\mru.c" />
     <ClCompile Include="..\tgit\name-hash.c" />
     <ClCompile Include="..\tgit\notes-cache.c" />
     <ClCompile Include="..\tgit\notes-merge.c" />
     <ClCompile Include="..\tgit\notes-utils.c" />
     <ClCompile Include="..\tgit\notes.c" />
     <ClCompile Include="..\tgit\object.c" />
+    <ClCompile Include="..\tgit\oidmap.c" />
+    <ClCompile Include="..\tgit\oidset.c" />
     <ClCompile Include="..\tgit\pack-bitmap-write.c" />
     <ClCompile Include="..\tgit\pack-bitmap.c" />
     <ClCompile Include="..\tgit\pack-check.c" />
     <ClCompile Include="..\tgit\pack-objects.c" />
     <ClCompile Include="..\tgit\pack-revindex.c" />
     <ClCompile Include="..\tgit\pack-write.c" />
+    <ClCompile Include="..\tgit\packfile.c" />
     <ClCompile Include="..\tgit\pager.c" />
     <ClCompile Include="..\tgit\parse-options-cb.c" />
     <ClCompile Include="..\tgit\parse-options.c" />
@@ -169,10 +180,16 @@
     <ClCompile Include="..\tgit\quote.c" />
     <ClCompile Include="..\tgit\reachable.c" />
     <ClCompile Include="..\tgit\read-cache.c" />
+    <ClCompile Include="..\tgit\ref-filter.c" />
     <ClCompile Include="..\tgit\reflog-walk.c" />
     <ClCompile Include="..\tgit\refs.c" />
+    <ClCompile Include="..\tgit\refs\files-backend.c" />
+    <ClCompile Include="..\tgit\refs\iterator.c" />
+    <ClCompile Include="..\tgit\refs\packed-backend.c" />
+    <ClCompile Include="..\tgit\refs\ref-cache.c" />
     <ClCompile Include="..\tgit\remote.c" />
     <ClCompile Include="..\tgit\replace_object.c" />
+    <ClCompile Include="..\tgit\repository.c" />
     <ClCompile Include="..\tgit\rerere.c" />
     <ClCompile Include="..\tgit\resolve-undo.c" />
     <ClCompile Include="..\tgit\revision.c" />
@@ -193,10 +210,15 @@
     <ClCompile Include="..\tgit\strbuf.c" />
     <ClCompile Include="..\tgit\streaming.c" />
     <ClCompile Include="..\tgit\string-list.c" />
+    <ClCompile Include="..\tgit\sub-process.c" />
+    <ClCompile Include="..\tgit\submodule-config.c" />
     <ClCompile Include="..\tgit\submodule.c" />
     <ClCompile Include="..\tgit\symlinks.c" />
     <ClCompile Include="..\tgit\tag.c" />
+    <ClCompile Include="..\tgit\tempfile.c" />
+    <ClCompile Include="..\tgit\tmp-objdir.c" />
     <ClCompile Include="..\tgit\trace.c" />
+    <ClCompile Include="..\tgit\trailer.c" />
     <ClCompile Include="..\tgit\transport-helper.c" />
     <ClCompile Include="..\tgit\transport.c" />
     <ClCompile Include="..\tgit\tree-diff.c" />
@@ -214,13 +236,16 @@
     <ClCompile Include="..\tgit\versioncmp.c" />
     <ClCompile Include="..\tgit\walker.c" />
     <ClCompile Include="..\tgit\wildmatch.c" />
+    <ClCompile Include="..\tgit\worktree.c" />
     <ClCompile Include="..\tgit\wrapper.c" />
     <ClCompile Include="..\tgit\write_or_die.c" />
     <ClCompile Include="..\tgit\ws.c" />
     <ClCompile Include="..\tgit\wt-status.c" />
     <ClCompile Include="..\tgit\xdiff-interface.c" />
     <ClCompile Include="..\tgit\zlib.c" />
-    <ClCompile Include="..\tgit\xdiff\xdiffi.c" />
+    <ClCompile Include="..\tgit\xdiff\xdiffi.c">
+      <Optimization Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Disabled</Optimization>
+    </ClCompile>
     <ClCompile Include="..\tgit\xdiff\xemit.c" />
     <ClCompile Include="..\tgit\xdiff\xhistogram.c" />
     <ClCompile Include="..\tgit\xdiff\xmerge.c" />
@@ -229,7 +254,9 @@
     <ClCompile Include="..\tgit\xdiff\xutils.c" />
     <ClCompile Include="..\tgit\builtin\add.c" />
     <ClCompile Include="..\tgit\builtin\annotate.c" />
-    <ClCompile Include="..\tgit\builtin\apply.c" />
+    <ClCompile Include="..\tgit\builtin\apply.c">
+      <ObjectFileName>$(IntDir)BuildIn%(Filename).obj</ObjectFileName>
+    </ClCompile>
     <ClCompile Include="..\tgit\builtin\archive.c">
       <ObjectFileName>$(IntDir)BuildIn%(Filename).obj</ObjectFileName>
     </ClCompile>
@@ -359,6 +386,7 @@
     <ClCompile Include="..\tgit\builtin\write-tree.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\tgit\apply.h" />
     <ClInclude Include="..\tgit\commit-slab.h" />
     <ClInclude Include="..\tgit\compat\msvc.h" />
     <ClInclude Include="..\tgit\archive.h" />
@@ -374,6 +402,7 @@
     <ClInclude Include="..\tgit\color.h" />
     <ClInclude Include="..\tgit\column.h" />
     <ClInclude Include="..\tgit\commit.h" />
+    <ClInclude Include="..\tgit\config.h" />
     <ClInclude Include="..\tgit\connect.h" />
     <ClInclude Include="..\tgit\connected.h" />
     <ClInclude Include="..\tgit\csum-file.h" />
@@ -381,6 +410,7 @@
     <ClInclude Include="..\tgit\delta.h" />
     <ClInclude Include="..\tgit\diff.h" />
     <ClInclude Include="..\tgit\diffcore.h" />
+    <ClInclude Include="..\tgit\dir-iterator.h" />
     <ClInclude Include="..\tgit\dir.h" />
     <ClInclude Include="..\tgit\ewah\ewok.h" />
     <ClInclude Include="..\tgit\ewah\ewok_rlw.h" />
@@ -391,27 +421,34 @@
     <ClInclude Include="..\tgit\gpg-interface.h" />
     <ClInclude Include="..\tgit\graph.h" />
     <ClInclude Include="..\tgit\grep.h" />
+    <ClInclude Include="..\tgit\hash.h" />
     <ClInclude Include="..\tgit\hashmap.h" />
     <ClInclude Include="..\tgit\help.h" />
+    <ClInclude Include="..\tgit\iterator.h" />
     <ClInclude Include="..\tgit\kwset.h" />
     <ClInclude Include="..\tgit\levenshtein.h" />
     <ClInclude Include="..\tgit\line-log.h" />
     <ClInclude Include="..\tgit\line-range.h" />
     <ClInclude Include="..\tgit\list-objects.h" />
+    <ClInclude Include="..\tgit\list.h" />
     <ClInclude Include="..\tgit\ll-merge.h" />
     <ClInclude Include="..\tgit\log-tree.h" />
     <ClInclude Include="..\tgit\mailmap.h" />
     <ClInclude Include="..\tgit\merge-blobs.h" />
     <ClInclude Include="..\tgit\merge-recursive.h" />
     <ClInclude Include="..\tgit\mergesort.h" />
+    <ClInclude Include="..\tgit\mru.h" />
     <ClInclude Include="..\tgit\notes-merge.h" />
     <ClInclude Include="..\tgit\notes-utils.h" />
     <ClInclude Include="..\tgit\notes.h" />
     <ClInclude Include="..\tgit\object.h" />
+    <ClInclude Include="..\tgit\oidmap.h" />
+    <ClInclude Include="..\tgit\oidset.h" />
     <ClInclude Include="..\tgit\pack-bitmap.h" />
     <ClInclude Include="..\tgit\pack-objects.h" />
     <ClInclude Include="..\tgit\pack-revindex.h" />
     <ClInclude Include="..\tgit\pack.h" />
+    <ClInclude Include="..\tgit\packfile.h" />
     <ClInclude Include="..\tgit\parse-options.h" />
     <ClInclude Include="..\tgit\patch-ids.h" />
     <ClInclude Include="..\tgit\pathspec.h" />
@@ -420,9 +457,14 @@
     <ClInclude Include="..\tgit\progress.h" />
     <ClInclude Include="..\tgit\quote.h" />
     <ClInclude Include="..\tgit\reachable.h" />
+    <ClInclude Include="..\tgit\ref-filter.h" />
     <ClInclude Include="..\tgit\reflog-walk.h" />
     <ClInclude Include="..\tgit\refs.h" />
+    <ClInclude Include="..\tgit\refs\packed-backend.h" />
+    <ClInclude Include="..\tgit\refs\ref-cache.h" />
+    <ClInclude Include="..\tgit\refs\refs-internal.h" />
     <ClInclude Include="..\tgit\remote.h" />
+    <ClInclude Include="..\tgit\repository.h" />
     <ClInclude Include="..\tgit\rerere.h" />
     <ClInclude Include="..\tgit\revision.h" />
     <ClInclude Include="..\tgit\run-command.h" />
@@ -437,9 +479,14 @@
     <ClInclude Include="..\tgit\strbuf.h" />
     <ClInclude Include="..\tgit\streaming.h" />
     <ClInclude Include="..\tgit\string-list.h" />
+    <ClInclude Include="..\tgit\sub-process.h" />
+    <ClInclude Include="..\tgit\submodule-config.h" />
     <ClInclude Include="..\tgit\tag.h" />
     <ClInclude Include="..\tgit\tar.h" />
+    <ClInclude Include="..\tgit\tempfile.h" />
     <ClInclude Include="..\tgit\thread-utils.h" />
+    <ClInclude Include="..\tgit\tmp-objdir.h" />
+    <ClInclude Include="..\tgit\trailer.h" />
     <ClInclude Include="..\tgit\transport.h" />
     <ClInclude Include="..\tgit\tree-walk.h" />
     <ClInclude Include="..\tgit\tree.h" />
@@ -451,6 +498,7 @@
     <ClInclude Include="..\tgit\version.h" />
     <ClInclude Include="..\tgit\walker.h" />
     <ClInclude Include="..\tgit\wildmatch.h" />
+    <ClInclude Include="..\tgit\worktree.h" />
     <ClInclude Include="..\tgit\wt-status.h" />
     <ClInclude Include="..\tgit\xdiff-interface.h" />
     <ClInclude Include="..\tgit\compat\mingw.h" />
@@ -466,6 +514,7 @@
     <ClInclude Include="..\tgit\xdiff\xprepare.h" />
     <ClInclude Include="..\tgit\xdiff\xtypes.h" />
     <ClInclude Include="..\tgit\xdiff\xutils.h" />
+    <ClInclude Include="libgit-defines.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

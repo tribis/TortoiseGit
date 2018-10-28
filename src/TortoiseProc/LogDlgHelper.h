@@ -1,7 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
 // Copyright (C) 2003-2007 - TortoiseSVN
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -20,7 +20,10 @@
 #pragma once
 #include "lanes.h"
 #include "GitHash.h"
+#include "Git.h"
 #include "GitLogCache.h"
+#include <unordered_map>
+#include <unordered_set>
 class CLogDlg;
 
 /**
@@ -28,7 +31,7 @@ class CLogDlg;
  * Instances of CStoreSelection save the selection of the CLogDlg. When the instance
  * is deleted the destructor restores the selection.
  */
-typedef std::map<CGitHash, int> MAP_HASH_REV;
+typedef std::unordered_map<CGitHash, int> MAP_HASH_REV;
 
 /**
  * \ingroup TortoiseProc
@@ -44,11 +47,15 @@ public:
 	{
 		m_pLogCache=pLogCache;
 		m_FirstFreeLane=0;
+		// Default to value set in Registry
+		m_logOrderBy = CRegDWORD(L"Software\\TortoiseGit\\LogOrderBy", CGit::LOG_ORDER_TOPOORDER);
 	}
 	CLogDataVector()
 	{
-		m_pLogCache=NULL;
+		m_pLogCache = nullptr;
 		m_FirstFreeLane=0;
+		// Default to value set in Registry
+		m_logOrderBy = CRegDWORD(L"Software\\TortoiseGit\\LogOrderBy", CGit::LOG_ORDER_TOPOORDER);
 	}
 	void SetLogCache(CLogCache *pLogCache)
 	{
@@ -61,12 +68,14 @@ public:
 	}
 	void ClearAll();
 	int  ParserFromLog(CTGitPath* path = nullptr, DWORD count = 0, DWORD infomask = CGit::LOG_INFO_STAT | CGit::LOG_INFO_FILESTATE | CGit::LOG_INFO_SHOW_MERGEDFILE, CString* range = nullptr);
-	int  Fill(std::set<CGitHash>& hashes);
+	int  Fill(std::unordered_set<CGitHash>& hashes);
 
 	int FetchFullInfo(int i);
 
 	Lanes m_Lns;
 	int	 m_FirstFreeLane;
+	// Log order: LOG_ORDER_CHRONOLOGIALREVERSED, LOG_ORDER_TOPOORDER, LOG_ORDER_DATEORDER
+	int m_logOrderBy;
 	MAP_HASH_REV m_HashMap;
 	void updateLanes(GitRevLoglist& c, Lanes& lns, CGitHash& sha);
 	void setLane(CGitHash& sha) ;

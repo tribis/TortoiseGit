@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2012-2016 - TortoiseGit
+// Copyright (C) 2012-2018 - TortoiseGit
 // Copyright (C) 2009-2011, 2013 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -74,6 +74,10 @@ CSettingsAdvanced::CSettingsAdvanced()
 	settings[i].type	= CSettingsAdvanced::SettingTypeBoolean;
 	settings[i++].def.b	= false;
 
+	settings[i].sName   = L"DiffSimilarityIndexThreshold";
+	settings[i].type    = CSettingsAdvanced::SettingTypeNumber;
+	settings[i++].def.l = 50;
+
 	settings[i].sName	= L"FullRowSelect";
 	settings[i].type	= CSettingsAdvanced::SettingTypeBoolean;
 	settings[i++].def.b	= true;
@@ -90,6 +94,10 @@ CSettingsAdvanced::CSettingsAdvanced()
 	settings[i].type	= CSettingsAdvanced::SettingTypeBoolean;
 	settings[i++].def.b	= false;
 
+	settings[i].sName	= L"LogShowSuperProjectSubmodulePointer";
+	settings[i].type	= CSettingsAdvanced::SettingTypeBoolean;
+	settings[i++].def.b	= true;
+
 	settings[i].sName	= L"MaxRefHistoryItems";
 	settings[i].type	= CSettingsAdvanced::SettingTypeNumber;
 	settings[i++].def.l	= 5;
@@ -97,6 +105,10 @@ CSettingsAdvanced::CSettingsAdvanced()
 	settings[i].sName   = L"Msys2Hack";
 	settings[i].type    = CSettingsAdvanced::SettingTypeBoolean;
 	settings[i++].def.b = false;
+
+	settings[i].sName	= L"NamedRemoteFetchAll";
+	settings[i].type	= CSettingsAdvanced::SettingTypeBoolean;
+	settings[i++].def.b	= true;
 
 	settings[i].sName	= L"NoSortLocalBranchesFirst";
 	settings[i].type	= CSettingsAdvanced::SettingTypeBoolean;
@@ -106,15 +118,23 @@ CSettingsAdvanced::CSettingsAdvanced()
 	settings[i].type	= CSettingsAdvanced::SettingTypeNumber;
 	settings[i++].def.l	= 10;
 
-	settings[i].sName	= L"PullRebaseBehaviorLike1816";
+	settings[i].sName	= L"OverlaysCaseSensitive";
 	settings[i].type	= CSettingsAdvanced::SettingTypeBoolean;
-	settings[i++].def.b	= false;
-	
+	settings[i++].def.b	= true;
+
+	settings[i].sName	= L"ProgressDlgLinesLimit";
+	settings[i].type	= CSettingsAdvanced::SettingTypeNumber;
+	settings[i++].def.l	= 50000;
+
 	settings[i].sName	= L"ReaddUnselectedAddedFilesAfterCommit";
 	settings[i].type	= CSettingsAdvanced::SettingTypeBoolean;
 	settings[i++].def.b	= true;
 
 	settings[i].sName	= L"RefreshFileListAfterResolvingConflict";
+	settings[i].type	= CSettingsAdvanced::SettingTypeBoolean;
+	settings[i++].def.b	= true;
+
+	settings[i].sName	= L"RememberFileListPosition";
 	settings[i].type	= CSettingsAdvanced::SettingTypeBoolean;
 	settings[i++].def.b	= true;
 
@@ -141,6 +161,14 @@ CSettingsAdvanced::CSettingsAdvanced()
 	settings[i].sName	= L"ShowListBackgroundImage";
 	settings[i].type	= CSettingsAdvanced::SettingTypeBoolean;
 	settings[i++].def.b	= true;
+
+	settings[i].sName	= L"ShowListFullPathTooltip";
+	settings[i].type	= CSettingsAdvanced::SettingTypeBoolean;
+	settings[i++].def.b	= true;
+
+	settings[i].sName	= L"SquashDate";
+	settings[i].type	= CSettingsAdvanced::SettingTypeNumber;
+	settings[i++].def.l	= 0;
 
 	settings[i].sName	= L"StyleCommitMessages";
 	settings[i].type	= CSettingsAdvanced::SettingTypeBoolean;
@@ -194,7 +222,7 @@ BOOL CSettingsAdvanced::OnInitDialog()
 	while (c >= 0)
 		m_ListCtrl.DeleteColumn(c--);
 
-	SetWindowTheme(m_ListCtrl.GetSafeHwnd(), L"Explorer", NULL);
+	SetWindowTheme(m_ListCtrl.GetSafeHwnd(), L"Explorer", nullptr);
 
 	CString temp;
 	temp.LoadString(IDS_SETTINGS_CONF_VALUECOL);
@@ -213,20 +241,20 @@ BOOL CSettingsAdvanced::OnInitDialog()
 		{
 		case SettingTypeBoolean:
 			{
-				CRegDWORD s(_T("Software\\TortoiseGit\\") + settings[i].sName, settings[i].def.b);
-				m_ListCtrl.SetItemText(i, 0, DWORD(s) ?	_T("true") : _T("false"));
+				CRegDWORD s(L"Software\\TortoiseGit\\" + settings[i].sName, settings[i].def.b);
+				m_ListCtrl.SetItemText(i, 0, DWORD(s) ?	L"true" : L"false");
 			}
 			break;
 		case SettingTypeNumber:
 			{
-				CRegDWORD s(_T("Software\\TortoiseGit\\") + settings[i].sName, settings[i].def.l);
-				temp.Format(_T("%ld"), (DWORD)s);
+				CRegDWORD s(L"Software\\TortoiseGit\\" + settings[i].sName, settings[i].def.l);
+				temp.Format(L"%ld", (DWORD)s);
 				m_ListCtrl.SetItemText(i, 0, temp);
 			}
 			break;
 		case SettingTypeString:
 			{
-				CRegString s(_T("Software\\TortoiseGit\\") + settings[i].sName, settings[i].def.s);
+				CRegString s(L"Software\\TortoiseGit\\" + settings[i].sName, settings[i].def.s);
 				m_ListCtrl.SetItemText(i, 0, CString(s));
 			}
 		}
@@ -238,9 +266,7 @@ BOOL CSettingsAdvanced::OnInitDialog()
 	int maxcol = m_ListCtrl.GetHeaderCtrl()->GetItemCount() - 1;
 	int col;
 	for (col = mincol; col <= maxcol; ++col)
-	{
 		m_ListCtrl.SetColumnWidth(col, LVSCW_AUTOSIZE_USEHEADER);
-	}
 	int arr[2] = {1,0};
 	m_ListCtrl.SetColumnOrderArray(2, arr);
 	m_ListCtrl.SetRedraw(TRUE);
@@ -258,35 +284,29 @@ BOOL CSettingsAdvanced::OnApply()
 		{
 		case SettingTypeBoolean:
 			{
-				CRegDWORD s(_T("Software\\TortoiseGit\\") + settings[i].sName, settings[i].def.b);
+				CRegDWORD s(L"Software\\TortoiseGit\\" + settings[i].sName, settings[i].def.b);
 				if (sValue.IsEmpty())
 					s.removeValue();
 				else
 				{
-					DWORD newValue = sValue.Compare(_T("true")) == 0;
+					DWORD newValue = sValue.Compare(L"true") == 0;
 					if (DWORD(s) != newValue)
-					{
 						s = newValue;
-					}
 				}
 			}
 			break;
 		case SettingTypeNumber:
 			{
-				CRegDWORD s(_T("Software\\TortoiseGit\\") + settings[i].sName, settings[i].def.l);
-				if (DWORD(_tstol(sValue)) != DWORD(s))
-				{
-					s = _tstol(sValue);
-				}
+				CRegDWORD s(L"Software\\TortoiseGit\\" + settings[i].sName, settings[i].def.l);
+				if (DWORD(_wtol(sValue)) != DWORD(s))
+					s = _wtol(sValue);
 			}
 			break;
 		case SettingTypeString:
 			{
-				CRegString s(_T("Software\\TortoiseGit\\") + settings[i].sName, settings[i].def.s);
+				CRegString s(L"Software\\TortoiseGit\\" + settings[i].sName, settings[i].def.s);
 				if (sValue.Compare(CString(s)))
-				{
 					s = sValue;
-				}
 			}
 		}
 
@@ -305,7 +325,7 @@ void CSettingsAdvanced::OnLvnEndlabeledit(NMHDR *pNMHDR, LRESULT *pResult)
 {
 	NMLVDISPINFO *pDispInfo = reinterpret_cast<NMLVDISPINFO*>(pNMHDR);
 	*pResult = 0;
-	if (pDispInfo->item.pszText == NULL)
+	if (!pDispInfo->item.pszText)
 		return;
 
 	bool allowEdit = false;
@@ -314,8 +334,8 @@ void CSettingsAdvanced::OnLvnEndlabeledit(NMHDR *pNMHDR, LRESULT *pResult)
 	case SettingTypeBoolean:
 		{
 			if ((pDispInfo->item.pszText[0] == 0) ||
-				(_tcscmp(pDispInfo->item.pszText, _T("true")) == 0) ||
-				(_tcscmp(pDispInfo->item.pszText, _T("false")) == 0))
+				(wcscmp(pDispInfo->item.pszText, L"true") == 0) ||
+				(wcscmp(pDispInfo->item.pszText, L"false") == 0))
 			{
 				allowEdit = true;
 			}

@@ -1,6 +1,6 @@
 ﻿// TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2015 - TortoiseGit
+// Copyright (C) 2015-2016, 2018 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -25,7 +25,7 @@ TEST(CGitHash, Initial)
 {
 	CGitHash empty;
 	EXPECT_TRUE(empty.IsEmpty());
-	EXPECT_STREQ(_T("0000000000000000000000000000000000000000"), GIT_REV_ZERO);
+	EXPECT_STREQ(L"0000000000000000000000000000000000000000", GIT_REV_ZERO);
 	EXPECT_STREQ(GIT_REV_ZERO, empty.ToString());
 	EXPECT_TRUE(empty == empty);
 	EXPECT_FALSE(empty != empty);
@@ -53,7 +53,7 @@ TEST(CGitHash, Initial)
 	EXPECT_TRUE(hash2.IsEmpty());
 
 	unsigned char chararray[20] = { 0x8D, 0x18, 0x61, 0x31, 0x60, 0x61, 0x74, 0x8C, 0xFE, 0xE7, 0xE0, 0x75, 0xDC, 0x13, 0x82, 0x87, 0x97, 0x81, 0x02, 0xAB };
-	CGitHash hash3((char*)chararray);
+	CGitHash hash3(chararray);
 	EXPECT_FALSE(hash3.IsEmpty());
 	EXPECT_STREQ(L"8d1861316061748cfee7e075dc138287978102ab", hash3.ToString());
 	EXPECT_TRUE(hash3 == hash);
@@ -91,4 +91,59 @@ TEST(CGitHash, IsSHA1Valid)
 	EXPECT_FALSE(CGitHash::IsValidSHA1(L"master"));
 	EXPECT_FALSE(CGitHash::IsValidSHA1(L"refs/heads/master"));
 	EXPECT_FALSE(CGitHash::IsValidSHA1(L"8d1861316061748cfee7e075dc138287978102az"));
+}
+
+TEST(CGitHash, MatchesPrefix)
+{
+	CString prefix = L"3012b757c23d16cc915acf60f5e3922d0409187a";
+	CGitHash hash = prefix;
+	CGitHash prefixHash = prefix;
+	EXPECT_TRUE(hash.MatchesPrefix(prefixHash, prefix, prefix.GetLength()));
+
+	prefix = L"";
+	prefixHash = L"0000000000000000000000000000000000000000";
+	EXPECT_TRUE(hash.MatchesPrefix(prefixHash, prefix, prefix.GetLength()));
+
+	prefix = L"3012b757";
+	prefixHash = L"3012b75700000000000000000000000000000000";
+	EXPECT_TRUE(hash.MatchesPrefix(prefixHash, prefix, prefix.GetLength()));
+
+	prefix = L"3012b758";
+	prefixHash = L"3012b75800000000000000000000000000000000";
+	EXPECT_FALSE(hash.MatchesPrefix(prefixHash, prefix, prefix.GetLength()));
+
+	prefix = L"a0";
+	prefixHash = L"a000000000000000000000000000000000000000";
+	EXPECT_FALSE(hash.MatchesPrefix(prefixHash, prefix, prefix.GetLength()));
+
+	prefix = L"3012b75";
+	prefixHash = L"3012b75000000000000000000000000000000000";
+	EXPECT_TRUE(hash.MatchesPrefix(prefixHash, prefix, prefix.GetLength()));
+
+	prefix = L"3012b76";
+	prefixHash = L"3012b76000000000000000000000000000000000";
+	EXPECT_FALSE(hash.MatchesPrefix(prefixHash, prefix, prefix.GetLength()));
+}
+
+TEST(CGitHash, stdhash)
+{
+	EXPECT_EQ(std::hash<CGitHash>()(CGitHash(GIT_REV_ZERO)), (size_t)0);
+	EXPECT_EQ(std::hash<CGitHash>()(CGitHash(L"ffffffffffffffff000000000000000000000000")), SIZE_T_MAX);
+
+	EXPECT_EQ(std::hash<CGitHash>()(CGitHash(L"1000000000000000000000000000000000000000")), (size_t)16);
+	EXPECT_EQ(std::hash<CGitHash>()(CGitHash(L"0100000000000000000000000000000000000000")), (size_t)1);
+	EXPECT_EQ(std::hash<CGitHash>()(CGitHash(L"0010000000000000000000000000000000000000")), (size_t)4096);
+	EXPECT_EQ(std::hash<CGitHash>()(CGitHash(L"0001000000000000000000000000000000000000")), (size_t)256);
+	EXPECT_EQ(std::hash<CGitHash>()(CGitHash(L"0000100000000000000000000000000000000000")), (size_t)1048576);
+	EXPECT_EQ(std::hash<CGitHash>()(CGitHash(L"0000000100000000000000000000000000000000")), (size_t)16777216);
+#ifdef WIN64
+	EXPECT_EQ(std::hash<CGitHash>()(CGitHash(L"0000000010000000000000000000000000000000")), (size_t)68719476736);
+	EXPECT_EQ(std::hash<CGitHash>()(CGitHash(L"0000000000000010000000000000000000000000")), (size_t)1152921504606846976);
+	EXPECT_EQ(std::hash<CGitHash>()(CGitHash(L"0000000000000001000000000000000000000000")), (size_t)72057594037927936);
+#else
+	EXPECT_EQ(std::hash<CGitHash>()(CGitHash(L"0000000010000000000000000000000000000000")), (size_t)0);
+	EXPECT_EQ(std::hash<CGitHash>()(CGitHash(L"0000000000000010000000000000000000000000")), (size_t)0);
+	EXPECT_EQ(std::hash<CGitHash>()(CGitHash(L"0000000000000001000000000000000000000000")), (size_t)0);
+#endif
+	EXPECT_EQ(std::hash<CGitHash>()(CGitHash(L"0000000000000000100000000000000000000000")), (size_t)0);
 }

@@ -2,10 +2,8 @@
 <!DOCTYPE sect2 SYSTEM "../../../dtd/dblite.dtd">
 <sect2 id="tgit-dug-settings-main">
 	<?dbhh topicname="HIDD_SETTINGSMAIN"?>
+	<?dbhh topicname="HIDD_FIRSTSTARTWIZARD_GIT"?>
 	<title>General Settings</title>
-	<indexterm>
-		<primary>sounds</primary>
-	</indexterm>
 	<indexterm>
 		<primary>git.exe path</primary>
 	</indexterm>
@@ -17,6 +15,9 @@
 	</indexterm>
 	<indexterm>
 		<primary>Extern DLL Path</primary>
+	</indexterm>
+	<indexterm>
+		<primary>Extra PATH</primary>
 	</indexterm>
 	<para>
 		<figure id="tgit-dug-settings-dia-main">
@@ -99,7 +100,7 @@
 			</listitem>
 		</varlistentry>
 		<varlistentry>
-			<term>Extern DLL Path</term>
+			<term>Extra PATH</term>
 			<listitem>
 				<para>
 					If your git installation needs an extra entry in the PATH environment variable,
@@ -107,7 +108,7 @@
 				</para>
 				<para>
 					This is especially needed if you installed the developer version of msysGit ("Full installer (self-contained) if you want to hack on Git" with the filename <literal>msysGit-fullinstall-*.exe</literal>),
-					in this case it is necessary that the <literal>[MSYSGIT-INSTALL-PATH]\mingw\bin</literal>-folder is on the path (i.e. entered in the <guilabel>Extern DLL Path</guilabel> textbox) in order to execute git.exe.
+					in this case it is necessary that the <literal>[MSYSGIT-INSTALL-PATH]\mingw\bin</literal>-folder is on the path (i.e. entered in the <guilabel>Extra PATH</guilabel> textbox) in order to execute git.exe.
 				</para>
 				<para>
 					Often you can see if you need this when you start git.exe in <literal>[MSYSGIT-INSTALL-PATH]\mingw\bin</literal>-folder and you get a messagebox saying that a dll is missing.
@@ -118,7 +119,7 @@
 			<term>Cygwin Git</term>
 			<listitem>
 				<para>
-					As noted above: There is no official support for Cygwin git in TortoiseGit. The TortoiseGit developers only use Git for Windows. Bug reports, however, are welcome. If you really want to use it here are the steps you have to perform:
+					As noted above: There is no official support for Cygwin git in TortoiseGit (do not enable this for the "Git for Windows package!). The TortoiseGit developers only use Git for Windows. Bug reports, however, are welcome. If you really want to use it here are the steps you have to perform:
 				</para>
 				<para>
 					1) Select the <literal>[CYGWIN-INSTALL-PATH]\bin</literal>-folder as git.exe folder.
@@ -141,7 +142,7 @@
 			<term>Msys2 Git</term>
 			<listitem>
 				<para>
-					As noted above: There is no official support for Msys2 git in TortoiseGit. The TortoiseGit developers only use Git for Windows. Bugreports, however, are welcome. If you really want to use it here are the steps you have to perform:
+					As noted above: There is no official support for Msys2 git in TortoiseGit (do not enable this for the "Git for Windows package!). The TortoiseGit developers only use Git for Windows. Bugreports, however, are welcome. If you really want to use it here are the steps you have to perform:
 				</para>
 				<para>
 					1) Select the <literal>[MSYS2-INSTALL-PATH]\usr\bin</literal>-folder as git.exe folder.
@@ -170,9 +171,11 @@
 				<graphic fileref="../images/SettingsContext.png"/>
 			</figure>
 			This page allows you to specify which of the TortoiseGit context menu
-			entries will show up in the main context menu, and which will appear
+			entries will show up in the main context menu (on the first level),
+			and which entries will appear
 			in the TortoiseGit submenu. By default most items are unchecked and
 			appear in the submenu.
+			If you want to hide specific entries, see <xref linkend="tgit-dug-settings-look-feel-extended"/>.
 		</para>
 		<para>
 			Most of the time, you won't need the TortoiseGit context menu, apart
@@ -199,19 +202,17 @@
 	</sect3>
 	
 	<sect3 id="tgit-dug-settings-look-feel-extended">
-		<title>Set Extend Menu Item</title>
+		<title>Context Menu 2 Settings</title>
 		<?dbhh topicname="HIDD_SETTINGSEXTMENU"?>
 		<para>
 			<figure id="tgit-dug-settings-ext-menu">
-				<title>The Settings Dialog, Set Extend Menu Item</title>
+				<title>The Settings Dialog, Context Menu 2</title>
 				<graphic fileref="../images/SettingsExtendMenu.png"/>
 			</figure>
 			This page allows you to specify which of the TortoiseGit context menu
-			entries will show up in the extend context menu (press <keycap>Shift</keycap>
-			key on <action>right click</action>), 
-			and which will appear in the normal context menu. 
-			This config will help reduce the context menu number at normal usage case
-			according to your usage module. 
+			entries will be hidden by default. Selected item will only be visible when you hold the <keycap>Shift</keycap>
+			key on <action>right click</action> (this is the so-called extended context menu, please don't mix this with the TortoiseGit submenu, which is also configurable (cf. <xref linkend="tgit-dug-settings-look-feel"/>)).
+			This configuration helps you to reduce the number of context menu entries according to your needs.
 		</para>
 	</sect3>
 	
@@ -219,7 +220,7 @@
 		<title>TortoiseGit Dialog Settings</title>
 		<?dbhh topicname="HIDD_SETTINGSDIALOGS"?>
 		<para>
-			<figure id="tgit-dug-settings-dia-dialogs">
+			<figure id="tgit-dug-settings-dia-dialogs-1">
 				<title>The Settings Dialog, Dialogs Page</title>
 				<graphic fileref="../images/SettingsDialog.png"/>
 			</figure>
@@ -294,10 +295,10 @@
 				<term>Symbolize ref names</term>
 				<listitem>
 					<para>
-						Show symbols on ref labels to substitute part of the ref names.
+						Show symbols on ref labels to substitute part of the ref names in order to make them smaller.
 						If this option is enabled, the following description and example will apply.
-						If there is only a single remote, a lightning symbol will substitute the remote name part of each remote branch.
-						If the remote branch is the upstream of a local branch, an up triangle symbol will substitute the branch name part of the remote branch.
+						If there is only a single remote, an up-arrow symbol (↑) will substitute the remote name part of each remote branch.
+						If the remote branch is the upstream of a local branch, an equivalent symbol (≡) will substitute the branch name part of the remote branch.
 						<figure id="tgit-dug-settings-symbolizerefname-example">
 							<title>Example of Symbolize ref names</title>
 							<graphic fileref="../images/SymbolizeRefNamesExample.png"/>
@@ -409,7 +410,7 @@
 		<title>TortoiseGit Dialog Settings 2</title>
 		<?dbhh topicname="HIDD_SETTINGSDIALOGS2"?>
 		<para>
-			<figure id="tgit-dug-settings-dia-dialogs">
+			<figure id="tgit-dug-settings-dia-dialogs-2">
 				<title>The Settings Dialog, Dialogs Page 2</title>
 				<graphic fileref="../images/SettingsDialog2.png"/>
 			</figure>
@@ -583,7 +584,7 @@
 		<title>TortoiseGit Dialog Settings 3</title>
 		<?dbhh topicname="HIDD_SETTINGSDIALOGS3"?>
 		<para>
-			<figure id="tgit-dug-settings-dia-dialogs">
+			<figure id="tgit-dug-settings-dia-dialogs-3">
 				<title>The Settings Dialog, Dialogs 3 Page</title>
 				<graphic fileref="../images/SettingsDialog3.png"/>
 			</figure>
@@ -593,7 +594,7 @@
 		</para>
 		<important>
 			<para>
-				If you have problems entering/storing data please see <xref linkend="tgit-dug-settings-hierachical"/>.
+				If you have problems entering/storing data please see <xref linkend="tgit-dug-settings-hierarchical"/>.
 			</para>
 		</important>
 		<variablelist>

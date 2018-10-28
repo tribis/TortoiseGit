@@ -1,6 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2011,2015 - Sven Strickroth <email@cs-ware.de>
+// Copyright (C) 2011, 2015-2017 - TortoiseGit
+// Copyright (C) 2011,2015-2016 - Sven Strickroth <email@cs-ware.de>
 
 //based on:
 // Copyright (C) 2003-2006,2008 - Stefan Kueng
@@ -33,14 +34,17 @@ static char THIS_FILE[]=__FILE__;
 IMPLEMENT_DYNCREATE(CMenuButton, CMFCMenuButton)
 
 CMenuButton::CMenuButton(void) : CMFCMenuButton()
-	, m_nDefault(-1)
+	, m_nDefault(0)
 	, m_bMarkDefault(TRUE)
+	, m_bShowCurrentItem(true)
 	, m_bRealMenuIsActive(false)
+	, m_bAlwaysShowArrow(false)
 {
 	m_bOSMenu = TRUE;
 	m_bDefaultClick = TRUE;
 	m_bTransparent = TRUE;
 	m_bMenuIsActive = TRUE;
+	m_bStayPressed = TRUE;
 
 	m_btnMenu.CreatePopupMenu();
 	m_hMenu = m_btnMenu.GetSafeHmenu();
@@ -52,7 +56,7 @@ CMenuButton::~CMenuButton(void)
 
 bool CMenuButton::SetCurrentEntry(INT_PTR entry)
 {
-	if (entry < 0 || entry >= m_sEntries.GetCount())
+	if (entry < 0 || entry >= m_sEntries.GetCount() || !m_bShowCurrentItem)
 		return false;
 
 	m_nDefault = entry + 1;
@@ -68,26 +72,14 @@ void CMenuButton::RemoveAll()
 	for (int index = 0; index < m_sEntries.GetCount(); index++)
 		m_btnMenu.RemoveMenu(0, MF_BYPOSITION);
 	m_sEntries.RemoveAll();
-	m_nDefault = m_nMenuResult = -1;
+	m_nDefault = m_nMenuResult = 0;
 	m_bMenuIsActive = TRUE;
 }
 
-INT_PTR CMenuButton::AddEntry(UINT iconId, const CString& sEntry)
+INT_PTR CMenuButton::AddEntry(const CString& sEntry, UINT uIcon /*= 0U*/)
 {
 	INT_PTR ret = m_sEntries.Add(sEntry);
-	m_btnMenu.AppendMenuIcon(m_sEntries.GetCount(), sEntry, iconId);
-	if (m_sEntries.GetCount() == 2)
-		m_bMenuIsActive = FALSE;
-
-	if (ret == 0)
-		SetCurrentEntry(ret);
-	return ret;
-}
-
-INT_PTR CMenuButton::AddEntry(const CString& sEntry)
-{
-	INT_PTR ret = m_sEntries.Add(sEntry);
-	m_btnMenu.AppendMenuIcon(m_sEntries.GetCount(), sEntry);
+	m_btnMenu.AppendMenuIcon(m_sEntries.GetCount(), sEntry, uIcon);
 	if (m_sEntries.GetCount() == 2)
 		m_bMenuIsActive = FALSE;
 
@@ -134,6 +126,8 @@ void CMenuButton::FixFont()
 BEGIN_MESSAGE_MAP(CMenuButton, CMFCMenuButton)
 	ON_WM_DESTROY()
 	ON_CONTROL_REFLECT_EX(BN_CLICKED, &CMenuButton::OnClicked)
+	ON_WM_SYSCOLORCHANGE()
+	ON_WM_THEMECHANGED()
 END_MESSAGE_MAP()
 
 
@@ -176,7 +170,7 @@ void CMenuButton::OnDestroy()
 
 void CMenuButton::OnDraw(CDC* pDC, const CRect& rect, UINT uiState)
 {
-	if (m_bMenuIsActive && !m_bRealMenuIsActive)
+	if (m_bMenuIsActive && !m_bRealMenuIsActive && !m_bAlwaysShowArrow)
 		CMFCButton::OnDraw(pDC, rect, uiState);
 	else
 		CMFCMenuButton::OnDraw(pDC, rect, uiState);
@@ -188,6 +182,89 @@ void CMenuButton::OnDraw(CDC* pDC, const CRect& rect, UINT uiState)
 void CMenuButton::OnShowMenu()
 {
 	m_bRealMenuIsActive = true;
-	CMFCMenuButton::OnShowMenu();
+
+	// Begin CMFCMenuButton::OnShowMenu()
+	if (m_hMenu == NULL || m_bMenuIsActive)
+	{
+		return;
+	}
+
+	CRect rectWindow;
+	GetWindowRect(rectWindow);
+
+	int x, y;
+
+	if (m_bRightArrow)
+	{
+		x = rectWindow.right;
+		y = rectWindow.top;
+	}
+	else
+	{
+		x = rectWindow.left;
+		y = rectWindow.bottom;
+	}
+
+	if (m_bStayPressed)
+	{
+		m_bPushed = TRUE;
+		m_bHighlighted = TRUE;
+	}
+
+	m_bMenuIsActive = TRUE;
+	Invalidate();
+
+	TPMPARAMS params;
+	params.cbSize = sizeof(TPMPARAMS);
+	params.rcExclude = rectWindow;
+	m_nMenuResult = ::TrackPopupMenuEx(m_hMenu, TPM_LEFTALIGN | TPM_LEFTBUTTON | TPM_NONOTIFY | TPM_RETURNCMD | TPM_VERTICAL, x, y, GetSafeHwnd(), &params);
+
+	CWnd* pParent = GetParent();
+
+#ifdef _DEBUG
+	if ((pParent->IsKindOf(RUNTIME_CLASS(CDialog))) && (!pParent->IsKindOf(RUNTIME_CLASS(CDialogEx))))
+	{
+		TRACE(_T("CMFCMenuButton parent is CDialog, should be CDialogEx for popup menu handling to work correctly.\n"));
+	}
+#endif
+
+	if (m_nMenuResult != 0)
+	{
+		//-------------------------------------------------------
+		// Trigger mouse up event(to button click notification):
+		//-------------------------------------------------------
+		if (pParent != NULL)
+		{
+			pParent->SendMessage(WM_COMMAND, MAKEWPARAM(GetDlgCtrlID(), BN_CLICKED), (LPARAM)m_hWnd);
+		}
+	}
+
+	m_bPushed = FALSE;
+	m_bHighlighted = FALSE;
+	m_bMenuIsActive = FALSE;
+
+	Invalidate();
+	UpdateWindow();
+
+	if (m_bCaptured)
+	{
+		ReleaseCapture();
+		m_bCaptured = FALSE;
+	}
+	// End CMFCMenuButton::OnShowMenu()
+
 	m_bRealMenuIsActive = false;
+}
+
+LRESULT CMenuButton::OnThemeChanged()
+{
+	CMFCVisualManager::GetInstance()->DestroyInstance();
+	m_Font.DeleteObject();
+	return 0L;
+}
+
+void CMenuButton::OnSysColorChange()
+{
+	__super::OnSysColorChange();
+	GetGlobalData()->UpdateSysColors();
 }

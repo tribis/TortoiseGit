@@ -27,12 +27,11 @@
 
 IMPLEMENT_DYNAMIC(CIgnoreDlg, CStateStandAloneDialog)
 
-CIgnoreDlg::CIgnoreDlg(CWnd* pParent /*=NULL*/)
+CIgnoreDlg::CIgnoreDlg(CWnd* pParent /*=nullptr*/)
 	: CStateStandAloneDialog(CIgnoreDlg::IDD, pParent)
 	, m_IgnoreType(0)
 	, m_IgnoreFile(1)
 {
-
 }
 
 CIgnoreDlg::~CIgnoreDlg()
@@ -65,7 +64,7 @@ BOOL CIgnoreDlg::OnInitDialog()
 	AdjustControlSize(IDC_RADIO_IGNORETYPE_ONLYINFOLDER);
 	AdjustControlSize(IDC_RADIO_IGNORETYPE_RECURSIVELY);
 
-	EnableSaveRestore(_T("IgnoreDlg"));
+	EnableSaveRestore(L"IgnoreDlg");
 
 	return TRUE;
 }

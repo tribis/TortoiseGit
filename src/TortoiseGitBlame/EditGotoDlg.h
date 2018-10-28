@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2011 - TortoiseGit
+// Copyright (C) 2008-2011, 2016-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -27,14 +27,14 @@ class CEditGotoDlg : public CDialog
 	DECLARE_DYNAMIC(CEditGotoDlg)
 
 public:
-	CEditGotoDlg(CWnd* pParent = NULL);   // standard constructor
+	CEditGotoDlg(CWnd* pParent = nullptr);   // standard constructor
 	virtual ~CEditGotoDlg();
 
 // Dialog Data
 	enum { IDD = IDD_GOTODLG };
 
 protected:
-	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
+	virtual void DoDataExchange(CDataExchange* pDX) override;    // DDX/DDV support
 
 	DECLARE_MESSAGE_MAP()
 public:

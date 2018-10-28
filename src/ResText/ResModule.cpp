@@ -1,7 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2015 - TortoiseGit
-// Copyright (C) 2003-2008, 2010-2015 - TortoiseSVN
+// Copyright (C) 2015-2017 - TortoiseGit
+// Copyright (C) 2003-2008, 2010-2017 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -28,6 +28,14 @@
 #include <functional>
 #include <locale>
 #include <codecvt>
+
+#pragma warning(push)
+#pragma warning(disable: 4091) // 'typedef ': ignored on left of '' when no variable is declared
+#include <Imagehlp.h>
+#pragma warning(pop)
+
+#pragma comment(lib, "Imagehlp.lib")
+
 #ifndef RT_RIBBON
 #define RT_RIBBON MAKEINTRESOURCE(28)
 #endif
@@ -61,8 +69,8 @@ CResModule::CResModule(void)
 	, m_bTranslatedRibbonTexts(0)
 	, m_bDefaultRibbonTexts(0)
 	, m_wTargetLang(0)
-	, m_hResDll(NULL)
-	, m_hUpdateRes(NULL)
+	, m_hResDll(nullptr)
+	, m_hUpdateRes(nullptr)
 	, m_bQuiet(false)
 	, m_bRTL(false)
 	, m_bAdjustEOLs(false)
@@ -73,7 +81,7 @@ CResModule::~CResModule(void)
 {
 }
 
-BOOL CResModule::ExtractResources(std::vector<std::wstring> filelist, LPCTSTR lpszPOFilePath, BOOL bNoUpdate, LPCTSTR lpszHeaderFile)
+BOOL CResModule::ExtractResources(const std::vector<std::wstring>& filelist, LPCTSTR lpszPOFilePath, BOOL bNoUpdate, LPCTSTR lpszHeaderFile)
 {
 	for (auto I = filelist.cbegin(); I != filelist.cend(); ++I)
 	{
@@ -91,8 +99,8 @@ BOOL CResModule::ExtractResources(std::vector<std::wstring> filelist, LPCTSTR lp
 			ScanHeaderFile(headerfile);
 			starpos = starposnext;
 		}
-		m_hResDll = LoadLibraryEx(filepath.c_str(), NULL, LOAD_LIBRARY_AS_IMAGE_RESOURCE | LOAD_LIBRARY_AS_DATAFILE);
-		if (m_hResDll == NULL)
+		m_hResDll = LoadLibraryEx(filepath.c_str(), nullptr, LOAD_LIBRARY_AS_IMAGE_RESOURCE | LOAD_LIBRARY_AS_DATAFILE);
+		if (!m_hResDll)
 			MYERROR;
 
 		size_t nEntries = m_StringEntries.size();
@@ -144,8 +152,8 @@ BOOL CResModule::ExtractResources(std::vector<std::wstring> filelist, LPCTSTR lp
 
 BOOL CResModule::ExtractResources(LPCTSTR lpszSrcLangDllPath, LPCTSTR lpszPoFilePath, BOOL bNoUpdate, LPCTSTR lpszHeaderFile)
 {
-	m_hResDll = LoadLibraryEx(lpszSrcLangDllPath, NULL, LOAD_LIBRARY_AS_IMAGE_RESOURCE|LOAD_LIBRARY_AS_DATAFILE);
-	if (m_hResDll == NULL)
+	m_hResDll = LoadLibraryEx(lpszSrcLangDllPath, nullptr, LOAD_LIBRARY_AS_IMAGE_RESOURCE | LOAD_LIBRARY_AS_DATAFILE);
+	if (!m_hResDll)
 		MYERROR;
 
 	size_t nEntries = 0;
@@ -188,6 +196,9 @@ BOOL CResModule::ExtractResources(LPCTSTR lpszSrcLangDllPath, LPCTSTR lpszPoFile
 		goto DONE_ERROR;
 
 	FreeLibrary(m_hResDll);
+
+	AdjustCheckSum(sDestFile);
+
 	return TRUE;
 
 DONE_ERROR:
@@ -196,21 +207,45 @@ DONE_ERROR:
 	return FALSE;
 }
 
+void CResModule::RemoveSignatures(LPCTSTR lpszDestLangDllPath)
+{
+	// Remove any signatures in the file:
+	// if we don't remove it here, the signature will be invalid after
+	// we modify this file, and the signtool.exe will throw an error and refuse to sign it again.
+	auto hFile = CreateFile(lpszDestLangDllPath, FILE_READ_DATA | FILE_WRITE_DATA, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+	if (hFile == INVALID_HANDLE_VALUE)
+	{
+		CUtils::Error();
+		return;
+	}
+
+	DWORD certcount = 0;
+	DWORD indices[100];
+	ImageEnumerateCertificates(hFile, CERT_SECTION_TYPE_ANY, &certcount, indices, _countof(indices));
+
+	for (DWORD i = 0; i < certcount; ++i)
+		ImageRemoveCertificate(hFile, i);
+
+	CloseHandle(hFile);
+}
+
 BOOL CResModule::CreateTranslatedResources(LPCTSTR lpszSrcLangDllPath, LPCTSTR lpszDestLangDllPath, LPCTSTR lpszPOFilePath)
 {
 	if (!CopyFile(lpszSrcLangDllPath, lpszDestLangDllPath, FALSE))
 		MYERROR;
 
+	RemoveSignatures(lpszDestLangDllPath);
+
 	int count = 0;
 	do
 	{
-		m_hResDll = LoadLibraryEx(lpszSrcLangDllPath, NULL, LOAD_LIBRARY_AS_DATAFILE_EXCLUSIVE|LOAD_LIBRARY_AS_IMAGE_RESOURCE|LOAD_IGNORE_CODE_AUTHZ_LEVEL);
-		if (m_hResDll == NULL)
+		m_hResDll = LoadLibraryEx(lpszSrcLangDllPath, nullptr, LOAD_LIBRARY_AS_DATAFILE_EXCLUSIVE | LOAD_LIBRARY_AS_IMAGE_RESOURCE | LOAD_IGNORE_CODE_AUTHZ_LEVEL);
+		if (!m_hResDll)
 			Sleep(100);
 		count++;
-	} while ((m_hResDll == NULL)&&(count < 10));
+	} while (!m_hResDll && (count < 10));
 
-	if (m_hResDll == NULL)
+	if (!m_hResDll)
 		MYERROR;
 
 	sDestFile = std::wstring(lpszDestLangDllPath);
@@ -232,12 +267,12 @@ BOOL CResModule::CreateTranslatedResources(LPCTSTR lpszSrcLangDllPath, LPCTSTR l
 	do
 	{
 		m_hUpdateRes = BeginUpdateResource(sDestFile.c_str(), FALSE);
-		if (m_hUpdateRes == NULL)
+		if (!m_hUpdateRes)
 			Sleep(100);
 		count++;
-	} while ((m_hUpdateRes == NULL)&&(count < 10));
+	} while (!m_hUpdateRes && (count < 10));
 
-	if (m_hUpdateRes == NULL)
+	if (!m_hUpdateRes)
 		MYERROR;
 
 
@@ -296,7 +331,7 @@ BOOL CResModule::ExtractString(LPCTSTR lpszType)
 		goto DONE_ERROR;
 	p = (LPWSTR)LockResource(hglStringTable);
 
-	if (p == NULL)
+	if (!p)
 		goto DONE_ERROR;
 	/*  [Block of 16 strings.  The strings are Pascal style with a WORD
 	length preceding the string.  16 strings are always written, even
@@ -316,7 +351,7 @@ BOOL CResModule::ExtractString(LPCTSTR lpszType)
 		wcscpy(pBuf, msgid.c_str());
 		CUtils::StringExtend(pBuf);
 
-		if (wcslen(pBuf))
+		if (pBuf[0])
 		{
 			std::wstring str = std::wstring(pBuf);
 			RESOURCEENTRY entry = m_StringEntries[str];
@@ -351,7 +386,7 @@ BOOL CResModule::ReplaceString(LPCTSTR lpszType, WORD wLanguage)
 		goto DONE_ERROR;
 	p = (LPWSTR)LockResource(hglStringTable);
 
-	if (p == NULL)
+	if (!p)
 		goto DONE_ERROR;
 /*  [Block of 16 strings.  The strings are Pascal style with a WORD
 	length preceding the string.  16 strings are always written, even
@@ -376,7 +411,8 @@ BOOL CResModule::ReplaceString(LPCTSTR lpszType, WORD wLanguage)
 
 		RESOURCEENTRY resEntry;
 		resEntry = m_StringEntries[msgid];
-		wcscpy(pBuf, resEntry.msgstr.c_str());
+		wcscpy(pBuf, resEntry.msgstr.empty() ? msgid.c_str() : resEntry.msgstr.c_str());
+		ReplaceWithRegex(pBuf);
 		CUtils::StringCollapse(pBuf);
 		size_t newlen = wcslen(pBuf);
 		if (newlen)
@@ -404,7 +440,8 @@ BOOL CResModule::ReplaceString(LPCTSTR lpszType, WORD wLanguage)
 
 		RESOURCEENTRY resEntry;
 		resEntry = m_StringEntries[msgid];
-		wcscpy(pBuf, resEntry.msgstr.c_str());
+		wcscpy(pBuf, resEntry.msgstr.empty() ? msgid.c_str() : resEntry.msgstr.c_str());
+		ReplaceWithRegex(pBuf);
 		CUtils::StringCollapse(pBuf);
 		size_t newlen = wcslen(pBuf);
 		if (newlen)
@@ -433,7 +470,7 @@ BOOL CResModule::ReplaceString(LPCTSTR lpszType, WORD wLanguage)
 		goto DONE_ERROR;
 	}
 
-	if ((m_wTargetLang)&&(!UpdateResource(m_hUpdateRes, RT_STRING, lpszType, wLanguage, NULL, 0)))
+	if (m_wTargetLang && (!UpdateResource(m_hUpdateRes, RT_STRING, lpszType, wLanguage, nullptr, 0)))
 	{
 		delete [] newTable;
 		goto DONE_ERROR;
@@ -465,7 +502,7 @@ BOOL CResModule::ExtractMenu(LPCTSTR lpszType)
 
 	p = (const WORD*)LockResource(hglMenuTemplate);
 
-	if (p == NULL)
+	if (!p)
 		MYERROR;
 
 	// Standard MENU resource
@@ -537,7 +574,7 @@ BOOL CResModule::ReplaceMenu(LPCTSTR lpszType, WORD wLanguage)
 
 	p = (LPWSTR)LockResource(hglMenuTemplate);
 
-	if (p == NULL)
+	if (!p)
 		MYERROR;
 
 	//struct MenuHeader {
@@ -564,7 +601,7 @@ BOOL CResModule::ReplaceMenu(LPCTSTR lpszType, WORD wLanguage)
 			p += offset;
 			p++;
 			size_t nMem = 0;
-			if (!CountMemReplaceMenuResource((WORD *)p, &nMem, NULL))
+			if (!CountMemReplaceMenuResource((WORD*)p, &nMem, nullptr))
 				goto DONE_ERROR;
 			WORD * newMenu = new WORD[nMem + (nMem % 2)+2];
 			SecureZeroMemory(newMenu, (nMem + (nMem % 2)+2)*2);
@@ -581,7 +618,7 @@ BOOL CResModule::ReplaceMenu(LPCTSTR lpszType, WORD wLanguage)
 				goto DONE_ERROR;
 			}
 
-			if ((m_wTargetLang)&&(!UpdateResource(m_hUpdateRes, RT_MENU, lpszType, wLanguage, NULL, 0)))
+			if (m_wTargetLang && (!UpdateResource(m_hUpdateRes, RT_MENU, lpszType, wLanguage, nullptr, 0)))
 			{
 				delete [] newMenu;
 				goto DONE_ERROR;
@@ -595,7 +632,7 @@ BOOL CResModule::ReplaceMenu(LPCTSTR lpszType, WORD wLanguage)
 			p++;
 			//dwHelpId = GET_DWORD(p);
 			size_t nMem = 0;
-			if (!CountMemReplaceMenuExResource((WORD *)(p0 + offset), &nMem, NULL))
+			if (!CountMemReplaceMenuExResource((WORD*)(p0 + offset), &nMem, nullptr))
 				goto DONE_ERROR;
 			WORD * newMenu = new WORD[nMem + (nMem % 2) + 4];
 			SecureZeroMemory(newMenu, (nMem + (nMem % 2) + 4) * 2);
@@ -613,7 +650,7 @@ BOOL CResModule::ReplaceMenu(LPCTSTR lpszType, WORD wLanguage)
 				goto DONE_ERROR;
 			}
 
-			if ((m_wTargetLang)&&(!UpdateResource(m_hUpdateRes, RT_MENU, lpszType, wLanguage, NULL, 0)))
+			if (m_wTargetLang && (!UpdateResource(m_hUpdateRes, RT_MENU, lpszType, wLanguage, nullptr, 0)))
 			{
 				delete [] newMenu;
 				goto DONE_ERROR;
@@ -682,7 +719,7 @@ const WORD* CResModule::ParseMenuResource(const WORD * res)
 			delete [] pBuf;
 
 			if ((res = ParseMenuResource(res))==0)
-				return NULL;
+				return nullptr;
 		}
 		else if (id != 0)
 		{
@@ -729,7 +766,7 @@ const WORD* CResModule::CountMemReplaceMenuResource(const WORD * res, size_t * w
 	{
 		flags = GET_WORD(res);
 		res++;
-		if (newMenu == NULL)
+		if (!newMenu)
 			(*wordcount)++;
 		else
 			newMenu[(*wordcount)++] = flags;
@@ -737,7 +774,7 @@ const WORD* CResModule::CountMemReplaceMenuResource(const WORD * res, size_t * w
 		{
 			id = GET_WORD(res); //normal menu item
 			res++;
-			if (newMenu == NULL)
+			if (!newMenu)
 				(*wordcount)++;
 			else
 				newMenu[(*wordcount)++] = id;
@@ -751,7 +788,7 @@ const WORD* CResModule::CountMemReplaceMenuResource(const WORD * res, size_t * w
 			res += wcslen((LPCWSTR)res) + 1;
 
 			if ((res = CountMemReplaceMenuResource(res, wordcount, newMenu))==0)
-				return NULL;
+				return nullptr;
 		}
 		else if (id != 0)
 		{
@@ -829,7 +866,7 @@ const WORD* CResModule::ParseMenuExResource(const WORD * res)
 			delete [] pBuf;
 
 			if ((res = ParseMenuExResource(res)) == 0)
-				return NULL;
+				return nullptr;
 		} else if (menuId != 0)
 		{
 			TCHAR * pBuf = new TCHAR[MAX_STRING_LENGTH];
@@ -880,9 +917,9 @@ const WORD* CResModule::CountMemReplaceMenuExResource(const WORD * res, size_t *
 		bResInfo = GET_WORD(res);
 		res++;
 
-		if (newMenu != NULL) {
+		if (newMenu)
 			CopyMemory(&newMenu[*wordcount], p0, 7 * sizeof(WORD));
-		}
+
 		(*wordcount) += 7;
 
 		if (dwType & MFT_SEPARATOR) {
@@ -901,14 +938,14 @@ const WORD* CResModule::CountMemReplaceMenuExResource(const WORD * res, size_t *
 			if ((*wordcount) & 0x01)
 				(*wordcount)++;
 
-			if (newMenu != NULL)
+			if (newMenu)
 				CopyMemory(&newMenu[*wordcount], res, sizeof(DWORD));  // Copy Help ID
 
 			res += 2;
 			(*wordcount) += 2;
 
 			if ((res = CountMemReplaceMenuExResource(res, wordcount, newMenu)) == 0)
-				return NULL;
+				return nullptr;
 		}
 		else if (menuId != 0)
 		{
@@ -948,7 +985,7 @@ BOOL CResModule::ExtractAccelerator(LPCTSTR lpszType)
 
 	p = (const WORD*)LockResource(hglAccTable);
 
-	if (p == NULL)
+	if (!p)
 		MYERROR;
 
 	/*
@@ -1034,7 +1071,7 @@ BOOL CResModule::ExtractAccelerator(LPCTSTR lpszType)
 
 		TCHAR szTempBuf[1024] = { 0 };
 		SecureZeroMemory(szTempBuf, sizeof (szTempBuf));
-		std::wstring wmenu = L"";
+		std::wstring wmenu;
 		pME_iter = m_MenuEntries.find(wID);
 		if (pME_iter != m_MenuEntries.end())
 		{
@@ -1067,14 +1104,14 @@ BOOL CResModule::ReplaceAccelerator(LPCTSTR lpszType, WORD wLanguage)
 
 	haccelOld = LoadAccelerators(m_hResDll, lpszType);
 
-	if (haccelOld == NULL)
+	if (!haccelOld)
 		MYERROR;
 
-	cAccelerators = CopyAcceleratorTable(haccelOld, NULL, 0);
+	cAccelerators = CopyAcceleratorTable(haccelOld, nullptr, 0);
 
 	lpaccelNew = (LPACCEL) LocalAlloc(LPTR, cAccelerators * sizeof(ACCEL));
 
-	if (lpaccelNew == NULL)
+	if (!lpaccelNew)
 		MYERROR;
 
 	CopyAcceleratorTable(haccelOld, lpaccelNew, cAccelerators);
@@ -1152,7 +1189,7 @@ BOOL CResModule::ReplaceAccelerator(LPCTSTR lpszType, WORD wLanguage)
 				continue;   // not a space - user must have made a mistake when translating
 			if (wtemp.compare(4, 1, L"+") == 0)
 			{
-				_stscanf(wtemp.substr(5, 1).c_str(), L"%c", &xkey);
+				swscanf(wtemp.substr(5, 1).c_str(), L"%c", &xkey);
 				lpaccelNew[i].fVirt = xfVirt;
 				lpaccelNew[i].key = (DWORD)xkey;
 			}
@@ -1164,7 +1201,7 @@ BOOL CResModule::ReplaceAccelerator(LPCTSTR lpszType, WORD wLanguage)
 
 	// Create the new accelerator table
 	hglAccTableNew = LocalAlloc(LPTR, cAccelerators * 4 * sizeof(WORD));
-	if (hglAccTableNew == NULL)
+	if (!hglAccTableNew)
 		goto DONE_ERROR;
 	p = (WORD *)hglAccTableNew;
 	lpaccelNew[cAccelerators-1].fVirt |= 0x80;
@@ -1185,7 +1222,7 @@ BOOL CResModule::ReplaceAccelerator(LPCTSTR lpszType, WORD wLanguage)
 		goto DONE_ERROR;
 	}
 
-	if ((m_wTargetLang)&&(!UpdateResource(m_hUpdateRes, RT_ACCELERATOR, lpszType, wLanguage, NULL, 0)))
+	if (m_wTargetLang && (!UpdateResource(m_hUpdateRes, RT_ACCELERATOR, lpszType, wLanguage, nullptr, 0)))
 	{
 		goto DONE_ERROR;
 	}
@@ -1212,16 +1249,16 @@ BOOL CResModule::ExtractDialog(LPCTSTR lpszType)
 
 	hrsrc = FindResource(m_hResDll, lpszType, RT_DIALOG);
 
-	if (hrsrc == NULL)
+	if (!hrsrc)
 		MYERROR;
 
 	hGlblDlgTemplate = LoadResource(m_hResDll, hrsrc);
-	if (hGlblDlgTemplate == NULL)
+	if (!hGlblDlgTemplate)
 		MYERROR;
 
 	lpDlg = (const WORD*) LockResource(hGlblDlgTemplate);
 
-	if (lpDlg == NULL)
+	if (!lpDlg)
 		MYERROR;
 
 	lpDlgItem = (const WORD*) GetDialogInfo(lpDlg, &dlg);
@@ -1253,7 +1290,7 @@ BOOL CResModule::ExtractDialog(LPCTSTR lpszType)
 		if (bCode == FALSE)
 			wcsncpy(szTitle, dlgItem.windowName, _countof(szTitle) - 1);
 
-		if (wcslen(szTitle) > 0)
+		if (szTitle[0])
 		{
 			CUtils::StringExtend(szTitle);
 
@@ -1278,22 +1315,22 @@ BOOL CResModule::ReplaceDialog(LPCTSTR lpszType, WORD wLanguage)
 
 	hrsrc = FindResourceEx(m_hResDll, RT_DIALOG, lpszType, wLanguage);
 
-	if (hrsrc == NULL)
+	if (!hrsrc)
 		MYERROR;
 
 	hGlblDlgTemplate = LoadResource(m_hResDll, hrsrc);
 
-	if (hGlblDlgTemplate == NULL)
+	if (!hGlblDlgTemplate)
 		MYERROR;
 
 	lpDlg = (WORD *) LockResource(hGlblDlgTemplate);
 
-	if (lpDlg == NULL)
+	if (!lpDlg)
 		MYERROR;
 
 	size_t nMem = 0;
 	const WORD * p = lpDlg;
-	if (!CountMemReplaceDialogResource(p, &nMem, NULL))
+	if (!CountMemReplaceDialogResource(p, &nMem, nullptr))
 		goto DONE_ERROR;
 	WORD * newDialog = new WORD[nMem + (nMem % 2)];
 	SecureZeroMemory(newDialog, (nMem + (nMem % 2))*2);
@@ -1311,7 +1348,7 @@ BOOL CResModule::ReplaceDialog(LPCTSTR lpszType, WORD wLanguage)
 		goto DONE_ERROR;
 	}
 
-	if ((m_wTargetLang)&&(!UpdateResource(m_hUpdateRes, RT_DIALOG, lpszType, wLanguage, NULL, 0)))
+	if (m_wTargetLang && (!UpdateResource(m_hUpdateRes, RT_DIALOG, lpszType, wLanguage, nullptr, 0)))
 	{
 		delete [] newDialog;
 		goto DONE_ERROR;
@@ -1373,7 +1410,7 @@ const WORD* CResModule::GetDialogInfo(const WORD * pTemplate, LPDIALOGINFO lpDlg
 	switch (GET_WORD(p))
 	{
 	case 0x0000:
-		lpDlgInfo->menuName = NULL;
+		lpDlgInfo->menuName = nullptr;
 		p++;
 		break;
 	case 0xffff:
@@ -1513,7 +1550,7 @@ const WORD* CResModule::GetControlInfo(const WORD* p, LPDLGITEMINFO lpDlgItemInf
 		p += GET_WORD(p) / sizeof(WORD);
 	}
 	else
-		lpDlgItemInfo->data = NULL;
+		lpDlgItemInfo->data = nullptr;
 
 	p++;
 	// Next control is on DWORD boundary
@@ -1863,7 +1900,7 @@ BOOL CResModule::ExtractRibbon(LPCTSTR lpszType)
 
 	p = (const BYTE*)LockResource(hglRibbonTemplate);
 
-	if (p == NULL)
+	if (!p)
 		MYERROR;
 
 	// Resource consists of one single string
@@ -1950,7 +1987,7 @@ BOOL CResModule::ReplaceRibbon(LPCTSTR lpszType, WORD wLanguage)
 
 	p = (const BYTE*)LockResource(hglRibbonTemplate);
 
-	if (p == NULL)
+	if (!p)
 		MYERROR;
 
 	std::string ss = std::string((const char*)p, sizeres);
@@ -1980,6 +2017,7 @@ BOOL CResModule::ReplaceRibbon(LPCTSTR lpszType, WORD wLanguage)
 			auto sbuf = std::make_unique<wchar_t[]>(entry.msgstr.size() + 10);
 			wcscpy(sbuf.get(), entry.msgstr.c_str());
 			CUtils::StringCollapse(sbuf.get());
+			ReplaceWithRegex(sbuf.get());
 			std::wstring sreplace = L"<TEXT>";
 			sreplace += sbuf.get();
 			sreplace += L"</TEXT>";
@@ -2008,6 +2046,7 @@ BOOL CResModule::ReplaceRibbon(LPCTSTR lpszType, WORD wLanguage)
 			auto sbuf = std::make_unique<wchar_t[]>(entry.msgstr.size() + 10);
 			wcscpy(sbuf.get(), entry.msgstr.c_str());
 			CUtils::StringCollapse(sbuf.get());
+			ReplaceWithRegex(sbuf.get());
 			std::wstring sreplace = L"</ELEMENT_NAME><NAME>";
 			sreplace += sbuf.get();
 			sreplace += L"</NAME>";
@@ -2019,7 +2058,7 @@ BOOL CResModule::ReplaceRibbon(LPCTSTR lpszType, WORD wLanguage)
 	}
 
 	auto buf = std::make_unique<char[]>(ssw.size() * 4 + 1);
-	int lengthIncTerminator = WideCharToMultiByte(CP_UTF8, 0, ssw.c_str(), -1, buf.get(), (int)len*4, NULL, NULL);
+	int lengthIncTerminator = WideCharToMultiByte(CP_UTF8, 0, ssw.c_str(), -1, buf.get(), (int)len * 4, nullptr, nullptr);
 
 
 	if (!UpdateResource(m_hUpdateRes, RT_RIBBON, lpszType, (m_wTargetLang ? m_wTargetLang : wLanguage), buf.get(), lengthIncTerminator-1))
@@ -2027,7 +2066,7 @@ BOOL CResModule::ReplaceRibbon(LPCTSTR lpszType, WORD wLanguage)
 		goto DONE_ERROR;
 	}
 
-	if ((m_wTargetLang)&&(!UpdateResource(m_hUpdateRes, RT_RIBBON, lpszType, wLanguage, NULL, 0)))
+	if (m_wTargetLang && (!UpdateResource(m_hUpdateRes, RT_RIBBON, lpszType, wLanguage, nullptr, 0)))
 	{
 		goto DONE_ERROR;
 	}
@@ -2043,9 +2082,43 @@ DONE_ERROR:
 	MYERROR;
 }
 
+std::wstring CResModule::ReplaceWithRegex(WCHAR* pBuf)
+{
+	for (const auto& t : m_StringEntries.m_regexes)
+	{
+		try
+		{
+			std::wregex e(std::get<0>(t), std::regex_constants::icase);
+			auto replaced = std::regex_replace(pBuf, e, std::get<1>(t));
+			wcscpy(pBuf, replaced.c_str());
+		}
+		catch (std::exception&)
+		{
+		}
+	}
+	return pBuf;
+}
+
+std::wstring CResModule::ReplaceWithRegex(std::wstring& s)
+{
+	for (const auto& t : m_StringEntries.m_regexes)
+	{
+		try
+		{
+			std::wregex e(std::get<0>(t), std::regex_constants::icase);
+			auto replaced = std::regex_replace(s, e, std::get<1>(t));
+			s = replaced;
+		}
+		catch (std::exception&)
+		{
+		}
+	}
+	return s;
+}
+
 BOOL CALLBACK CResModule::EnumResNameCallback(HMODULE /*hModule*/, LPCTSTR lpszType, LPTSTR lpszName, LONG_PTR lParam)
 {
-	CResModule* lpResModule = (CResModule*)lParam;
+	auto lpResModule = reinterpret_cast<CResModule*>(lParam);
 
 	if (lpszType == RT_STRING)
 	{
@@ -2095,7 +2168,7 @@ BOOL CALLBACK CResModule::EnumResNameCallback(HMODULE /*hModule*/, LPCTSTR lpszT
 #pragma warning(disable: 4189)
 BOOL CALLBACK CResModule::EnumResNameWriteCallback(HMODULE hModule, LPCTSTR lpszType, LPTSTR lpszName, LONG_PTR lParam)
 {
-	CResModule* lpResModule = (CResModule*)lParam;
+	auto lpResModule = reinterpret_cast<CResModule*>(lParam);
 	return EnumResourceLanguages(hModule, lpszType, lpszName, (ENUMRESLANGPROC)&lpResModule->EnumResWriteLangCallback, lParam);
 }
 #pragma warning(pop)
@@ -2103,7 +2176,7 @@ BOOL CALLBACK CResModule::EnumResNameWriteCallback(HMODULE hModule, LPCTSTR lpsz
 BOOL CALLBACK CResModule::EnumResWriteLangCallback(HMODULE /*hModule*/, LPCTSTR lpszType, LPTSTR lpszName, WORD wLanguage, LONG_PTR lParam)
 {
 	BOOL bRes = FALSE;
-	CResModule* lpResModule = (CResModule*)lParam;
+	auto lpResModule = reinterpret_cast<CResModule*>(lParam);
 
 	if (lpszType == RT_STRING)
 	{
@@ -2138,10 +2211,12 @@ void CResModule::ReplaceStr(LPCWSTR src, WORD * dest, size_t * count, int * tran
 	CUtils::StringExtend(pBuf);
 
 	std::wstring wstr = std::wstring(pBuf);
+	ReplaceWithRegex(pBuf);
 	RESOURCEENTRY entry = m_StringEntries[wstr];
 	if (!entry.msgstr.empty())
 	{
 		wcscpy(pBuf, entry.msgstr.c_str());
+		ReplaceWithRegex(pBuf);
 		CUtils::StringCollapse(pBuf);
 		if (dest)
 			wcscpy((wchar_t *)&dest[(*count)], pBuf);
@@ -2150,13 +2225,33 @@ void CResModule::ReplaceStr(LPCWSTR src, WORD * dest, size_t * count, int * tran
 	}
 	else
 	{
-		if (dest)
-			wcscpy((wchar_t *)&dest[(*count)], src);
-		(*count) += wcslen(src) + 1;
-		if (wcslen(src))
-			(*def)++;
+		if (wcscmp(pBuf, wstr.c_str()))
+		{
+			if (dest)
+				wcscpy((wchar_t*)&dest[(*count)], pBuf);
+			(*count) += wcslen(pBuf) + 1;
+			(*translated)++;
+		}
+		else
+		{
+			if (dest)
+				wcscpy((wchar_t*)&dest[(*count)], src);
+			(*count) += wcslen(src) + 1;
+			if (wcslen(src))
+				(*def)++;
+		}
 	}
 	delete [] pBuf;
+}
+
+static bool StartsWith(const std::string& heystacl, const char* needle)
+{
+	return heystacl.compare(0, strlen(needle), needle) == 0;
+}
+
+static bool StartsWith(const std::wstring& heystacl, const wchar_t* needle)
+{
+	return heystacl.compare(0, wcslen(needle), needle) == 0;
 }
 
 size_t CResModule::ScanHeaderFile(const std::wstring & filepath)
@@ -2164,9 +2259,9 @@ size_t CResModule::ScanHeaderFile(const std::wstring & filepath)
 	size_t count = 0;
 
 	// open the file and read the contents
-	DWORD reqLen = GetFullPathName(filepath.c_str(), 0, NULL, NULL);
+	DWORD reqLen = GetFullPathName(filepath.c_str(), 0, nullptr, nullptr);
 	auto wcfullPath = std::make_unique<TCHAR[]>(reqLen + 1);
-	GetFullPathName(filepath.c_str(), reqLen, wcfullPath.get(), NULL);
+	GetFullPathName(filepath.c_str(), reqLen, wcfullPath.get(), nullptr);
 	std::wstring fullpath = wcfullPath.get();
 
 
@@ -2191,19 +2286,29 @@ size_t CResModule::ScanHeaderFile(const std::wstring & filepath)
 						value = std::stoul(text.substr(spacepos), nullptr, 16);
 					text = text.substr(0, spacepos);
 					trim(text);
-					if (text.find("IDS_") == 0)
+					if (StartsWith(text, "IDS_") || StartsWith(text, "AFX_IDS_") || StartsWith(text, "AFX_IDP_"))
 					{
 						m_currentHeaderDataStrings[value] = CUnicodeUtils::StdGetUnicode(text);
 						++count;
 					}
-					else if (text.find("IDD_") == 0)
+					else if (StartsWith(text, "IDD_") || StartsWith(text, "AFX_IDD_"))
 					{
 						m_currentHeaderDataDialogs[value] = CUnicodeUtils::StdGetUnicode(text);
 						++count;
 					}
-					else if (text.find("ID_") == 0)
+					else if (StartsWith(text, "ID_") || StartsWith(text, "AFX_ID_"))
 					{
 						m_currentHeaderDataMenus[value] = CUnicodeUtils::StdGetUnicode(text);
+						++count;
+					}
+					else if (StartsWith(text, "cmd"))
+					{
+						m_currentHeaderDataStrings[value] = CUnicodeUtils::StdGetUnicode(text);
+						++count;
+					}
+					else if (text.find("_RESID") != std::string::npos)
+					{
+						m_currentHeaderDataStrings[value] = CUnicodeUtils::StdGetUnicode(text);
 						++count;
 					}
 				}
@@ -2237,19 +2342,29 @@ size_t CResModule::ScanHeaderFile(const std::wstring & filepath)
 						value = std::stoul(text.substr(spacepos), nullptr, 16);
 					text = text.substr(0, spacepos);
 					trim(text);
-					if (text.find(L"IDS_") == 0)
+					if (StartsWith(text, L"IDS_") || StartsWith(text, L"AFX_IDS_") || StartsWith(text, L"AFX_IDP_"))
 					{
 						m_currentHeaderDataStrings[value] = text;
 						++count;
 					}
-					else if (text.find(L"IDD_") == 0)
+					else if (StartsWith(text, L"IDD_") || StartsWith(text, L"AFX_IDD_"))
 					{
 						m_currentHeaderDataDialogs[value] = text;
 						++count;
 					}
-					else if (text.find(L"ID_") == 0)
+					else if (StartsWith(text, L"ID_") || StartsWith(text, L"AFX_ID_"))
 					{
 						m_currentHeaderDataMenus[value] = text;
+						++count;
+					}
+					else if (StartsWith(text, L"cmd"))
+					{
+						m_currentHeaderDataStrings[value] = text;
+						++count;
+					}
+					else if (text.find(L"_RESID") != std::string::npos)
+					{
+						m_currentHeaderDataStrings[value] = text;
 						++count;
 					}
 				}
@@ -2290,4 +2405,62 @@ void CResModule::InsertResourceIDs(LPCWSTR lpType, INT_PTR mainId, RESOURCEENTRY
 			entry.resourceIDs.insert(infotext);
 	else
 		entry.resourceIDs.insert(NumToStr(id) + infotext);
+}
+
+bool CResModule::AdjustCheckSum(const std::wstring& resFile)
+{
+	HANDLE hFile = INVALID_HANDLE_VALUE;
+	HANDLE hFileMapping = nullptr;
+	PVOID pBaseAddress = nullptr;
+
+	try
+	{
+		hFile = CreateFile(resFile.c_str(), FILE_READ_DATA | FILE_WRITE_DATA, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+		if (hFile == INVALID_HANDLE_VALUE)
+			throw GetLastError();
+
+		hFileMapping = CreateFileMapping(hFile, nullptr, PAGE_READWRITE, 0, 0, nullptr);
+		if (!hFileMapping)
+			throw GetLastError();
+
+		pBaseAddress = MapViewOfFile(hFileMapping, FILE_MAP_ALL_ACCESS, 0, 0, 0);
+		if (!pBaseAddress)
+			throw GetLastError();
+
+		auto fileSize = GetFileSize(hFile, nullptr);
+		if (fileSize == INVALID_FILE_SIZE)
+			throw GetLastError();
+		DWORD dwChecksum = 0;
+		DWORD dwHeaderSum = 0;
+		CheckSumMappedFile(pBaseAddress, fileSize, &dwHeaderSum, &dwChecksum);
+
+		PIMAGE_DOS_HEADER pDOSHeader = static_cast<PIMAGE_DOS_HEADER>(pBaseAddress);
+		if (pDOSHeader->e_magic != IMAGE_DOS_SIGNATURE)
+			throw GetLastError();
+
+		PIMAGE_NT_HEADERS pNTHeader = reinterpret_cast<PIMAGE_NT_HEADERS>((PBYTE)pBaseAddress + pDOSHeader->e_lfanew);
+		if (pNTHeader->Signature != IMAGE_NT_SIGNATURE)
+			throw GetLastError();
+
+		SetLastError(ERROR_SUCCESS);
+
+		DWORD* pChecksum = &(pNTHeader->OptionalHeader.CheckSum);
+		*pChecksum = dwChecksum;
+
+		UnmapViewOfFile(pBaseAddress);
+		CloseHandle(hFileMapping);
+		CloseHandle(hFile);
+	}
+	catch (...)
+	{
+		if (pBaseAddress)
+			UnmapViewOfFile(pBaseAddress);
+		if (hFileMapping)
+			CloseHandle(hFileMapping);
+		if (hFile != INVALID_HANDLE_VALUE)
+			CloseHandle(hFile);
+		return false;
+	}
+
+	return true;
 }

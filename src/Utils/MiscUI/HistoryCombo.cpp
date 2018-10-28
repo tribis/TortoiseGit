@@ -1,7 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
 // Copyright (C) 2003-2012 - TortoiseSVN
-// Copyright (C) 2013-2015 - TortoiseGit
+// Copyright (C) 2013-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -30,17 +30,17 @@
 int CHistoryCombo::m_nGitIconIndex = 0;
 
 CHistoryCombo::CHistoryCombo(BOOL bAllowSortStyle /*=FALSE*/ )
+	: m_nMaxHistoryItems ( MAX_HISTORY_ITEMS)
+	, m_bAllowSortStyle(bAllowSortStyle)
+	, m_bURLHistory(FALSE)
+	, m_bPathHistory(FALSE)
+	, m_hWndToolTip(nullptr)
+	, m_ttShown(FALSE)
+	, m_bDyn(FALSE)
+	, m_bWantReturn(FALSE)
+	, m_bTrim(TRUE)
+	, m_bCaseSensitive(FALSE)
 {
-	m_nMaxHistoryItems = MAX_HISTORY_ITEMS;
-	m_bAllowSortStyle = bAllowSortStyle;
-	m_bURLHistory = FALSE;
-	m_bPathHistory = FALSE;
-	m_hWndToolTip = NULL;
-	m_ttShown = FALSE;
-	m_bDyn = FALSE;
-	m_bWantReturn = FALSE;
-	m_bTrim = TRUE;
-	m_bCaseSensitive = FALSE;
 	SecureZeroMemory(&m_ToolInfo, sizeof(m_ToolInfo));
 }
 
@@ -165,18 +165,18 @@ int CHistoryCombo::InsertEntry(const CString& combostring, INT_PTR pos)
 #ifdef HISTORYCOMBO_WITH_SYSIMAGELIST
 	if (m_bURLHistory)
 	{
-		cbei.iImage = SYS_IMAGE_LIST().GetFileIconIndex(combostring);
+		cbei.iImage = SYS_IMAGE_LIST().GetPathIconIndex(combostring);
 		if (cbei.iImage == 0 || cbei.iImage == SYS_IMAGE_LIST().GetDefaultIconIndex())
 		{
-			if (combostring.Left(5) == _T("http:"))
-				cbei.iImage = SYS_IMAGE_LIST().GetFileIconIndex(_T(".html"));
-			else if (combostring.Left(6) == _T("https:"))
-				cbei.iImage = SYS_IMAGE_LIST().GetFileIconIndex(_T(".html"));
-			else if (combostring.Left(5) == _T("file:"))
+			if (CStringUtils::StartsWith(combostring, L"http:"))
+				cbei.iImage = SYS_IMAGE_LIST().GetPathIconIndex(L".html");
+			else if (CStringUtils::StartsWith(combostring, L"https:"))
+				cbei.iImage = SYS_IMAGE_LIST().GetPathIconIndex(L".html");
+			else if (CStringUtils::StartsWith(combostring, L"file:"))
 				cbei.iImage = SYS_IMAGE_LIST().GetDirIconIndex();
-			else if (combostring.Left(4) == _T("git:"))
+			else if (CStringUtils::StartsWith(combostring, L"git:"))
 				cbei.iImage = m_nGitIconIndex;
-			else if (combostring.Left(4) == _T("ssh:"))
+			else if (CStringUtils::StartsWith(combostring, L"ssh:"))
 				cbei.iImage = m_nGitIconIndex;
 			else
 				cbei.iImage = SYS_IMAGE_LIST().GetDirIconIndex();
@@ -186,7 +186,7 @@ int CHistoryCombo::InsertEntry(const CString& combostring, INT_PTR pos)
 	}
 	if (m_bPathHistory)
 	{
-		cbei.iImage = SYS_IMAGE_LIST().GetFileIconIndex(combostring);
+		cbei.iImage = SYS_IMAGE_LIST().GetPathIconIndex(combostring);
 		if (cbei.iImage == SYS_IMAGE_LIST().GetDefaultIconIndex())
 		{
 			cbei.iImage = SYS_IMAGE_LIST().GetDirIconIndex();
@@ -222,8 +222,8 @@ void CHistoryCombo::SetList(const STRING_VECTOR& list)
 
 CString CHistoryCombo::LoadHistory(LPCTSTR lpszSection, LPCTSTR lpszKeyPrefix)
 {
-	if (lpszSection == NULL || lpszKeyPrefix == NULL || *lpszSection == '\0')
-		return _T("");
+	if (!lpszSection || !lpszKeyPrefix || *lpszSection == '\0')
+		return L"";
 
 	m_sSection = lpszSection;
 	m_sKeyPrefix = lpszKeyPrefix;
@@ -234,7 +234,7 @@ CString CHistoryCombo::LoadHistory(LPCTSTR lpszSection, LPCTSTR lpszKeyPrefix)
 	{
 		//keys are of form <lpszKeyPrefix><entrynumber>
 		CString sKey;
-		sKey.Format(_T("%s\\%s%d"), (LPCTSTR)m_sSection, (LPCTSTR)m_sKeyPrefix, n++);
+		sKey.Format(L"%s\\%s%d", (LPCTSTR)m_sSection, (LPCTSTR)m_sKeyPrefix, n++);
 		sText = CRegString(sKey);
 		if (!sText.IsEmpty())
 			AddString(sText);
@@ -270,7 +270,7 @@ void CHistoryCombo::SaveHistory()
 	for (int n = 0; n < nMax; n++)
 	{
 		CString sKey;
-		sKey.Format(_T("%s\\%s%d"), (LPCTSTR)m_sSection, (LPCTSTR)m_sKeyPrefix, n);
+		sKey.Format(L"%s\\%s%d", (LPCTSTR)m_sSection, (LPCTSTR)m_sKeyPrefix, n);
 		CRegString regkey(sKey);
 		regkey = m_arEntries.GetAt(n);
 	}
@@ -278,7 +278,7 @@ void CHistoryCombo::SaveHistory()
 	for (int n = nMax; ; n++)
 	{
 		CString sKey;
-		sKey.Format(_T("%s\\%s%d"), (LPCTSTR)m_sSection, (LPCTSTR)m_sKeyPrefix, n);
+		sKey.Format(L"%s\\%s%d", (LPCTSTR)m_sSection, (LPCTSTR)m_sKeyPrefix, n);
 		CRegString regkey(sKey);
 		CString sText = regkey;
 		if (sText.IsEmpty())
@@ -296,7 +296,7 @@ void CHistoryCombo::ClearHistory(BOOL bDeleteRegistryEntries/*=TRUE*/)
 		CString sKey;
 		for (int n = 0; ; n++)
 		{
-			sKey.Format(_T("%s\\%s%d"), (LPCTSTR)m_sSection, (LPCTSTR)m_sKeyPrefix, n);
+			sKey.Format(L"%s\\%s%d", (LPCTSTR)m_sSection, (LPCTSTR)m_sKeyPrefix, n);
 			CRegString regkey(sKey);
 			CString sText = regkey;
 			if (sText.IsEmpty())
@@ -316,7 +316,7 @@ void CHistoryCombo::RemoveEntryFromHistory(LPCTSTR lpszSection, LPCTSTR lpszKeyP
 	do
 	{
 		CString sKey;
-		sKey.Format(_T("%s\\%s%d"), lpszSection, lpszKeyPrefix, ++n);
+		sKey.Format(L"%s\\%s%d", lpszSection, lpszKeyPrefix, ++n);
 		CRegString regkey(sKey);
 		sText = regkey;
 		if (sText == entryToRemove)
@@ -332,13 +332,13 @@ void CHistoryCombo::RemoveEntryFromHistory(LPCTSTR lpszSection, LPCTSTR lpszKeyP
 	for (;; ++n)
 	{
 		CString sKey;
-		sKey.Format(_T("%s\\%s%d"), lpszSection, lpszKeyPrefix, n);
+		sKey.Format(L"%s\\%s%d", lpszSection, lpszKeyPrefix, n);
 		CRegString regkey(sKey);
 		sText = regkey;
 		if (!sText.IsEmpty())
 		{
 			CString sKeyNew;
-			sKeyNew.Format(_T("%s\\%s%d"), lpszSection, lpszKeyPrefix, n - 1);
+			sKeyNew.Format(L"%s\\%s%d", lpszSection, lpszKeyPrefix, n - 1);
 			CRegString regkeyNew(sKeyNew);
 			regkeyNew = sText;
 			regkey.removeValue();
@@ -358,7 +358,7 @@ void CHistoryCombo::SetURLHistory(BOOL bURLHistory)
 		HWND hwndEdit;
 		// use for ComboEx
 		hwndEdit = (HWND)::SendMessage(this->m_hWnd, CBEM_GETEDITCONTROL, 0, 0);
-		if (NULL == hwndEdit)
+		if (!hwndEdit)
 		{
 			// Try the unofficial way of getting the edit control CWnd*
 			CWnd* pWnd = this->GetDlgItem(1001);
@@ -385,17 +385,11 @@ void CHistoryCombo::SetPathHistory(BOOL bPathHistory)
 		HWND hwndEdit;
 		// use for ComboEx
 		hwndEdit = (HWND)::SendMessage(this->m_hWnd, CBEM_GETEDITCONTROL, 0, 0);
-		if (NULL == hwndEdit)
+		if (!hwndEdit)
 		{
-			//if not, try the old standby
-			if(hwndEdit==NULL)
-			{
-				CWnd* pWnd = this->GetDlgItem(1001);
-				if(pWnd)
-				{
-					hwndEdit = pWnd->GetSafeHwnd();
-				}
-			}
+			CWnd* pWnd = this->GetDlgItem(1001);
+			if (pWnd)
+				hwndEdit = pWnd->GetSafeHwnd();
 		}
 		if (hwndEdit)
 			SHAutoComplete(hwndEdit, SHACF_FILESYSTEM);
@@ -405,6 +399,73 @@ void CHistoryCombo::SetPathHistory(BOOL bPathHistory)
 	SetImageList(&SYS_IMAGE_LIST());
 #endif
 }
+
+void CHistoryCombo::SetCustomAutoSuggest(BOOL listEntries, BOOL bPathHistory, BOOL bURLHistory)
+{
+	m_bPathHistory = bPathHistory;
+	m_bURLHistory = bURLHistory;
+
+	HWND hwndEdit;
+	// use for ComboEx
+	hwndEdit = (HWND)::SendMessage(this->m_hWnd, CBEM_GETEDITCONTROL, 0, 0);
+	if (!hwndEdit)
+	{
+		CWnd* pWnd = this->GetDlgItem(1001);
+		if (pWnd)
+			hwndEdit = pWnd->GetSafeHwnd();
+	}
+	if (hwndEdit)
+	{
+		CComPtr<IObjMgr> pom;
+		if (!SUCCEEDED(CoCreateInstance(CLSID_ACLMulti, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pom))))
+			return;
+
+		if (listEntries)
+		{
+			CComPtr<IUnknown> punkSource;
+			CComPtr<CCustomAutoCompleteSource> pcacs = new CCustomAutoCompleteSource(m_arEntries);
+			if (SUCCEEDED(pcacs->QueryInterface(IID_PPV_ARGS(&punkSource))))
+				pom->Append(punkSource);
+		}
+
+		if (m_bPathHistory)
+		{
+			CComPtr<IUnknown> punkSource2;
+			if (SUCCEEDED(CoCreateInstance(CLSID_ACListISF, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&punkSource2))))
+			{
+				CComPtr<IACList2> pal2;
+				if (SUCCEEDED(punkSource2->QueryInterface(IID_PPV_ARGS(&pal2))))
+					pal2->SetOptions(ACLO_FILESYSDIRS);
+				pom->Append(punkSource2);
+			}
+		}
+
+		if (m_bURLHistory)
+		{
+			CComPtr<IUnknown> punkSource3;
+			if (SUCCEEDED(CoCreateInstance(CLSID_ACLHistory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&punkSource3))))
+				pom->Append(punkSource3);
+
+			CComPtr<IUnknown> punkSource4;
+			if (SUCCEEDED(CoCreateInstance(CLSID_ACLMRU, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&punkSource4))))
+				pom->Append(punkSource4);
+		}
+
+		CComPtr<IAutoComplete> pac;
+		if (!SUCCEEDED(CoCreateInstance(CLSID_AutoComplete, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pac))))
+			return;
+		pac->Init(hwndEdit, pom, nullptr, nullptr);
+
+		CComPtr<IAutoComplete2> pac2;
+		if (SUCCEEDED(pac->QueryInterface(IID_PPV_ARGS(&pac2))))
+			pac2->SetOptions(ACO_AUTOSUGGEST);
+	}
+
+#ifdef HISTORYCOMBO_WITH_SYSIMAGELIST
+	SetImageList(&SYS_IMAGE_LIST());
+#endif
+}
+
 
 void CHistoryCombo::SetMaxHistoryItems(int nMaxItems)
 {
@@ -426,6 +487,8 @@ CString CHistoryCombo::GetString() const
 	if (sel == CB_ERR ||(m_bURLHistory)||(m_bPathHistory) || (!(style&CBS_SIMPLE)))
 	{
 		GetWindowText(str);
+		if (m_bTrim)
+			str.Trim();
 		return str;
 	}
 
@@ -461,7 +524,7 @@ BOOL CHistoryCombo::RemoveSelectedItem()
 		// The one and only item has just been
 		// deleted -> reset window text since
 		// there is no item to select
-		SetWindowText(_T(""));
+		SetWindowText(L"");
 	}
 	else
 	{
@@ -540,8 +603,8 @@ void CHistoryCombo::OnMouseMove(UINT nFlags, CPoint point)
 				::SendMessage(m_hWndToolTip, TTM_UPDATETIPTEXT, 0, (LPARAM) &m_ToolInfo);
 				::SendMessage(m_hWndToolTip, TTM_TRACKPOSITION, 0, (LPARAM)MAKELONG(rectClient.left, rectClient.top));
 				::SendMessage(m_hWndToolTip, TTM_TRACKACTIVATE, TRUE, (LPARAM)(LPTOOLINFO) &m_ToolInfo);
-				SetTimer(1, 80, NULL);
-				SetTimer(2, 2000, NULL);
+				SetTimer(1, 80, nullptr);
+				SetTimer(2, 2000, nullptr);
 				m_ttShown = TRUE;
 			}
 		}
@@ -596,16 +659,16 @@ void CHistoryCombo::CreateToolTip()
 	// create tooltip
 	m_hWndToolTip = ::CreateWindowEx(NULL,
 		TOOLTIPS_CLASS,
-		NULL,
+		nullptr,
 		TTS_NOPREFIX | TTS_ALWAYSTIP,
 		CW_USEDEFAULT,
 		CW_USEDEFAULT,
 		CW_USEDEFAULT,
 		CW_USEDEFAULT,
 		m_hWnd,
-		NULL,
-		NULL,
-		NULL);
+		nullptr,
+		nullptr,
+		nullptr);
 
 	// initialize tool info struct
 	memset(&m_ToolInfo, 0, sizeof(m_ToolInfo));
@@ -649,4 +712,91 @@ int CHistoryCombo::FindStringExactCaseSensitive(int nIndexStart, LPCTSTR lpszFin
 		}
 	}
 	return -1;
+}
+
+CCustomAutoCompleteSource::CCustomAutoCompleteSource(const CStringArray& pData)
+	: m_pData(pData)
+	, m_index(0)
+	, m_cRefCount(0)
+{
+}
+
+STDMETHODIMP CCustomAutoCompleteSource::QueryInterface(REFIID riid, void** ppvObject)
+{
+	if (!ppvObject)
+		return E_POINTER;
+	*ppvObject = nullptr;
+	if (IsEqualIID(IID_IUnknown, riid) || IsEqualIID(IID_IEnumString, riid))
+		*ppvObject = static_cast<IEnumString*>(this);
+	else
+		return E_NOINTERFACE;
+
+	AddRef();
+	return S_OK;
+}
+
+STDMETHODIMP_(ULONG) CCustomAutoCompleteSource::AddRef()
+{
+	return ++m_cRefCount;
+}
+
+STDMETHODIMP_(ULONG) CCustomAutoCompleteSource::Release()
+{
+	--m_cRefCount;
+	if (m_cRefCount == 0)
+	{
+		delete this;
+		return 0;
+	}
+	return m_cRefCount;
+}
+
+STDMETHODIMP_(HRESULT) CCustomAutoCompleteSource::Clone(IEnumString** ppenum)
+{
+	if (!ppenum)
+		return E_POINTER;
+
+	CCustomAutoCompleteSource* pnew = new CCustomAutoCompleteSource(m_pData);
+
+	pnew->AddRef();
+	*ppenum = pnew;
+
+	return S_OK;
+}
+
+STDMETHODIMP_(HRESULT) CCustomAutoCompleteSource::Next(ULONG celt, LPOLESTR* rgelt, ULONG* pceltFetched)
+{
+	if (!celt)
+		celt = 1;
+
+	ULONG i = 0;
+	for (; i < celt && m_index < m_pData.GetCount(); i++)
+	{
+		rgelt[i] = (LPWSTR)::CoTaskMemAlloc(sizeof(WCHAR) * (m_pData.GetAt(m_index).GetLength() + 1));
+		lstrcpy(rgelt[i], m_pData.GetAt(m_index));
+
+		if (pceltFetched)
+			++*pceltFetched;
+
+		++m_index;
+	}
+
+	if (i == celt)
+		return S_OK;
+
+	return S_FALSE;
+}
+
+STDMETHODIMP_(HRESULT) CCustomAutoCompleteSource::Reset()
+{
+	m_index = 0;
+	return S_OK;
+}
+
+STDMETHODIMP_(HRESULT) CCustomAutoCompleteSource::Skip(ULONG celt)
+{
+	m_index += celt;
+	if (m_index >= m_pData.GetCount())
+		return S_FALSE;
+	return S_OK;
 }

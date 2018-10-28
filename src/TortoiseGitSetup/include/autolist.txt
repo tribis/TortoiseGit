@@ -1,3 +1,7 @@
+# This file is maintained by the TortoiseGit team
+#
+# Custom additions should go to %APPDATA%\TortoiseGit\autolist.txt
+# for this you don't need admin rights and changes won't get overridden automatically
 .asm = ^([\w]+):
 .au3, .auh = Func\s+([\w]+)|\$([\w]+)
 .bas, .frm, .cls = ^\s*(?:(?:Public (?:Default )?|Private )?(?:Sub|Function|Property Get|Property Set|Property Let) ?)(\w+)\(|^Attribute VB_Name = "(\w+)"
@@ -5,7 +9,7 @@
 .build = \sname\s*=\s*\"(\w+)\"
 .cbl, .cpy = ^.{6} ([A-Z][A-Z0-9-]*)(?: SECTION)?\.
 .c, .cc, .cpp, .cxx = \s(?:[\w]+)::([\w]+)|[ \t:.>]([\w]+)\s?\([\w\s,.)]*\);|^#\s*define\s+(\w+)
-.asp, .aspx, .cs = (?:public|protected|private|internal)\s+(?:[\w.]+\s+)*([\w.]+)
+.asp, .aspx, .cs = (?:public|protected|private|internal)\s+(?:[\w.]+\??\s+)*(?:[\w.\[\]]+\s+|[\w.]+\s*\<[^(]+\>(?:\[.*\])?\s+)?([\w]+)\s*(?:\<[^(]+\>)?\s*(?:\(|\{|:|;|=)
 .h, .hpp, .hxx = ^\s*(?:class|struct)\s+([\w]+)|^\s+(?:\w+\s+)*([\w]+)\s*\(|^#define\s+(\w+)
 .html, .htm = \"#(\w+)\"
 .java = (?:public|protected|private|internal)\s+(?:[\w.]+\s+)*([\w.]+)|class\s+([\w]+)(?:(?:\s+)?(?:extends|implements)(?:\s+)?([\w]+)?)

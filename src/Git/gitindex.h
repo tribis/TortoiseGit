@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2016 - TortoiseGit
+// Copyright (C) 2008-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -23,6 +23,17 @@
 #include "UnicodeUtils.h"
 #include "ReaderWriterLock.h"
 #include "GitAdminDir.h"
+#include "StringUtils.h"
+#include "PathUtils.h"
+
+#ifndef S_IFLNK
+#define S_IFLNK 0120000
+#undef _S_IFLNK
+#define _S_IFLNK S_IFLNK
+#endif
+#ifndef S_ISLNK
+#define S_ISLNK(m) (((m) & _S_IFMT) == _S_IFLNK)
+#endif
 
 class CGitIndex
 {
@@ -33,34 +44,36 @@ public:
 	uint16_t	m_FlagsExtended;
 	CGitHash	m_IndexHash;
 	__int64		m_Size;
+	uint32_t	m_Mode;
 
 	int Print();
 };
 
 class CGitIndexList:public std::vector<CGitIndex>
 {
-protected:
-
 public:
 	__time64_t  m_LastModifyTime;
+	__int64		m_LastFileSize;
 	BOOL		m_bHasConflicts;
+	inline bool	IsIgnoreCase() { return m_iIndexCaps & GIT_INDEXCAP_IGNORE_CASE; }
 
 	CGitIndexList();
 	~CGitIndexList();
 
-	int ReadIndex(CString file);
-	int GetStatus(const CString& gitdir, CString path, git_wc_status_kind* status, BOOL IsFull = FALSE, BOOL IsRecursive = FALSE, FILL_STATUS_CALLBACK callback = nullptr, void* pData = nullptr, CGitHash* pHash = nullptr, bool* assumeValid = nullptr, bool* skipWorktree = nullptr);
+	int ReadIndex(CString dotgitdir);
+	int GetFileStatus(const CString& gitdir, const CString& path, git_wc_status2_t& status, CGitHash* pHash = nullptr);
+	int GetFileStatus(CAutoRepository& repository, const CString& gitdir, CGitIndex& entry, git_wc_status2_t& status, __int64 time, __int64 filesize, bool isSymlink);
 #ifdef GTEST_INCLUDE_GTEST_GTEST_H_
 	FRIEND_TEST(GitIndexCBasicGitWithTestRepoFixture, GetFileStatus);
 #endif
 protected:
+	int		m_iIndexCaps;
 	__int64 m_iMaxCheckSize;
-	CComCriticalSection m_critRepoSec;
-	CAutoRepository repository;
-	int GetFileStatus(const CString &gitdir, const CString &path, git_wc_status_kind * status, __int64 time, __int64 filesize, FILL_STATUS_CALLBACK callback = nullptr, void *pData = nullptr, CGitHash *pHash = nullptr, bool * assumeValid = nullptr, bool * skipWorktree = nullptr);
+	CAutoConfig config;
+	int GetFileStatus(const CString& gitdir, const CString& path, git_wc_status2_t& status, __int64 time, __int64 filesize, bool isSymlink, CGitHash* pHash = nullptr);
 };
 
-typedef std::tr1::shared_ptr<CGitIndexList> SHARED_INDEX_PTR;
+typedef std::shared_ptr<CGitIndexList> SHARED_INDEX_PTR;
 typedef CComCritSecLock<CComCriticalSection> CAutoLocker;
 
 class CGitIndexFileMap:public std::map<CString, SHARED_INDEX_PTR>
@@ -71,9 +84,9 @@ public:
 	CGitIndexFileMap() { m_critIndexSec.Init(); }
 	~CGitIndexFileMap() { m_critIndexSec.Term(); }
 
-	SHARED_INDEX_PTR SafeGet(CString thePath)
+	SHARED_INDEX_PTR SafeGet(const CString& path)
 	{
-		thePath.MakeLower();
+		CString thePath(CPathUtils::NormalizePath(path));
 		CAutoLocker lock(m_critIndexSec);
 		auto lookup = find(thePath);
 		if (lookup == cend())
@@ -81,16 +94,16 @@ public:
 		return lookup->second;
 	}
 
-	void SafeSet(CString thePath, SHARED_INDEX_PTR ptr)
+	void SafeSet(const CString& path, SHARED_INDEX_PTR ptr)
 	{
-		thePath.MakeLower();
+		CString thePath(CPathUtils::NormalizePath(path));
 		CAutoLocker lock(m_critIndexSec);
 		(*this)[thePath] = ptr;
 	}
 
-	bool SafeClear(CString thePath)
+	bool SafeClear(const CString& path)
 	{
-		thePath.MakeLower();
+		CString thePath(CPathUtils::NormalizePath(path));
 		CAutoLocker lock(m_critIndexSec);
 		auto lookup = find(thePath);
 		if (lookup == cend())
@@ -99,14 +112,14 @@ public:
 		return true;
 	}
 
-	bool SafeClearRecursively(CString thePath)
+	bool SafeClearRecursively(const CString& path)
 	{
-		thePath.MakeLower();
+		CString thePath(CPathUtils::NormalizePath(path));
 		CAutoLocker lock(m_critIndexSec);
 		std::vector<CString> toRemove;
 		for (auto it = this->cbegin(); it != this->cend(); ++it)
 		{
-			if ((*it).first.Find(thePath) == 0)
+			if (CStringUtils::StartsWith((*it).first, thePath))
 				toRemove.push_back((*it).first);
 		}
 		for (auto it = toRemove.cbegin(); it != toRemove.cend(); ++it)
@@ -114,36 +127,15 @@ public:
 		return !toRemove.empty();
 	}
 
-	int Check(const CString &gitdir, bool *isChanged);
+	bool HasIndexChangedOnDisk(const CString& gitdir);
 	int LoadIndex(const CString &gitdir);
 
-	bool CheckAndUpdate(const CString &gitdir,bool isLoadUpdatedIndex)
+	void CheckAndUpdate(const CString& gitdir)
 	{
-		bool isChanged=false;
-		if(isLoadUpdatedIndex && Check(gitdir,&isChanged))
-			return false;
-
-		if(isChanged && isLoadUpdatedIndex)
-		{
+		if (HasIndexChangedOnDisk(gitdir))
 			LoadIndex(gitdir);
-			return true;
-		}
-
-		return false;
 	}
-	int GetFileStatus(const CString &gitdir,const CString &path,git_wc_status_kind * status,
-							BOOL IsFull=false, BOOL IsRecursive=false,
-							FILL_STATUS_CALLBACK callback = nullptr,
-							void *pData=NULL,CGitHash *pHash=NULL,
-							bool isLoadUpdatedIndex = true, bool * assumeValid = NULL, bool * skipWorktree = NULL);
-
-	int IsUnderVersionControl(const CString &gitdir,
-							  CString path,
-							  bool isDir,
-							  bool *isVersion,
-							  bool isLoadUpdateIndex=true);
 };
-
 
 class CGitTreeItem
 {
@@ -153,18 +145,20 @@ public:
 	int			m_Flags;
 };
 
-/* After object create, never change field agains
+/* After object create, never change field against
  * that needn't lock to get field
 */
 class CGitHeadFileList:public std::vector<CGitTreeItem>
 {
 private:
 	int GetPackRef(const CString &gitdir);
-	CReaderWriterLock m_SharedMutex;
 
 	__time64_t  m_LastModifyTimeHead;
 	__time64_t  m_LastModifyTimeRef;
 	__time64_t	m_LastModifyTimePackRef;
+
+	__int64		m_LastFileSizeHead;
+	__int64		m_LastFileSizePackRef;
 
 	CString		m_HeadRefFile;
 	CGitHash	m_Head;
@@ -172,28 +166,27 @@ private:
 	CString		m_Gitdir;
 	CString		m_PackRefFile;
 
-	CGitHash	m_TreeHash; /* buffered tree hash value */
-
 	std::map<CString,CGitHash> m_PackRefMap;
 
 public:
 	CGitHeadFileList()
+	: m_LastModifyTimeHead(0)
+	, m_LastModifyTimeRef(0)
+	, m_LastModifyTimePackRef(0)
+	, m_LastFileSizeHead(-1)
+	, m_LastFileSizePackRef(-1)
 	{
-		m_LastModifyTimeHead=0;
-		m_LastModifyTimeRef=0;
-		m_LastModifyTimePackRef = 0;
 	}
 
-	int ReadTree();
+	int ReadTree(bool ignoreCase);
 	int ReadHeadHash(const CString& gitdir);
 	bool CheckHeadUpdate();
-	bool HeadHashEqualsTreeHash();
-	bool HeadFileIsEmpty();
-	bool HeadIsEmpty();
-	static int CallBack(const unsigned char *, const char *, int, const char *, unsigned int, int, void *);
+
+private:
+	int ReadTreeRecursive(git_repository& repo, const git_tree* tree, const CStringA& base);
 };
 
-typedef std::tr1::shared_ptr<CGitHeadFileList> SHARED_TREE_PTR;
+typedef std::shared_ptr<CGitHeadFileList> SHARED_TREE_PTR;
 class CGitHeadFileMap:public std::map<CString,SHARED_TREE_PTR>
 {
 public:
@@ -203,30 +196,26 @@ public:
 	CGitHeadFileMap() { m_critTreeSec.Init(); }
 	~CGitHeadFileMap() { m_critTreeSec.Term(); }
 
-	SHARED_TREE_PTR SafeGet(CString thePath, bool allowEmpty = false)
+	SHARED_TREE_PTR SafeGet(const CString& path)
 	{
-		thePath.MakeLower();
+		CString thePath(CPathUtils::NormalizePath(path));
 		CAutoLocker lock(m_critTreeSec);
 		auto lookup = find(thePath);
 		if (lookup == cend())
-		{
-			if (allowEmpty)
-				return SHARED_TREE_PTR();
-			return SHARED_TREE_PTR(new CGitHeadFileList);
-		}
+			return SHARED_TREE_PTR();
 		return lookup->second;
 	}
 
-	void SafeSet(CString thePath, SHARED_TREE_PTR ptr)
+	void SafeSet(const CString& path, SHARED_TREE_PTR ptr)
 	{
-		thePath.MakeLower();
+		CString thePath(CPathUtils::NormalizePath(path));
 		CAutoLocker lock(m_critTreeSec);
 		(*this)[thePath] = ptr;
 	}
 
-	bool SafeClear(CString thePath)
+	bool SafeClear(const CString& path)
 	{
-		thePath.MakeLower();
+		CString thePath(CPathUtils::NormalizePath(path));
 		CAutoLocker lock(m_critTreeSec);
 		auto lookup = find(thePath);
 		if (lookup == cend())
@@ -235,70 +224,67 @@ public:
 		return true;
 	}
 
-	bool SafeClearRecursively(CString thePath)
+	bool SafeClearRecursively(const CString& path)
 	{
-		thePath.MakeLower();
+		CString thePath(CPathUtils::NormalizePath(path));
 		CAutoLocker lock(m_critTreeSec);
 		std::vector<CString> toRemove;
 		for (auto it = this->cbegin(); it != this->cend(); ++it)
 		{
-			if ((*it).first.Find(thePath) == 0)
+			if (CStringUtils::StartsWith((*it).first, thePath))
 				toRemove.push_back((*it).first);
 		}
 		for (auto it = toRemove.cbegin(); it != toRemove.cend(); ++it)
 			this->erase(*it);
 		return !toRemove.empty();
 	}
-
-	int GetFileStatus(const CString &gitdir,const CString &path,git_wc_status_kind * status,BOOL IsFull=false, BOOL IsRecursive=false,
-						FILL_STATUS_CALLBACK callback = nullptr, void *pData = nullptr,
-						bool isLoaded=false);
-	bool CheckHeadAndUpdate(const CString &gitdir, bool readTree = true);
-	int IsUnderVersionControl(const CString& gitdir, CString path, bool isDir, bool* isVersion);
+	void CheckHeadAndUpdate(const CString& gitdir, bool ignoreCase);
 };
 
 class CGitFileName
 {
 public:
 	CGitFileName() {}
-	CGitFileName(const CString& filename)
+	CGitFileName(LPCTSTR filename, __int64 size, __int64 lastmodified)
+	: m_FileName(filename)
+	, m_Size(size)
+	, m_LastModified(lastmodified)
+	, m_bSymlink(false)
 	{
-		m_CaseFileName = filename;
-		m_FileName = filename;
-		m_FileName.MakeLower();
 	}
 	CString m_FileName;
-	CString m_CaseFileName;
+	__int64 m_Size;
+	__int64 m_LastModified;
+	bool	m_bSymlink;
 };
-
-static bool SortCGitFileName(const CGitFileName& item1, const CGitFileName& item2)
-{
-	return item1.m_FileName.Compare(item2.m_FileName) < 0;
-}
 
 class CGitIgnoreItem
 {
 public:
 	CGitIgnoreItem()
+	: m_LastModifyTime(0)
+	, m_LastFileSize(-1)
+	, m_pExcludeList(nullptr)
+	, m_buffer(nullptr)
+	, m_iIgnoreCase(nullptr)
 	{
-		m_LastModifyTime =0;
-		m_pExcludeList =NULL;
-		m_buffer = NULL;
 	}
+
 	~CGitIgnoreItem()
 	{
 		if(m_pExcludeList)
 			git_free_exclude_list(m_pExcludeList);
 		free(m_buffer);
-		m_pExcludeList=NULL;
-		m_buffer = NULL;
 	}
+
 	__time64_t  m_LastModifyTime;
+	__int64		m_LastFileSize;
 	CStringA m_BaseDir;
 	BYTE *m_buffer;
 	EXCLUDE_LIST m_pExcludeList;
+	int* m_iIgnoreCase;
 
-	int FetchIgnoreList(const CString &projectroot, const CString &file, bool isGlobal);
+	int FetchIgnoreList(const CString& projectroot, const CString& file, bool isGlobal, int* ignoreCase);
 
 	/**
 	* patha: the filename to be checked whether is is ignored or not
@@ -322,7 +308,9 @@ private:
 
 	// core.excludesfile stuff
 	std::map<CString, CString> m_CoreExcludesfiles;
+	std::map<CString, int> m_IgnoreCase;
 	CString m_sGitSystemConfigPath;
+	CString m_sGitProgramDataConfigPath;
 	ULONGLONG m_dGitSystemConfigPathLastChecked;
 	CReaderWriterLock	m_coreExcludefilesSharedMutex;
 	// checks if the msysgit path has changed and return true/false
@@ -339,49 +327,71 @@ public:
 
 	std::map<CString, CGitIgnoreItem> m_Map;
 
-	bool CheckIgnoreChanged(const CString &gitdir,const CString &path, bool isDir);
-	int  LoadAllIgnoreFile(const CString &gitdir, const CString &path, bool isDir);
+	bool CheckAndUpdateIgnoreFiles(const CString& gitdir, const CString& path, bool isDir);
 	bool IsIgnore(CString path, const CString& root, bool isDir);
 };
 
 template<class T>
-int GetRangeInSortVector(const T &vector, LPCTSTR pstr, int len, int *start, int *end, int pos)
+inline void DoSortFilenametSortVector(T& vector, bool ignoreCase)
 {
-	if( pos < 0)
-	{
+	if (ignoreCase)
+		std::sort(vector.begin(), vector.end(), [](const auto& e1, const auto& e2) { return e1.m_FileName.CompareNoCase(e2.m_FileName) < 0; });
+	else
+		std::sort(vector.begin(), vector.end(), [](const auto& e1, const auto& e2) { return e1.m_FileName.Compare(e2.m_FileName) < 0; });
+}
+
+static const size_t NPOS = (size_t)-1; // bad/missing length/position
+static_assert(MAXSIZE_T == NPOS, "NPOS must equal MAXSIZE_T");
+#pragma warning(push)
+#pragma warning(disable: 4310)
+static_assert(-1 == (int)NPOS, "NPOS must equal -1");
+#pragma warning(pop)
+
+template<class T>
+inline int GetRangeInSortVector(const T& vector, LPCTSTR pstr, size_t len, bool ignoreCase, size_t* start, size_t* end, size_t pos)
+{
+	if (ignoreCase)
+		return GetRangeInSortVector_int(vector, pstr, len, _wcsnicmp, start, end, pos);
+
+	return GetRangeInSortVector_int(vector, pstr, len, wcsncmp, start, end, pos);
+}
+
+template<class T, class V>
+int GetRangeInSortVector_int(const T& vector, LPCTSTR pstr, size_t len, V compare, size_t* start, size_t* end, size_t pos)
+{
+	if (pos == NPOS)
 		return -1;
-	}
-	if(start == 0 || end == NULL)
+	if (!start || !end)
 		return -1;
 
-	*start=*end=-1;
+	*start = *end = NPOS;
 
 	if (vector.empty())
 		return -1;
 
-	if (pos >= (int)vector.size())
+	if (pos >= vector.size())
 		return -1;
 
-	if( _tcsnccmp(vector[pos].m_FileName, pstr,len) != 0)
+	if (compare(vector[pos].m_FileName, pstr, len) != 0)
 		return -1;
 
 	*start = 0;
-	*end = (int)vector.size() - 1;
+	*end = vector.size() - 1;
 
 	// shortcut, if all entries are going match
 	if (!len)
 		return 0;
 
-	for (int i = pos; i < (int)vector.size(); ++i)
+	for (size_t i = pos; i < vector.size(); ++i)
 	{
-		if (_tcsnccmp(vector[i].m_FileName, pstr, len) != 0)
+		if (compare(vector[i].m_FileName, pstr, len) != 0)
 			break;
 
 		*end = i;
 	}
-	for (int i = pos; i >= 0; --i)
+	for (size_t i = pos + 1; i-- > 0;)
 	{
-		if (_tcsnccmp(vector[i].m_FileName, pstr, len) != 0)
+		if (compare(vector[i].m_FileName, pstr, len) != 0)
 			break;
 
 		*start = i;
@@ -391,23 +401,35 @@ int GetRangeInSortVector(const T &vector, LPCTSTR pstr, int len, int *start, int
 }
 
 template<class T>
-int SearchInSortVector(const T &vector, LPCTSTR pstr, int len)
+inline size_t SearchInSortVector(const T& vector, LPCTSTR pstr, int len, bool ignoreCase)
 {
-	int end = (int)vector.size() - 1;
-	int start = 0;
-	int mid = (start+end)/2;
+	if (ignoreCase)
+	{
+		if (len < 0)
+			return SearchInSortVector_int(vector, pstr, _wcsicmp);
+
+		return SearchInSortVector_int(vector, pstr, [len](const auto& s1, const auto& s2) { return _wcsnicmp(s1, s2, len); });
+	}
+
+	if (len < 0)
+		return SearchInSortVector_int(vector, pstr, wcscmp);
+
+	return SearchInSortVector_int(vector, pstr, [len](const auto& s1, const auto& s2) { return wcsncmp(s1, s2, len); });
+}
+
+template<class T, class V>
+size_t SearchInSortVector_int(const T& vector, LPCTSTR pstr, V compare)
+{
+	size_t end = vector.size() - 1;
+	size_t start = 0;
+	size_t mid = (start + end) / 2;
 
 	if (vector.empty())
-		return -1;
+		return NPOS;
 
 	while(!( start == end && start==mid))
 	{
-		int cmp;
-		if(len < 0)
-			cmp = _tcscmp(vector[mid].m_FileName,pstr);
-		else
-			cmp = _tcsnccmp( vector[mid].m_FileName,pstr,len );
-
+		int cmp = compare(vector[mid].m_FileName, pstr);
 		if (cmp == 0)
 			return mid;
 		else if (cmp < 0)
@@ -418,17 +440,11 @@ int SearchInSortVector(const T &vector, LPCTSTR pstr, int len)
 		mid=(start +end ) /2;
 
 	}
-	if(len <0)
-	{
-		if(_tcscmp(vector[mid].m_FileName,pstr) == 0)
-			return mid;
-	}
-	else
-	{
-		if(_tcsnccmp( vector[mid].m_FileName,pstr,len ) == 0)
-			return mid;
-	}
-	return -1;
+
+	if (compare(vector[mid].m_FileName, pstr) == 0)
+		return mid;
+
+	return NPOS;
 };
 
 class CGitAdminDirMap:public std::map<CString, CString>
@@ -436,34 +452,30 @@ class CGitAdminDirMap:public std::map<CString, CString>
 public:
 	CComCriticalSection			m_critIndexSec;
 	std::map<CString, CString>	m_reverseLookup;
+	std::map<CString, CString>	m_WorktreeAdminDirLookup;
 
 	CGitAdminDirMap() { m_critIndexSec.Init(); }
 	~CGitAdminDirMap() { m_critIndexSec.Term(); }
 
 	CString GetAdminDir(const CString &path)
 	{
-		CString thePath(path);
-		thePath.MakeLower();
+		CString thePath(CPathUtils::NormalizePath(path));
 		CAutoLocker lock(m_critIndexSec);
 		auto lookup = find(thePath);
 		if (lookup == cend())
 		{
-			if (PathIsDirectory(path + _T("\\.git")))
+			CString adminDir;
+			bool isWorktree = false;
+			GitAdminDir::GetAdminDirPath(thePath, adminDir, &isWorktree);
+			if (PathIsDirectory(adminDir))
 			{
-				(*this)[thePath] = path + _T("\\.git\\");
-				m_reverseLookup[thePath + _T("\\.git")] = path;
+				adminDir = CPathUtils::BuildPathWithPathDelimiter(CPathUtils::NormalizePath(adminDir));
+				(*this)[thePath] = adminDir;
+				if (!isWorktree) // GitAdminDir::GetAdminDirPath returns the commongit dir ("parent/.git") and this would override the lookup path for the main repo
+					m_reverseLookup[adminDir] = thePath;
 				return (*this)[thePath];
 			}
-
-			CString result = GitAdminDir::ReadGitLink(path, path + _T("\\.git"));
-			if (!result.IsEmpty())
-			{
-				(*this)[thePath] = result + _T("\\");
-				m_reverseLookup[result.MakeLower()] = path;
-				return (*this)[thePath];
-			}
-
-			return path + _T("\\.git\\"); // in case of an error stick to old behavior
+			return thePath + L".git\\"; // in case of an error stick to old behavior
 		}
 
 		return lookup->second;
@@ -476,10 +488,38 @@ public:
 		return result;
 	}
 
+	CString GetWorktreeAdminDir(const CString& path)
+	{
+		CString thePath(CPathUtils::NormalizePath(path));
+		CAutoLocker lock(m_critIndexSec);
+		auto lookup = m_WorktreeAdminDirLookup.find(thePath);
+		if (lookup == m_WorktreeAdminDirLookup.cend())
+		{
+			CString wtadmindir;
+			GitAdminDir::GetWorktreeAdminDirPath(thePath, wtadmindir);
+			if (PathIsDirectory(wtadmindir))
+			{
+				wtadmindir = CPathUtils::BuildPathWithPathDelimiter(CPathUtils::NormalizePath(wtadmindir));
+				m_WorktreeAdminDirLookup[thePath] = wtadmindir;
+				m_reverseLookup[wtadmindir] = thePath;
+				return m_WorktreeAdminDirLookup[thePath];
+			}
+			ATLASSERT(false);
+			return thePath + L".git\\"; // we should never get here
+		}
+		return lookup->second;
+	}
+
+	CString GetWorktreeAdminDirConcat(const CString& path, const CString& subpath)
+	{
+		CString result(GetWorktreeAdminDir(path));
+		result += subpath;
+		return result;
+	}
+
 	CString GetWorkingCopy(const CString &gitDir)
 	{
-		CString path(gitDir);
-		path.MakeLower();
+		CString path(CPathUtils::BuildPathWithPathDelimiter(CPathUtils::NormalizePath(gitDir)));
 		CAutoLocker lock(m_critIndexSec);
 		auto lookup = m_reverseLookup.find(path);
 		if (lookup == m_reverseLookup.cend())

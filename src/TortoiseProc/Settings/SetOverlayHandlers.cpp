@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2010, 2012, 2014-2015 - TortoiseSVN
+// Copyright (C) 2010, 2012, 2014-2016 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -31,12 +31,12 @@ CSetOverlayHandlers::CSetOverlayHandlers()
 	, m_bShowReadonlyOverlay(TRUE)
 	, m_bShowDeletedOverlay(TRUE)
 {
-	m_regShowIgnoredOverlay     = CRegDWORD(_T("Software\\TortoiseOverlays\\ShowIgnoredOverlay"), TRUE);
-	m_regShowUnversionedOverlay = CRegDWORD(_T("Software\\TortoiseOverlays\\ShowUnversionedOverlay"), TRUE);
-	m_regShowAddedOverlay       = CRegDWORD(_T("Software\\TortoiseOverlays\\ShowAddedOverlay"), TRUE);
-	m_regShowLockedOverlay      = CRegDWORD(_T("Software\\TortoiseOverlays\\ShowLockedOverlay"), TRUE);
-	m_regShowReadonlyOverlay    = CRegDWORD(_T("Software\\TortoiseOverlays\\ShowReadonlyOverlay"), TRUE);
-	m_regShowDeletedOverlay     = CRegDWORD(_T("Software\\TortoiseOverlays\\ShowDeletedOverlay"), TRUE);
+	m_regShowIgnoredOverlay     = CRegDWORD(L"Software\\TortoiseOverlays\\ShowIgnoredOverlay", TRUE);
+	m_regShowUnversionedOverlay = CRegDWORD(L"Software\\TortoiseOverlays\\ShowUnversionedOverlay", TRUE);
+	m_regShowAddedOverlay       = CRegDWORD(L"Software\\TortoiseOverlays\\ShowAddedOverlay", TRUE);
+	m_regShowLockedOverlay      = CRegDWORD(L"Software\\TortoiseOverlays\\ShowLockedOverlay", TRUE);
+	m_regShowReadonlyOverlay    = CRegDWORD(L"Software\\TortoiseOverlays\\ShowReadonlyOverlay", TRUE);
+	m_regShowDeletedOverlay     = CRegDWORD(L"Software\\TortoiseOverlays\\ShowDeletedOverlay", TRUE);
 
 	m_bShowIgnoredOverlay       = m_regShowIgnoredOverlay;
 	m_bShowUnversionedOverlay   = m_regShowUnversionedOverlay;
@@ -138,7 +138,7 @@ int CSetOverlayHandlers::GetInstalledOverlays()
 	// scan the registry for installed overlay handlers
 	HKEY hKey;
 	if (RegOpenKeyEx(HKEY_LOCAL_MACHINE,
-		_T("Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ShellIconOverlayIdentifiers"),
+		L"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ShellIconOverlayIdentifiers",
 		0, KEY_ENUMERATE_SUB_KEYS, &hKey)==ERROR_SUCCESS)
 	{
 		TCHAR value[2048] = { 0 };
@@ -147,24 +147,22 @@ int CSetOverlayHandlers::GetInstalledOverlays()
 		{
 			DWORD size = _countof(value);
 			FILETIME last_write_time;
-			rc = RegEnumKeyEx(hKey, i, value, &size, NULL, NULL, NULL, &last_write_time);
+			rc = RegEnumKeyEx(hKey, i, value, &size, nullptr, nullptr, nullptr, &last_write_time);
 			if (rc == ERROR_SUCCESS)
 			{
 				for (int j = 0; value[j]; ++j)
-				{
 					value[j] = (wchar_t)towlower(value[j]);
-				}
-				if (wcsstr(&value[0], L"tortoise") == 0)
+				if (!wcsstr(&value[0], L"tortoise"))
 				{
 					// check if there's a 'default' entry with a guid
-					_tcscpy_s(keystring, _T("Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ShellIconOverlayIdentifiers\\"));
-					_tcscat_s(keystring, value);
+					wcscpy_s(keystring, L"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ShellIconOverlayIdentifiers\\");
+					wcscat_s(keystring, value);
 					DWORD dwType = 0;
 					DWORD dwSize = _countof(value); // the API docs only specify "The size of the destination data buffer",
 					// but better be safe than sorry using _countof instead of sizeof
 					if (SHGetValue(HKEY_LOCAL_MACHINE,
 						keystring,
-						NULL,
+						nullptr,
 						&dwType, value, &dwSize) == ERROR_SUCCESS)
 					{
 						if ((dwSize > 10)&&(value[0] == '{'))
@@ -208,9 +206,8 @@ void CSetOverlayHandlers::UpdateInfoLabel()
 
 	if (!sInfo2.IsEmpty())
 	{
-		CString sTemp;
-		sTemp.Format(IDS_SETTINGS_OVERLAYINFO2, (LPCWSTR)sInfo2);
-		sInfo += L"\n" + sTemp;
+		sInfo += L'\n';
+		sInfo.AppendFormat(IDS_SETTINGS_OVERLAYINFO2, (LPCTSTR)sInfo2);
 	}
 	SetDlgItemText(IDC_HANDLERHINT, sInfo);
 }

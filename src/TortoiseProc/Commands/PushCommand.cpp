@@ -1,7 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
 // Copyright (C) 2007-2008 - TortoiseSVN
-// Copyright (C) 2008-2013, 2015 - TortoiseGit
+// Copyright (C) 2008-2013, 2015-2016, 2018 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -27,12 +27,12 @@ bool PushCommand::Execute()
 {
 	if (!GitAdminDir::IsWorkingTreeOrBareRepo(g_Git.m_CurrentDir))
 	{
-		CMessageBox::Show(hwndExplorer, IDS_NOWORKINGCOPY, IDS_APPNAME, MB_ICONERROR);
+		CMessageBox::Show(GetExplorerHWND(), IDS_NOWORKINGCOPY, IDS_APPNAME, MB_ICONERROR);
 		return false;
 	}
 
 	CString branch;
-	if (parser.HasVal(_T("branch")))
-		branch = parser.GetVal(_T("branch"));
-	return CAppUtils::Push(branch);
+	if (parser.HasVal(L"branch"))
+		branch = parser.GetVal(L"branch");
+	return CAppUtils::Push(GetExplorerHWND(), branch);
 }

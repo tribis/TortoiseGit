@@ -1,5 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
+// Copyright (C) 2016 - TortoiseGit
 // Copyright (C) 2003-2007, 2009, 2011 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -22,7 +23,7 @@
 #include "AppUtils.h"
 
 IMPLEMENT_DYNAMIC(CToolAssocDlg, CDialog)
-CToolAssocDlg::CToolAssocDlg(const CString& type, bool add, CWnd* pParent /*=NULL*/)
+CToolAssocDlg::CToolAssocDlg(const CString& type, bool add, CWnd* pParent /*=nullptr*/)
 	: CDialog(CToolAssocDlg::IDD, pParent)
 	, m_sType(type)
 	, m_bAdd(add)
@@ -41,10 +42,8 @@ void CToolAssocDlg::DoDataExchange(CDataExchange* pDX)
 
 	if (pDX->m_bSaveAndValidate)
 	{
-		if (m_sExtension.Find('/')<0)
-		{
-			m_sExtension.TrimLeft(_T("*"));
-		}
+		if (m_sExtension.Find(L'/') < 0)
+			m_sExtension.TrimLeft(L'*');
 	}
 }
 
@@ -61,7 +60,7 @@ BOOL CToolAssocDlg::OnInitDialog()
 	m_tooltips.Create(this);
 
 	CString title;
-	if (m_sType == _T("Diff"))
+	if (m_sType == L"Diff")
 	{
 		title.LoadString(m_bAdd ? IDS_DLGTITLE_ADD_DIFF_TOOL : IDS_DLGTITLE_EDIT_DIFF_TOOL);
 		m_tooltips.AddTool(IDC_TOOLEDIT, IDS_SETTINGS_EXTDIFF_TT);
@@ -88,8 +87,12 @@ BOOL CToolAssocDlg::PreTranslateMessage(MSG* pMsg)
 void CToolAssocDlg::OnBnClickedToolbrowse()
 {
 	UpdateData(TRUE);
-	if (CAppUtils::FileOpenSave(m_sTool, NULL, IDS_SETTINGS_SELECTDIFF, IDS_PROGRAMSFILEFILTER, true, m_hWnd))
-	{
-		UpdateData(FALSE);
-	}
+	CString filename = m_sTool;
+	if (!PathFileExists(filename))
+		filename.Empty();
+	if (!CAppUtils::FileOpenSave(filename, nullptr, IDS_SETTINGS_SELECTDIFF, IDS_PROGRAMSFILEFILTER, true, m_hWnd))
+		return;
+
+	m_sTool = filename;
+	UpdateData(FALSE);
 }

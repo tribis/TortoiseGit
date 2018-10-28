@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2009 - TortoiseGit
+// Copyright (C) 2009, 2018 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -22,9 +22,11 @@
 
 class RefBrowseCommand : public Command
 {
-	virtual bool Execute()
+	virtual bool Execute() override
 	{
-		CBrowseRefsDlg(orgCmdLinePath.GetWinPath()).DoModal();
+		CBrowseRefsDlg dlg(orgCmdLinePath.GetWinPath());
+		theApp.m_pMainWnd = &dlg;
+		dlg.DoModal();
 		return true;
 	}
 };

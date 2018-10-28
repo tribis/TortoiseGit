@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2013-2015 - TortoiseGit
+// Copyright (C) 2013-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -18,7 +18,7 @@
 //
 #include "stdafx.h"
 #include "UpdateDownloader.h"
-#include "..\version.h"
+#include "../version.h"
 
 CUpdateDownloader::CUpdateDownloader(HWND hwnd, bool force, UINT msg, CEvent *eventStop)
 : m_hWnd(hwnd)
@@ -29,13 +29,13 @@ CUpdateDownloader::CUpdateDownloader(HWND hwnd, bool force, UINT msg, CEvent *ev
 	OSVERSIONINFOEX inf = {0};
 	BruteforceGetWindowsVersionNumber(inf);
 
-	m_sWindowsPlatform = (inf.dwPlatformId == VER_PLATFORM_WIN32_NT) ? _T("NT") : _T("");
+	m_sWindowsPlatform = (inf.dwPlatformId == VER_PLATFORM_WIN32_NT) ? L"NT" : L"";
 	m_sWindowsVersion.Format(L"%ld.%ld", inf.dwMajorVersion, inf.dwMinorVersion);
 	if (inf.wServicePackMajor)
 		m_sWindowsServicePack.Format(L"SP%ld", inf.wServicePackMajor);
 
 	CString userAgent;
-	userAgent.Format(L"TortoiseGit %s; %s; Windows%s%s %s%s%s", _T(STRFILEVER), _T(TGIT_PLATFORM), m_sWindowsPlatform.IsEmpty() ? _T("") : _T(" "), (LPCTSTR)m_sWindowsPlatform, (LPCTSTR)m_sWindowsVersion, m_sWindowsServicePack.IsEmpty() ? _T("") : _T(" "), (LPCTSTR)m_sWindowsServicePack);
+	userAgent.Format(L"TortoiseGit %s; %s; Windows%s%s %s%s%s", _T(STRFILEVER), _T(TGIT_PLATFORM), m_sWindowsPlatform.IsEmpty() ? L"" : L" ", (LPCTSTR)m_sWindowsPlatform, (LPCTSTR)m_sWindowsVersion, m_sWindowsServicePack.IsEmpty() ? L"" : L" ", (LPCTSTR)m_sWindowsServicePack);
 	hOpenHandle = InternetOpen(userAgent, INTERNET_OPEN_TYPE_PRECONFIG, nullptr, nullptr, 0);
 }
 
@@ -48,8 +48,8 @@ CUpdateDownloader::~CUpdateDownloader(void)
 void CUpdateDownloader::BruteforceGetWindowsVersionNumber(OSVERSIONINFOEX& osVersionInfo)
 {
 	osVersionInfo.dwOSVersionInfoSize = sizeof(OSVERSIONINFOEX);
-	osVersionInfo.dwMajorVersion = HIBYTE(_WIN32_WINNT_VISTA);
-	osVersionInfo.dwMinorVersion = LOBYTE(_WIN32_WINNT_VISTA);
+	osVersionInfo.dwMajorVersion = HIBYTE(_WIN32_WINNT_WIN7);
+	osVersionInfo.dwMinorVersion = LOBYTE(_WIN32_WINNT_WIN7);
 	osVersionInfo.dwPlatformId = VER_PLATFORM_WIN32_NT;
 
 	ULONGLONG maskConditioMajor = ::VerSetConditionMask(0, VER_MAJORVERSION, VER_LESS);
@@ -99,7 +99,7 @@ DWORD CUpdateDownloader::DownloadFile(const CString& url, const CString& dest, b
 	if (!hConnectHandle)
 	{
 		DWORD err = GetLastError();
-		CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": Download of %s failed on InternetConnect: %d\n"), (LPCTSTR)url, err);
+		CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) L": Download of %s failed on InternetConnect: %d\n", (LPCTSTR)url, err);
 		return err;
 	}
 	SCOPE_EXIT{ InternetCloseHandle(hConnectHandle); };
@@ -107,7 +107,7 @@ DWORD CUpdateDownloader::DownloadFile(const CString& url, const CString& dest, b
 	if (!hResourceHandle)
 	{
 		DWORD err = GetLastError();
-		CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": Download of %s failed on HttpOpenRequest: %d\n"), (LPCTSTR)url, err);
+		CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) L": Download of %s failed on HttpOpenRequest: %d\n", (LPCTSTR)url, err);
 		return err;
 	}
 	SCOPE_EXIT{ InternetCloseHandle(hResourceHandle); };
@@ -126,7 +126,7 @@ resend:
 		else if (!httpsendrequest)
 		{
 			DWORD err = GetLastError();
-			CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": Download of %s failed: %d, %d\n"), (LPCTSTR)url, httpsendrequest, err);
+			CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) L": Download of %s failed: %d, %d\n", (LPCTSTR)url, httpsendrequest, err);
 			return err;
 		}
 	}
@@ -134,14 +134,14 @@ resend:
 	DWORD contentLength = 0;
 	{
 		DWORD length = sizeof(contentLength);
-		HttpQueryInfo(hResourceHandle, HTTP_QUERY_CONTENT_LENGTH | HTTP_QUERY_FLAG_NUMBER, (LPVOID)&contentLength, &length, NULL);
+		HttpQueryInfo(hResourceHandle, HTTP_QUERY_CONTENT_LENGTH | HTTP_QUERY_FLAG_NUMBER, (LPVOID)&contentLength, &length, nullptr);
 	}
 	{
 		DWORD statusCode = 0;
 		DWORD length = sizeof(statusCode);
-		if (!HttpQueryInfo(hResourceHandle, HTTP_QUERY_STATUS_CODE | HTTP_QUERY_FLAG_NUMBER, (LPVOID)&statusCode, &length, NULL) || statusCode != 200)
+		if (!HttpQueryInfo(hResourceHandle, HTTP_QUERY_STATUS_CODE | HTTP_QUERY_FLAG_NUMBER, (LPVOID)&statusCode, &length, nullptr) || statusCode != 200)
 		{
-			CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": Download of %s returned %d\n"), (LPCTSTR)url, statusCode);
+			CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) L": Download of %s returned %d\n", (LPCTSTR)url, statusCode);
 			if (statusCode == 404)
 				return ERROR_FILE_NOT_FOUND;
 			else if (statusCode == 403)
@@ -162,7 +162,7 @@ resend:
 		if (!InternetQueryDataAvailable(hResourceHandle, &size, 0, 0))
 		{
 			DWORD err = GetLastError();
-			CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": Download of %s failed on InternetQueryDataAvailable: %d\n"), (LPCTSTR)url, err);
+			CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) L": Download of %s failed on InternetQueryDataAvailable: %d\n", (LPCTSTR)url, err);
 			return err;
 		}
 
@@ -171,7 +171,7 @@ resend:
 		if (!InternetReadFile(hResourceHandle, (LPVOID)buff.get(), size, &downloaded))
 		{
 			DWORD err = GetLastError();
-			CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": Download of %s failed on InternetReadFile: %d\n"), (LPCTSTR)url, err);
+			CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) L": Download of %s failed on InternetReadFile: %d\n", (LPCTSTR)url, err);
 			return err;
 		}
 
@@ -210,7 +210,7 @@ resend:
 
 	if (downloadedSum == 0)
 	{
-		CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": Download size of %s was zero.\n"), (LPCTSTR)url);
+		CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) L": Download size of %s was zero.\n", (LPCTSTR)url);
 		return (DWORD)INET_E_DOWNLOAD_FAILURE;
 	}
 	return ERROR_SUCCESS;

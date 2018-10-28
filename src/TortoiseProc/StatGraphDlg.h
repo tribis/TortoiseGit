@@ -1,7 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2013 - TortoiseGit
-// Copyright (C) 2003-2011 - TortoiseSVN
+// Copyright (C) 2008, 2011-2013, 2015-2017 - TortoiseGit
+// Copyright (C) 2003-2011, 2015 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -27,9 +27,6 @@
 #include "tstring.h"
 #include "GitLogListBase.h"
 
-#include <map>
-#include <list>
-
 /**
  * \ingroup TortoiseProc
  * Helper class for drawing and then saving the drawing to a meta file (wmf)
@@ -39,7 +36,7 @@ class CMyMetaFileDC : public CMetaFileDC
 public:
 	HGDIOBJ SelectObject(HGDIOBJ hObject)
 	{
-		return (hObject != NULL) ? ::SelectObject(m_hDC, hObject) : NULL;
+		return (hObject != nullptr) ? ::SelectObject(m_hDC, hObject) : nullptr;
 	}
 };
 
@@ -62,12 +59,12 @@ class CStatGraphDlg : public CResizableStandAloneDialog//CResizableStandAloneDia
 	DECLARE_DYNAMIC(CStatGraphDlg)
 
 public:
-	CStatGraphDlg(CWnd* pParent = NULL);
+	CStatGraphDlg(CWnd* pParent = nullptr);
 	virtual ~CStatGraphDlg();
 
 	enum { IDD = IDD_STATGRAPH };
 
-	CThreadSafePtrArray m_ShowList;
+	std::vector<GitRevLoglist*> m_ShowList;
 
 	// Data	passed from	the	caller of the dialog.
 	CDWordArray		m_parDates;
@@ -130,15 +127,14 @@ protected:
 	typedef std::map<tstring, double>                AuthorshipDataMap;
 
 	// *** Re-implemented member functions from CDialog
-	virtual void OnOK();
-	virtual void OnCancel();
+	virtual void OnOK() override;
+	virtual void OnCancel() override;
 
-	virtual void DoDataExchange(CDataExchange* pDX);
-	virtual BOOL OnInitDialog();
+	virtual void DoDataExchange(CDataExchange* pDX) override;
+	virtual BOOL OnInitDialog() override;
 	void ShowLabels(BOOL bShow);
 	afx_msg void OnCbnSelchangeGraphcombo();
 	afx_msg void OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar);
-	afx_msg void OnBnClickedStacked();
 	afx_msg void OnNeedText(NMHDR *pnmh, LRESULT *pResult);
 	afx_msg void OnBnClickedGraphbarbutton();
 	afx_msg void OnBnClickedGraphbarstackedbutton();
@@ -147,6 +143,8 @@ protected:
 	afx_msg void OnBnClickedGraphpiebutton();
 	afx_msg void OnFileSavestatgraphas();
 	afx_msg void OnBnClickedFetchDiff();
+	afx_msg void OnBnClickedCommitternames();
+	afx_msg void OnBnClickedCommitdates();
 	DECLARE_MESSAGE_MAP()
 
 	// ** Member functions **
@@ -227,6 +225,8 @@ protected:
 	CSliderCtrl		m_Skipper;
 	BOOL			m_bAuthorsCaseSensitive;
 	BOOL			m_bSortByCommitCount;
+	BOOL			m_bUseCommitterNames;
+	BOOL			m_bUseCommitDates;
 	BOOL			m_bDiffFetched;
 
 	CMFCButton		m_btnGraphBar;

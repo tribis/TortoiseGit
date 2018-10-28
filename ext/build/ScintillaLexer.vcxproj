@@ -43,13 +43,12 @@
   <ItemDefinitionGroup>
     <ClCompile>
       <AdditionalIncludeDirectories>..\scintilla\include;..\scintilla\src;..\scintilla\lexlib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>NDEBUG;SCI_LEXER;USE_D2D;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <DisableSpecificWarnings>4996;4018;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+      <PreprocessorDefinitions>NDEBUG;SCI_LEXER;USE_D2D;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
-      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>imm32.lib;comctl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>imm32.lib;comctl32.lib;msimg32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -58,17 +57,22 @@
     <ClCompile Include="..\scintilla\lexers\LexDiff.cxx" />
     <ClCompile Include="..\scintilla\lexers\LexDMAP.cxx" />
     <ClCompile Include="..\scintilla\lexers\LexDMIS.cxx" />
+    <ClCompile Include="..\scintilla\lexers\LexEDIFACT.cxx" />
     <ClCompile Include="..\scintilla\lexers\LexErrorList.cxx" />
     <ClCompile Include="..\scintilla\lexers\LexHex.cxx" />
+    <ClCompile Include="..\scintilla\lexers\LexIndent.cxx" />
+    <ClCompile Include="..\scintilla\lexers\LexJSON.cxx" />
     <ClCompile Include="..\scintilla\lexers\LexKVIrc.cxx" />
     <ClCompile Include="..\scintilla\lexers\LexLaTeX.cxx" />
     <ClCompile Include="..\scintilla\lexers\LexMake.cxx" />
+    <ClCompile Include="..\scintilla\lexers\LexMaxima.cxx" />
     <ClCompile Include="..\scintilla\lexers\LexNull.cxx" />
     <ClCompile Include="..\scintilla\lexers\LexProps.cxx" />
     <ClCompile Include="..\scintilla\lexers\LexRegistry.cxx" />
     <ClCompile Include="..\scintilla\lexers\LexRust.cxx" />
     <ClCompile Include="..\scintilla\lexers\LexSTTXT.cxx" />
     <ClCompile Include="..\scintilla\lexlib\CharacterCategory.cxx" />
+    <ClCompile Include="..\scintilla\lexlib\DefaultLexer.cxx" />
     <ClCompile Include="..\scintilla\src\AutoComplete.cxx" />
     <ClCompile Include="..\scintilla\src\CallTip.cxx" />
     <ClCompile Include="..\scintilla\src\CaseConvert.cxx" />
@@ -77,6 +81,7 @@
     <ClCompile Include="..\scintilla\src\CellBuffer.cxx" />
     <ClCompile Include="..\scintilla\src\CharClassify.cxx" />
     <ClCompile Include="..\scintilla\src\ContractionState.cxx" />
+    <ClCompile Include="..\scintilla\src\DBCS.cxx" />
     <ClCompile Include="..\scintilla\src\Decoration.cxx" />
     <ClCompile Include="..\scintilla\src\Document.cxx" />
     <ClCompile Include="..\scintilla\src\EditModel.cxx" />
@@ -195,11 +200,17 @@
     <ClCompile Include="..\scintilla\lexlib\WordList.cxx" />
     <ClCompile Include="..\scintilla\win32\HanjaDic.cxx" />
     <ClCompile Include="..\scintilla\win32\PlatWin.cxx" />
+    <ClCompile Include="..\scintilla\win32\ScintillaDLL.cxx" />
     <ClCompile Include="..\scintilla\win32\ScintillaWin.cxx" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\scintilla\include\ILexer.h" />
+    <ClInclude Include="..\scintilla\include\ILoader.h" />
+    <ClInclude Include="..\scintilla\include\SciLexer.h" />
+    <ClInclude Include="..\scintilla\include\Scintilla.h" />
     <ClInclude Include="..\scintilla\include\Sci_Position.h" />
     <ClInclude Include="..\scintilla\lexlib\CharacterCategory.h" />
+    <ClInclude Include="..\scintilla\lexlib\DefaultLexer.h" />
     <ClInclude Include="..\scintilla\src\AutoComplete.h" />
     <ClInclude Include="..\scintilla\src\CallTip.h" />
     <ClInclude Include="..\scintilla\src\CaseConvert.h" />
@@ -208,14 +219,17 @@
     <ClInclude Include="..\scintilla\src\CellBuffer.h" />
     <ClInclude Include="..\scintilla\src\CharClassify.h" />
     <ClInclude Include="..\scintilla\src\ContractionState.h" />
+    <ClInclude Include="..\scintilla\src\DBCS.h" />
     <ClInclude Include="..\scintilla\src\Decoration.h" />
     <ClInclude Include="..\scintilla\src\Document.h" />
     <ClInclude Include="..\scintilla\src\EditModel.h" />
     <ClInclude Include="..\scintilla\src\Editor.h" />
     <ClInclude Include="..\scintilla\src\EditView.h" />
+    <ClInclude Include="..\scintilla\src\ElapsedPeriod.h" />
     <ClInclude Include="..\scintilla\src\ExternalLexer.h" />
     <ClInclude Include="..\scintilla\src\FontQuality.h" />
     <ClInclude Include="..\scintilla\src\Indicator.h" />
+    <ClInclude Include="..\scintilla\src\IntegerRectangle.h" />
     <ClInclude Include="..\scintilla\src\KeyMap.h" />
     <ClInclude Include="..\scintilla\src\LineMarker.h" />
     <ClInclude Include="..\scintilla\src\MarginView.h" />
@@ -227,10 +241,11 @@
     <ClInclude Include="..\scintilla\src\RunStyles.h" />
     <ClInclude Include="..\scintilla\src\ScintillaBase.h" />
     <ClInclude Include="..\scintilla\src\Selection.h" />
+    <ClInclude Include="..\scintilla\src\SparseVector.h" />
     <ClInclude Include="..\scintilla\src\SplitVector.h" />
     <ClInclude Include="..\scintilla\src\Style.h" />
-    <ClInclude Include="..\scintilla\src\UnicodeFromUTF8.h" />
     <ClInclude Include="..\scintilla\src\UniConversion.h" />
+    <ClInclude Include="..\scintilla\src\UniqueString.h" />
     <ClInclude Include="..\scintilla\src\ViewStyle.h" />
     <ClInclude Include="..\scintilla\src\XPM.h" />
     <ClInclude Include="..\scintilla\include\Platform.h" />
@@ -247,6 +262,7 @@
     <ClInclude Include="..\scintilla\lexlib\StyleContext.h" />
     <ClInclude Include="..\scintilla\lexlib\WordList.h" />
     <ClInclude Include="..\scintilla\win32\HanjaDic.h" />
+    <ClInclude Include="..\scintilla\win32\ScintillaWin.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\scintilla\win32\ScintRes.rc" />

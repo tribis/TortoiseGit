@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2011-2015 - TortoiseGit
+// Copyright (C) 2011-2018 - TortoiseGit
 // Copyright (C) 2003-2008, 2013 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -35,21 +35,21 @@ public:
 	CSetDialogs();
 	virtual ~CSetDialogs();
 
-	UINT GetIconID() {return IDI_DIALOGS;}
+	UINT GetIconID() override { return IDI_DIALOGS; }
 
 // Dialog Data
 	enum { IDD = IDD_SETTINGSDIALOGS };
 
 protected:
-	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
+	virtual void DoDataExchange(CDataExchange* pDX) override;    // DDX/DDV support
 
 	DECLARE_MESSAGE_MAP()
 
-	virtual BOOL OnInitDialog();
-	virtual BOOL OnApply();
+	virtual BOOL OnInitDialog() override;
+	virtual BOOL OnApply() override;
 	afx_msg void OnChange();
 	afx_msg void OnCbnSelchangeDefaultlogscale();
-	afx_msg void OnBnClickedBrowsecheckoutpath();
+	afx_msg void OnMeasureItem(int nIDCtl, LPMEASUREITEMSTRUCT lpMeasureItemStruct);
 
 private:
 	BOOL				m_bShortDateFormat;
@@ -97,6 +97,10 @@ private:
 	CRegDWORD			m_regDescribeAbbreviatedSize;
 	BOOL				m_bDescribeAlwaysLong;
 	CRegDWORD			m_regDescribeAlwaysLong;
+	BOOL				m_bDescribeOnlyFollowFirstParent;
+	CRegDWORD			m_regDescribeOnlyFollowFirstParent;
 	BOOL				m_bFullCommitMessageOnLogLine;
 	CRegDWORD			m_regFullCommitMessageOnLogLine;
+	BOOL				m_bMailmapOnLog;
+	CRegDWORD			m_regMailmapOnLog;
 };

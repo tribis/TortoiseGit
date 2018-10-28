@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2016 - TortoiseGit
+// Copyright (C) 2008-2018 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -31,25 +31,25 @@
 
 IMPLEMENT_DYNAMIC(CPullFetchDlg, CHorizontalResizableStandAloneDialog)
 
-CPullFetchDlg::CPullFetchDlg(CWnd* pParent /*=NULL*/)
+CPullFetchDlg::CPullFetchDlg(CWnd* pParent /*=nullptr*/)
 	: CHorizontalResizableStandAloneDialog(CPullFetchDlg::IDD, pParent)
+	, m_IsPull(TRUE)
+	, m_bRebaseActivatedInConfigForPull(false)
+	, m_bNoFF(BST_UNCHECKED)
+	, m_bRebase(BST_UNCHECKED)
+	, m_bRebasePreserveMerges(false)
+	, m_bSquash(BST_UNCHECKED)
+	, m_bNoCommit(BST_UNCHECKED)
+	, m_nDepth(1)
+	, m_bDepth(BST_UNCHECKED)
+	, m_bFFonly(BST_UNCHECKED)
+	, m_bFetchTags(BST_INDETERMINATE)
+	, m_bAllRemotes(BST_UNCHECKED)
+	, m_bPrune(BST_INDETERMINATE)
+	, m_bAutoLoad(CAppUtils::IsSSHPutty())
+	, m_bAutoLoadEnable(CAppUtils::IsSSHPutty())
+	, m_bNamedRemoteFetchAll(!!CRegDWORD(L"Software\\TortoiseGit\\NamedRemoteFetchAll", TRUE))
 {
-	m_IsPull=TRUE;
-	m_bRebaseActivatedInConfigForPull = false;
-	m_bAutoLoad = CAppUtils::IsSSHPutty();
-	m_bAutoLoadEnable=CAppUtils::IsSSHPutty();;
-	m_regRebase = false;
-	m_bNoFF = false;
-	m_bRebase = FALSE;
-	m_bRebasePreserveMerges = false;
-	m_bSquash = false;
-	m_bNoCommit = false;
-	m_nDepth = 1;
-	m_bDepth = FALSE;
-	m_bFFonly = false;
-	m_bFetchTags = 2;
-	m_bAllRemotes = FALSE;
-	m_bPrune = BST_INDETERMINATE;
 }
 
 CPullFetchDlg::~CPullFetchDlg()
@@ -93,6 +93,18 @@ BOOL CPullFetchDlg::OnInitDialog()
 	CHorizontalResizableStandAloneDialog::OnInitDialog();
 	CAppUtils::MarkWindowAsUnpinnable(m_hWnd);
 
+	AdjustControlSize(IDC_REMOTE_RD);
+	AdjustControlSize(IDC_OTHER_RD);
+	AdjustControlSize(IDC_CHECK_SQUASH);
+	AdjustControlSize(IDC_CHECK_NOCOMMIT);
+	AdjustControlSize(IDC_CHECK_DEPTH);
+	AdjustControlSize(IDC_CHECK_NOFF);
+	AdjustControlSize(IDC_CHECK_FFONLY);
+	AdjustControlSize(IDC_CHECK_FETCHTAGS);
+	AdjustControlSize(IDC_PUTTYKEY_AUTOLOAD);
+	AdjustControlSize(IDC_CHECK_REBASE);
+	AdjustControlSize(IDC_CHECK_PRUNE);
+
 	AddAnchor(IDC_REMOTE_COMBO, TOP_LEFT, TOP_RIGHT);
 	AddAnchor(IDC_OTHER, TOP_LEFT,TOP_RIGHT);
 
@@ -109,28 +121,16 @@ BOOL CPullFetchDlg::OnInitDialog()
 	AddAnchor(IDC_REMOTE_MANAGE,BOTTOM_LEFT);
 	AddAnchor(IDHELP, BOTTOM_RIGHT);
 
-	AdjustControlSize(IDC_REMOTE_RD);
-	AdjustControlSize(IDC_OTHER_RD);
-	AdjustControlSize(IDC_CHECK_SQUASH);
-	AdjustControlSize(IDC_CHECK_NOCOMMIT);
-	AdjustControlSize(IDC_CHECK_DEPTH);
-	AdjustControlSize(IDC_CHECK_NOFF);
-	AdjustControlSize(IDC_CHECK_FFONLY);
-	AdjustControlSize(IDC_CHECK_FETCHTAGS);
-	AdjustControlSize(IDC_PUTTYKEY_AUTOLOAD);
-	AdjustControlSize(IDC_CHECK_REBASE);
-	AdjustControlSize(IDC_CHECK_PRUNE);
-
 	CString WorkingDir=g_Git.m_CurrentDir;
-	WorkingDir.Replace(_T(':'),_T('_'));
+	WorkingDir.Replace(L':', L'_');
 
-	m_RemoteReg = CRegString(CString(_T("Software\\TortoiseGit\\History\\PullRemote\\")+WorkingDir));
+	m_RemoteReg = CRegString(L"Software\\TortoiseGit\\History\\PullRemote\\" + WorkingDir);
 	CString regkey;
-	regkey.Format(_T("Software\\TortoiseGit\\TortoiseProc\\PullFetch\\%s_%d\\rebase"), (LPCTSTR)WorkingDir, m_IsPull);
+	regkey.Format(L"Software\\TortoiseGit\\TortoiseProc\\PullFetch\\%s_%d\\rebase", (LPCTSTR)WorkingDir, m_IsPull);
 	m_regRebase=CRegDWORD(regkey,false);
-	regkey.Format(_T("Software\\TortoiseGit\\TortoiseProc\\PullFetch\\%s_%d\\ffonly"), (LPCTSTR)WorkingDir, m_IsPull);
+	regkey.Format(L"Software\\TortoiseGit\\TortoiseProc\\PullFetch\\%s_%d\\ffonly", (LPCTSTR)WorkingDir, m_IsPull);
 	m_regFFonly = CRegDWORD(regkey, false);
-	regkey.Format(_T("Software\\TortoiseGit\\TortoiseProc\\PullFetch\\%s_%d\\autoload"), (LPCTSTR)WorkingDir, m_IsPull);
+	regkey.Format(L"Software\\TortoiseGit\\TortoiseProc\\PullFetch\\%s_%d\\autoload", (LPCTSTR)WorkingDir, m_IsPull);
 
 	m_regAutoLoadPutty = CRegDWORD(regkey,this->m_bAutoLoad);
 	m_bAutoLoad = m_regAutoLoadPutty;
@@ -142,7 +142,7 @@ BOOL CPullFetchDlg::OnInitDialog()
 
 	CAutoRepository repo(g_Git.GetGitRepository());
 	if (!repo)
-		MessageBox(CGit::GetLibGit2LastErr(_T("Could not open repository.")), _T("TortoiseGit"), MB_OK | MB_ICONERROR);
+		MessageBox(CGit::GetLibGit2LastErr(L"Could not open repository."), L"TortoiseGit", MB_OK | MB_ICONERROR);
 
 	// Check config branch.<name>.rebase and pull.reabse
 	do
@@ -161,26 +161,26 @@ BOOL CPullFetchDlg::OnInitDialog()
 
 		BOOL rebase = FALSE;
 		// branch.<name>.rebase overrides pull.rebase
-		if (config.GetBOOL(_T("branch.") + g_Git.GetCurrentBranch() + _T(".rebase"), rebase) == GIT_ENOTFOUND)
+		if (config.GetBOOL(L"branch." + g_Git.GetCurrentBranch() + L".rebase", rebase) == GIT_ENOTFOUND)
 		{
-			if (config.GetBOOL(_T("pull.rebase"), rebase) == GIT_ENOTFOUND)
+			if (config.GetBOOL(L"pull.rebase", rebase) == GIT_ENOTFOUND)
 				break;
-			else if (CRegDWORD(L"Software\\TortoiseGit\\PullRebaseBehaviorLike1816", FALSE) == FALSE)
+			else
 			{
 				CString value;
-				config.GetString(_T("pull.rebase"), value);
-				if (value == _T("preserve"))
+				config.GetString(L"pull.rebase", value);
+				if (value == L"preserve")
 				{
 					rebase = TRUE;
 					m_bRebasePreserveMerges = true;
 				}
 			}
 		}
-		else if (CRegDWORD(L"Software\\TortoiseGit\\PullRebaseBehaviorLike1816", FALSE) == FALSE)
+		else
 		{
 			CString value;
-			config.GetString(_T("branch.") + g_Git.GetCurrentBranch() + _T(".rebase"), value);
-			if (value == _T("preserve"))
+			config.GetString(L"branch." + g_Git.GetCurrentBranch() + L".rebase", value);
+			if (value == L"preserve")
 			{
 				rebase = TRUE;
 				m_bRebasePreserveMerges = true;
@@ -192,7 +192,7 @@ BOOL CPullFetchDlg::OnInitDialog()
 		// Since rebase = true in config, means that "git.exe pull" will ALWAYS rebase without "--rebase".
 		// So, lock it, then let Fetch Rebase do the rest things.
 		m_bRebase = TRUE;
-		m_bRebaseActivatedInConfigForPull = (CRegDWORD(L"Software\\TortoiseGit\\PullRebaseBehaviorLike1816", FALSE) == FALSE);
+		m_bRebaseActivatedInConfigForPull = true;
 	} while (0);
 
 	this->UpdateData(FALSE);
@@ -205,7 +205,8 @@ BOOL CPullFetchDlg::OnInitDialog()
 	m_Remote.EnableWindow(TRUE);
 	m_Remote.SetMaxHistoryItems(0x7FFFFFFF);
 	m_Other.EnableWindow(FALSE);
-	if(!m_IsPull)
+	m_RemoteBranch.SetCaseSensitive(TRUE);
+	if (!m_IsPull && m_bNamedRemoteFetchAll)
 	{
 		m_RemoteBranch.EnableWindow(FALSE);
 		GetDlgItem(IDC_BUTTON_BROWSE_REF)->EnableWindow(FALSE);
@@ -243,9 +244,9 @@ BOOL CPullFetchDlg::OnInitDialog()
 
 	m_Other.SetCaseSensitive(TRUE);
 	m_Other.SetURLHistory(TRUE);
-	m_Other.LoadHistory(_T("Software\\TortoiseGit\\History\\PullURLS"), _T("url"));
+	m_Other.LoadHistory(L"Software\\TortoiseGit\\History\\PullURLS", L"url");
 
-	m_RemoteBranch.LoadHistory(_T("Software\\TortoiseGit\\History\\PullRemoteBranch"), _T("br"));
+	m_RemoteBranch.LoadHistory(L"Software\\TortoiseGit\\History\\PullRemoteBranch", L"br");
 	m_RemoteBranch.SetCurSel(0);
 
 	CString sWindowTitle;
@@ -258,7 +259,7 @@ BOOL CPullFetchDlg::OnInitDialog()
 
 	Refresh();
 
-	EnableSaveRestore(_T("PullFetchDlg"));
+	EnableSaveRestore(L"PullFetchDlg");
 	this->m_RemoteManage.SetURL(CString());
 	return TRUE;
 }
@@ -311,13 +312,13 @@ void CPullFetchDlg::OnCbnSelchangeRemote()
 	CString remote = m_Remote.GetString();
 	if (remote.IsEmpty() || remote == CString(MAKEINTRESOURCE(IDS_PROC_PUSHFETCH_ALLREMOTES)))
 	{
-		GetDlgItem(IDC_STATIC_TAGOPT)->SetWindowText(_T(""));
-		GetDlgItem(IDC_STATIC_PRUNE)->SetWindowText(_T(""));
+		GetDlgItem(IDC_STATIC_TAGOPT)->SetWindowText(L"");
+		GetDlgItem(IDC_STATIC_PRUNE)->SetWindowText(L"");
 		return;
 	}
 
 	CString key;
-	key.Format(_T("remote.%s.tagopt"), (LPCTSTR)remote);
+	key.Format(L"remote.%s.tagopt", (LPCTSTR)remote);
 	CString tagopt = g_Git.GetConfigValue(key);
 	if (tagopt == "--no-tags")
 		tagopt.LoadString(IDS_NONE);
@@ -326,20 +327,20 @@ void CPullFetchDlg::OnCbnSelchangeRemote()
 	else
 		tagopt.LoadString(IDS_FETCH_REACHABLE);
 	CString value;
-	value.Format(_T("%s: %s"), (LPCTSTR)CString(MAKEINTRESOURCE(IDS_DEFAULT)), (LPCTSTR)tagopt);
+	value.Format(L"%s: %s", (LPCTSTR)CString(MAKEINTRESOURCE(IDS_DEFAULT)), (LPCTSTR)tagopt);
 	GetDlgItem(IDC_STATIC_TAGOPT)->SetWindowText(value);
 
-	key.Format(_T("remote.%s.prune"), (LPCTSTR)remote);
+	key.Format(L"remote.%s.prune", (LPCTSTR)remote);
 	CString prune = g_Git.GetConfigValue(key);
 	if (prune.IsEmpty())
-		prune = g_Git.GetConfigValue(_T("fetch.prune"));
+		prune = g_Git.GetConfigValue(L"fetch.prune");
 	if (!prune.IsEmpty())
 	{
-		value.Format(_T("%s: %s"), (LPCTSTR)CString(MAKEINTRESOURCE(IDS_DEFAULT)), (LPCTSTR)prune);
+		value.Format(L"%s: %s", (LPCTSTR)CString(MAKEINTRESOURCE(IDS_DEFAULT)), (LPCTSTR)prune);
 		GetDlgItem(IDC_STATIC_PRUNE)->SetWindowText(value);
 	}
 	else
-		GetDlgItem(IDC_STATIC_PRUNE)->SetWindowText(_T(""));
+		GetDlgItem(IDC_STATIC_PRUNE)->SetWindowText(L"");
 }
 
 void CPullFetchDlg::OnBnClickedRd()
@@ -351,12 +352,14 @@ void CPullFetchDlg::OnBnClickedRd()
 		DialogEnableWindow(IDC_CHECK_REBASE, TRUE);
 		m_bRebase = m_bRebaseActivatedInConfigForPull;
 		UpdateData(FALSE);
-		if(!m_IsPull)
+		if (!m_IsPull && m_bNamedRemoteFetchAll)
 			m_RemoteBranch.EnableWindow(FALSE);
 	}
 	if( GetCheckedRadioButton(IDC_REMOTE_RD,IDC_OTHER_RD) == IDC_OTHER_RD)
 	{
-		CString clippath = CAppUtils::GetClipboardLink(m_IsPull ? _T("git pull") : _T("git fetch"), 1);
+		CString clippath = CAppUtils::GetClipboardLink(m_IsPull ? L"git pull" : L"git fetch", 1);
+		if (clippath.IsEmpty())
+			clippath = CAppUtils::GetClipboardLink(!m_IsPull ? L"git pull" : L"git fetch", 1);
 		if (clippath.IsEmpty())
 			m_Other.SetCurSel(0);
 		else
@@ -387,8 +390,8 @@ void CPullFetchDlg::OnBnClickedOk()
 	{
 		m_RemoteURL=m_Remote.GetString();
 		m_bAllRemotes = (m_Remote.GetCurSel() == 0 && m_Remote.GetCount() > 1 && !m_IsPull);
-		if( !m_IsPull ||
-			(m_configPullRemote == m_RemoteURL && m_configPullBranch == m_RemoteBranch.GetString() ))
+		if (m_bNamedRemoteFetchAll && (!m_IsPull ||
+			(m_configPullRemote == m_RemoteURL && m_configPullBranch == m_RemoteBranch.GetString())))
 			//When fetching or when pulling from the configured tracking branch, dont explicitly set the remote branch name,
 			//because otherwise git will not update the remote tracking branches.
 			m_RemoteBranchName.Empty();
@@ -397,7 +400,7 @@ void CPullFetchDlg::OnBnClickedOk()
 	}
 	if( GetCheckedRadioButton(IDC_REMOTE_RD,IDC_OTHER_RD) == IDC_OTHER_RD)
 	{
-		m_Other.GetWindowTextW(m_RemoteURL);
+		m_RemoteURL = m_Other.GetString();
 		m_RemoteBranchName=m_RemoteBranch.GetString();
 
 		// only store URL in history if it's value was used
@@ -432,7 +435,7 @@ void CPullFetchDlg::OnBnClickedButtonBrowseRef()
 	CString initialRef;
 	initialRef.Format(L"refs/remotes/%s/%s", (LPCTSTR)m_Remote.GetString(), (LPCTSTR)m_RemoteBranch.GetString());
 	CString selectedRef = CBrowseRefsDlg::PickRef(false, initialRef, gPickRef_Remote);
-	if(selectedRef.Left(13) != "refs/remotes/")
+	if (!CStringUtils::StartsWith(selectedRef, L"refs/remotes/"))
 		return;
 
 	selectedRef = selectedRef.Mid(13);
@@ -464,17 +467,13 @@ void CPullFetchDlg::OnBnClickedCheckFfonly()
 		GetDlgItem(IDC_CHECK_FFONLY)->EnableWindow(FALSE);
 	}
 	else
-	{
 		GetDlgItem(IDC_CHECK_FFONLY)->EnableWindow(TRUE);
-	}
 	if (m_bFFonly)
 	{
 		m_bNoFF = FALSE;
 		GetDlgItem(IDC_CHECK_NOFF)->EnableWindow(FALSE);
 	}
 	else
-	{
 		GetDlgItem(IDC_CHECK_NOFF)->EnableWindow(TRUE);
-	}
 	UpdateData(FALSE);
 }

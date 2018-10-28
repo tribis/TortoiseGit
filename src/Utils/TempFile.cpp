@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2011-2013, 2015 - TortoiseGit
+// Copyright (C) 2009, 2011-2013, 2015-2016 - TortoiseGit
 // Copyright (C) 2003-2008 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -39,9 +39,9 @@ CTempFiles& CTempFiles::Instance()
 	return instance;
 }
 
-CTGitPath CTempFiles::GetTempFilePath(bool bRemoveAtEnd, const CTGitPath& path /* = CTGitPath() */, const GitRev &revision /* = GitRev() */)
+CTGitPath CTempFiles::GetTempFilePath(bool bRemoveAtEnd, const CTGitPath& path /* = CTGitPath() */, const CGitHash& hash /* = CGitHash() */)
 {
-	DWORD len = GetTortoiseGitTempPath(0, NULL);
+	DWORD len = GetTortoiseGitTempPath(0, nullptr);
 
 	auto temppath = std::make_unique<TCHAR[]>(len + 1);
 	auto tempF = std::make_unique<TCHAR[]>(len + 50);
@@ -50,7 +50,7 @@ CTGitPath CTempFiles::GetTempFilePath(bool bRemoveAtEnd, const CTGitPath& path /
 	CString possibletempfile;
 	if (path.IsEmpty())
 	{
-		::GetTempFileName (temppath.get(), _T("git"), 0, tempF.get());
+		::GetTempFileName (temppath.get(), L"git", 0, tempF.get());
 		tempfile = CTGitPath(tempF.get());
 	}
 	else
@@ -58,21 +58,18 @@ CTGitPath CTempFiles::GetTempFilePath(bool bRemoveAtEnd, const CTGitPath& path /
 		int i=0;
 		do
 		{
-			if (!((GitRev&)revision).m_CommitHash.IsEmpty())
-			{
-				possibletempfile.Format(_T("%s%s-rev%s.git%3.3x.tmp%s"), temppath.get(), (LPCTSTR)path.GetFileOrDirectoryName(), (LPCTSTR)((GitRev&)revision).m_CommitHash.ToString().Left(7), i, (LPCTSTR)path.GetFileExtension());
-			}
+			if (!hash.IsEmpty())
+				possibletempfile.Format(L"%s%s-%s.%3.3x%s", temppath.get(), (LPCTSTR)path.GetBaseFilename(), (LPCTSTR)hash.ToString().Left(7), i, (LPCTSTR)path.GetFileExtension());
 			else
-			{
-				possibletempfile.Format(_T("%s%s.git%3.3x.tmp%s"), temppath.get(), (LPCTSTR)path.GetFileOrDirectoryName(), i, (LPCTSTR)path.GetFileExtension());
-			}
+				possibletempfile.Format(L"%s%s.%3.3x%s", temppath.get(), (LPCTSTR)path.GetBaseFilename(), i, (LPCTSTR)path.GetFileExtension());
 			tempfile.SetFromWin(possibletempfile);
 			++i;
-		} while (PathFileExists(tempfile.GetWinPath()));
+			// now create the temp file in a thread safe way, so that subsequent calls to GetTempFile() return different filenames.
+			CAutoFile hFile = CreateFile(tempfile.GetWinPath(), GENERIC_READ, FILE_SHARE_READ, nullptr, CREATE_NEW, FILE_ATTRIBUTE_TEMPORARY, nullptr);
+			if (hFile || GetLastError() != ERROR_FILE_EXISTS)
+				break;
+		} while (true);
 	}
-	//now create the temp file, so that subsequent calls to GetTempFile() return
-	//different filenames.
-	CAutoFile hFile = CreateFile(tempfile.GetWinPath(), GENERIC_READ, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY, NULL);
 	if (bRemoveAtEnd)
 		m_TempFileList.AddPath(tempfile);
 	return tempfile;

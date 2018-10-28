@@ -1,5 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
+// Copyright (C) 2016 - TortoiseGit
 // Copyright (C) 2003-2008,2010 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -29,7 +30,7 @@ class CSetHooksAdv : public CResizableStandAloneDialog
 	DECLARE_DYNAMIC(CSetHooksAdv)
 
 public:
-	CSetHooksAdv(CWnd* pParent = NULL);   // standard constructor
+	CSetHooksAdv(CWnd* pParent = nullptr);   // standard constructor
 	virtual ~CSetHooksAdv();
 
 // Dialog Data
@@ -39,9 +40,9 @@ public:
 	hookcmd cmd;
 
 protected:
-	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
-	virtual BOOL OnInitDialog();
-	virtual void OnOK();
+	virtual void DoDataExchange(CDataExchange* pDX) override;    // DDX/DDV support
+	virtual BOOL OnInitDialog() override;
+	virtual void OnOK() override;
 	afx_msg void OnBnClickedHookbrowse();
 	afx_msg void OnBnClickedHookcommandbrowse();
 
@@ -49,6 +50,7 @@ protected:
 
 	CString			m_sPath;
 	CString			m_sCommandLine;
+	BOOL			m_bEnabled;
 	BOOL			m_bWait;
 	BOOL			m_bHide;
 	CComboBox		m_cHookTypeCombo;

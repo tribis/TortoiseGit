@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2012, 2014-2015 - TortoiseGit
+// Copyright (C) 2012-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -18,12 +18,13 @@
 //
 #include "stdafx.h"
 #include "TortoiseProc.h"
+#include "Git.h"
 #include "AppUtils.h"
 #include "SubmoduleDiffDlg.h"
 #include "LoglistCommonResource.h"
 
 IMPLEMENT_DYNAMIC(CSubmoduleDiffDlg, CHorizontalResizableStandAloneDialog)
-CSubmoduleDiffDlg::CSubmoduleDiffDlg(CWnd* pParent /*=NULL*/)
+CSubmoduleDiffDlg::CSubmoduleDiffDlg(CWnd* pParent /*=nullptr*/)
 	: CHorizontalResizableStandAloneDialog(CSubmoduleDiffDlg::IDD, pParent)
 	, m_bToIsWorkingCopy(false)
 	, m_bFromOK(false)
@@ -85,24 +86,24 @@ BOOL CSubmoduleDiffDlg::OnInitDialog()
 	AddAnchor(IDC_TOHASH, TOP_LEFT, TOP_RIGHT);
 	AddAnchor(IDC_TOSUBJECT, TOP_LEFT, TOP_RIGHT);
 
-	EnableSaveRestore(_T("SubmoduleDiffDlg"));
+	EnableSaveRestore(L"SubmoduleDiffDlg");
 
 	if (m_bToIsWorkingCopy)
 	{
 		CString toGroup;
 		GetDlgItem(IDC_TOGROUP)->GetWindowText(toGroup);
-		toGroup += _T(" (") + CString(MAKEINTRESOURCE(IDS_git_DEPTH_WORKING)) +  _T(")");
+		toGroup += L" (" + CString(MAKEINTRESOURCE(IDS_WORKING_TREE)) +  L')';
 		GetDlgItem(IDC_TOGROUP)->SetWindowText(toGroup);
 	}
 
 	CString fsPath = m_sPath;
-	fsPath.Replace('\\', '/');
-	CString title = _T("Submodule \"") + fsPath + _T("\"");
+	fsPath.Replace(L'\\', L'/');
+	CString title = L"Submodule \"" + fsPath + L'"';
 	GetDlgItem(IDC_SUBMODULEDIFFTITLE)->SetWindowText(title);
 
 	UpdateData(FALSE);
 	if (m_bDirty)
-		GetDlgItem(IDC_TOHASH)->SetWindowText(m_sToHash + _T("-dirty"));
+		GetDlgItem(IDC_TOHASH)->SetWindowText(m_sToHash + L"-dirty");
 
 	CString changeTypeTable[] =
 	{
@@ -229,7 +230,7 @@ void CSubmoduleDiffDlg::SetDiff(CString path, bool toIsWorkingCopy, CString from
 void CSubmoduleDiffDlg::ShowLog(CString hash)
 {
 	CString sCmd;
-	sCmd.Format(_T("/command:log /path:\"%s\" /endrev:%s"), (LPCTSTR)g_Git.CombinePath(m_sPath), (LPCTSTR)hash);
+	sCmd.Format(L"/command:log /path:\"%s\" /endrev:%s", (LPCTSTR)g_Git.CombinePath(m_sPath), (LPCTSTR)hash);
 	CAppUtils::RunTortoiseGitProc(sCmd, false, false);
 }
 
@@ -246,13 +247,17 @@ void CSubmoduleDiffDlg::OnBnClickedLog2()
 void CSubmoduleDiffDlg::OnBnClickedShowDiff()
 {
 	CString sCmd;
-	sCmd.Format(_T("/command:showcompare /path:\"%s\" /revision1:%s /revision2:%s"), (LPCTSTR)g_Git.CombinePath(m_sPath), (LPCTSTR)m_sFromHash, ((m_bDirty && m_nChangeType == CGitDiff::Unknown) || m_ctrlShowDiffBtn.GetCurrentEntry() == 1) ? GIT_REV_ZERO : (LPCTSTR)m_sToHash);
+	sCmd.Format(L"/command:showcompare /path:\"%s\" /revision1:%s /revision2:%s", (LPCTSTR)g_Git.CombinePath(m_sPath), (LPCTSTR)m_sFromHash, ((m_bDirty && m_nChangeType == CGitDiff::Unknown) || m_ctrlShowDiffBtn.GetCurrentEntry() == 1) ? GIT_REV_ZERO : (LPCTSTR)m_sToHash);
+
+	if (!!(GetAsyncKeyState(VK_SHIFT) & 0x8000))
+		sCmd += L" /alternative";
+
 	CAppUtils::RunTortoiseGitProc(sCmd, false, false);
 }
 
 void CSubmoduleDiffDlg::OnBnClickedButtonUpdate()
 {
 	CString sCmd;
-	sCmd.Format(_T("/command:subupdate /bkpath:\"%s\" /selectedpath:\"%s\""), (LPCTSTR)g_Git.m_CurrentDir, (LPCTSTR)m_sPath);
+	sCmd.Format(L"/command:subupdate /bkpath:\"%s\" /selectedpath:\"%s\"", (LPCTSTR)g_Git.m_CurrentDir, (LPCTSTR)m_sPath);
 	CAppUtils::RunTortoiseGitProc(sCmd);
 }

@@ -1,7 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
 // Copyright (C) 2008-2009 - TortoiseSVN
-// Copyright (C) 2008-2012, 2015 - TortoiseGit
+// Copyright (C) 2008-2012, 2015-2016, 2018 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -28,13 +28,14 @@ bool SyncCommand::Execute()
 {
 	if (!GitAdminDir::IsWorkingTreeOrBareRepo(g_Git.m_CurrentDir))
 	{
-		CMessageBox::Show(hwndExplorer, IDS_NOWORKINGCOPY, IDS_APPNAME, MB_ICONERROR);
+		CMessageBox::Show(GetExplorerHWND(), IDS_NOWORKINGCOPY, IDS_APPNAME, MB_ICONERROR);
 		return false;
 	}
 
 	bool bRet = false;
 	CSyncDlg dlg;
-	dlg.m_seq = parser.GetLongVal(_T("seq"));
+	theApp.m_pMainWnd = &dlg;
+	dlg.m_seq = parser.GetLongVal(L"seq");
 	if(dlg.DoModal() == IDOK)
 		bRet=true;
 

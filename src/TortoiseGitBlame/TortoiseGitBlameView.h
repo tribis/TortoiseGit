@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2013, 2015-2016 - TortoiseGit
+// Copyright (C) 2008-2013, 2015-2018 - TortoiseGit
 // Copyright (C) 2003-2008, 2014 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -44,18 +44,7 @@ const COLORREF lightBlue = RGB(0xA6, 0xCA, 0xF0);
 const int blockSize = 128 * 1024;
 
 #define BLAMESPACE 5
-#define HEADER_HEIGHT 18
 #define LOCATOR_WIDTH 10
-
-#define MAX_LOG_LENGTH 2000
-
-
-#ifndef GET_X_LPARAM
-#define GET_X_LPARAM(lp)                        ((int)(short)LOWORD(lp))
-#endif
-#ifndef GET_Y_LPARAM
-#define GET_Y_LPARAM(lp)                        ((int)(short)HIWORD(lp))
-#endif
 
 class CSciEditBlame: public CSciEdit
 {
@@ -104,26 +93,29 @@ public:
 
 // Overrides
 public:
-	virtual void OnDraw(CDC* pDC);  // overridden to draw this view
-	virtual BOOL PreCreateWindow(CREATESTRUCT& cs);
+	afx_msg void OnDraw(CDC* pDC);  // overridden to draw this view
+	afx_msg BOOL OnEraseBkgnd(CDC* pDC);
+	virtual BOOL PreCreateWindow(CREATESTRUCT& cs) override;
 protected:
-	virtual BOOL OnPreparePrinting(CPrintInfo* pInfo);
-	virtual void OnBeginPrinting(CDC* pDC, CPrintInfo* pInfo);
-	virtual void OnEndPrinting(CDC* pDC, CPrintInfo* pInfo);
+	afx_msg BOOL OnPreparePrinting(CPrintInfo* pInfo);
+	afx_msg void OnBeginPrinting(CDC* pDC, CPrintInfo* pInfo);
+	afx_msg void OnEndPrinting(CDC* pDC, CPrintInfo* pInfo);
+	virtual ULONG GetGestureStatus(CPoint ptTouch) override;
 
 // Implementation
 public:
 	virtual ~CTortoiseGitBlameView();
 #ifdef _DEBUG
-	virtual void AssertValid() const;
-	virtual void Dump(CDumpContext& dc) const;
+	virtual void AssertValid() const override;
+	virtual void Dump(CDumpContext& dc) const override;
 #endif
 
 protected:
 
 // Generated message map functions
 protected:
-	BOOL PreTranslateMessage(MSG* pMsg);
+	virtual BOOL PreTranslateMessage(MSG* pMsg) override;
+	afx_msg void OnSysColorChange();
 	afx_msg void OnChangeEncode(UINT nID);
 	afx_msg void OnEditFind();
 	afx_msg void OnEditGoto();
@@ -139,6 +131,7 @@ protected:
 	afx_msg void OnSciGetBkColor(NMHDR*, LRESULT*);
 	afx_msg void OnMouseHover(UINT nFlags, CPoint point);
 	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
+	afx_msg void OnMouseLeave();
 	afx_msg LRESULT OnFindDialogMessage(WPARAM wParam, LPARAM lParam);
 	afx_msg void OnViewNext();
 	afx_msg void OnViewPrev();
@@ -164,15 +157,19 @@ protected:
 	afx_msg void OnUpdateViewToggleIgnoreWhitespace(CCmdUI *pCmdUI);
 	afx_msg void OnViewToggleShowCompleteLog();
 	afx_msg void OnUpdateViewToggleShowCompleteLog(CCmdUI *pCmdUI);
+	afx_msg void OnViewToggleOnlyFirstParent();
+	afx_msg void OnUpdateViewToggleOnlyFirstParent(CCmdUI* pCmdUI);
 	afx_msg void OnViewToggleFollowRenames();
 	afx_msg void OnUpdateViewToggleFollowRenames(CCmdUI *pCmdUI);
 	afx_msg void OnViewToggleColorByAge();
 	afx_msg void OnUpdateViewToggleColorByAge(CCmdUI *pCmdUI);
 	afx_msg void OnViewToggleLexer();
 	afx_msg void OnUpdateViewToggleLexer(CCmdUI *pCmdUI);
+	afx_msg void OnViewWrapLongLines();
+	afx_msg void OnUpdateViewWrapLongLines(CCmdUI* pCmdUI);
 	afx_msg void OnUpdateViewCopyToClipboard(CCmdUI *pCmdUI);
 	void OnViewDetectMovedOrCopiedLines(DWORD dwDetectMovedOrCopiedLines);
-	void ContextMenuAction(int cmd, GitRev* pRev, GIT_REV_LIST& parentHash, const std::vector<CString>& parentFilename);
+	void ContextMenuAction(int cmd, GitRev* pRev, GIT_REV_LIST& parentHash, const std::vector<CString>& parentFilename, int line);
 	void ReloadDocument();
 
 	DECLARE_MESSAGE_MAP()
@@ -209,12 +206,13 @@ public:
 	DWORD m_dwDetectMovedOrCopiedLines;
 	BOOL m_bIgnoreWhitespace;
 	BOOL m_bShowCompleteLog;
+	BOOL m_bOnlyFirstParent;
 	BOOL m_bFollowRenames;
-	BOOL m_bBlameOuputContainsOtherFilenames;
+	BOOL m_bBlameOutputContainsOtherFilenames;
 
 	LRESULT SendEditor(UINT Msg, WPARAM wParam=0, LPARAM lParam=0);
 
-	void SetAStyle(int style, COLORREF fore, COLORREF back = ::GetSysColor(COLOR_WINDOW), int size = -1, const char *face = NULL);
+	void SetAStyle(int style, COLORREF fore, COLORREF back = ::GetSysColor(COLOR_WINDOW), int size = -1, const char* face = nullptr);
 
 	void InitialiseEditor();
 	LONG GetBlameWidth();
@@ -224,8 +222,6 @@ public:
 	bool DoSearch(CTortoiseGitBlameData::SearchDirection direction);
 	bool GotoLine(int line);
 	bool ScrollToLine(long line);
-	void GotoLineDlg();
-	static INT_PTR CALLBACK GotoDlgProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
 	void SetSelectedLine(int line) { m_SelectedLine = line;};
 
@@ -234,6 +230,7 @@ public:
 	CGitHash				m_selecteddate;
 	bool					m_colorage;
 	bool					m_bLexer;
+	bool					m_bWrapLongLines;
 
 	CTortoiseGitBlameData	m_data;
 	std::vector<int>		m_lineToLogIndex;
@@ -246,9 +243,9 @@ protected:
 	void CreateFont();
 	void SetupLexer(CString filename);
 	void SetupCppLexer();
-	COLORREF GetLineColor(int line);
+	int GetLineUnderCursor(CPoint point);
+	COLORREF GetLineColor(size_t line);
 	COLORREF InterColor(COLORREF c1, COLORREF c2, int Slider);
-	CString GetAppDirectory();
 	CFont					m_font;
 	CFont					m_italicfont;
 	LONG					m_blamewidth;

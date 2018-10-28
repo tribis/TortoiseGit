@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2014 - TortoiseGit
+// Copyright (C) 2014, 2017 - TortoiseGit
 // Copyright (C) 2003-2014 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -147,7 +147,7 @@ DWORD CRegBaseCommon<S>::removeKey()
     m_exists = false;
     m_read = true;
 
-    HKEY hKey = NULL;
+    HKEY hKey = nullptr;
     RegOpenKeyEx (m_base, GetPlainString (m_path), 0, KEY_WRITE|m_sam, &hKey);
     return SHDeleteKey(m_base, GetPlainString (m_path));
 }
@@ -158,7 +158,7 @@ LONG CRegBaseCommon<S>::removeValue()
     m_exists = false;
     m_read = true;
 
-    HKEY hKey = NULL;
+    HKEY hKey = nullptr;
     RegOpenKeyEx(m_base, GetPlainString (m_path), 0, KEY_WRITE|m_sam, &hKey);
     return RegDeleteValue(hKey, GetPlainString (m_key));
 }
@@ -424,10 +424,9 @@ void CRegTypedBase<T, Base>::read()
     m_value = m_defaultvalue;
     m_exists = false;
 
-    HKEY hKey = NULL;
+    HKEY hKey = nullptr;
     if ((LastError = RegOpenKeyEx (m_base, GetPlainString (m_path), 0, STANDARD_RIGHTS_READ|KEY_QUERY_VALUE|m_sam, &hKey))==ERROR_SUCCESS)
     {
-
         T value = m_defaultvalue;
         InternalRead (hKey, value);
 
@@ -447,10 +446,10 @@ void CRegTypedBase<T, Base>::read()
 template<class T, class Base>
 void CRegTypedBase<T, Base>::write()
 {
-    HKEY hKey = NULL;
+    HKEY hKey = nullptr;
 
     DWORD disp = 0;
-    if ((LastError = RegCreateKeyEx(m_base, GetPlainString (m_path), 0, _T(""), REG_OPTION_NON_VOLATILE, KEY_WRITE|m_sam, NULL, &hKey, &disp))!=ERROR_SUCCESS)
+    if ((LastError = RegCreateKeyEx(m_base, GetPlainString(m_path), 0, L"", REG_OPTION_NON_VOLATILE, KEY_WRITE | m_sam, nullptr, &hKey, &disp)) != ERROR_SUCCESS)
     {
         return;
     }
@@ -613,7 +612,7 @@ void CRegDWORDCommon<Base>::InternalRead (HKEY hKey, DWORD& value)
 {
     DWORD size = sizeof(value);
     DWORD type = 0;
-    if ((LastError = RegQueryValueEx(hKey, GetPlainString (m_key), NULL, &type, (BYTE*) &value, &size))==ERROR_SUCCESS)
+    if ((LastError = RegQueryValueEx(hKey, GetPlainString(m_key), nullptr, &type, (BYTE*)&value, &size)) == ERROR_SUCCESS)
     {
         ASSERT(type==REG_DWORD);
     }
@@ -693,8 +692,8 @@ public:
      * \param base a predefined base key like HKEY_LOCAL_MACHINE. see the SDK documentation for more information.
      * \param sam
      */
-    CRegStringCommon(const typename Base::StringT& key, const typename Base::StringT& def = _T(""), bool force = false, HKEY base = HKEY_CURRENT_USER, REGSAM sam = 0);
-    CRegStringCommon(DWORD lookupInterval, const typename Base::StringT& key, const typename Base::StringT& def = _T(""), bool force = false, HKEY base = HKEY_CURRENT_USER, REGSAM sam = 0);
+    CRegStringCommon(const typename Base::StringT& key, const typename Base::StringT& def = L"", bool force = false, HKEY base = HKEY_CURRENT_USER, REGSAM sam = 0);
+    CRegStringCommon(DWORD lookupInterval, const typename Base::StringT& key, const typename Base::StringT& def = L"", bool force = false, HKEY base = HKEY_CURRENT_USER, REGSAM sam = 0);
 
     CRegStringCommon& operator=(const typename Base::StringT& rhs) {CRegTypedBase<StringT, Base>::operator =(rhs); return *this;}
     CRegStringCommon& operator+=(const typename Base::StringT& s) { return *this = (typename Base::StringT)*this + s; }
@@ -725,12 +724,12 @@ void CRegStringCommon<Base>::InternalRead (HKEY hKey, typename Base::StringT& va
 {
     DWORD size = 0;
     DWORD type = 0;
-    LastError = RegQueryValueEx(hKey, GetPlainString (m_key), NULL, &type, NULL, &size);
+    LastError = RegQueryValueEx(hKey, GetPlainString(m_key), nullptr, &type, nullptr, &size);
 
     if (LastError == ERROR_SUCCESS)
     {
         auto pStr = std::make_unique<TCHAR[]>(size);
-        if ((LastError = RegQueryValueEx(hKey, GetPlainString (m_key), NULL, &type, (BYTE*) pStr.get(), &size))==ERROR_SUCCESS)
+        if ((LastError = RegQueryValueEx(hKey, GetPlainString(m_key), nullptr, &type, (BYTE*)pStr.get(), &size)) == ERROR_SUCCESS)
         {
             ASSERT(type==REG_SZ || type==REG_EXPAND_SZ);
             value = StringT (pStr.get());
@@ -826,8 +825,8 @@ public:
     CRegRect& operator-=(SIZE r) { return *this = (CRect)*this - r;}
     CRegRect& operator-=(LPCRECT  r) { return *this = (CRect)*this - r;}
 
-    CRegRect& operator&=(CRect r) { return *this = r & *this;}
-    CRegRect& operator|=(CRect r) { return *this = r | *this;}
+    CRegRect& operator&=(const CRect& r) { return *this = r & *this;}
+    CRegRect& operator|=(const CRect& r) { return *this = r | *this;}
 };
 #endif
 
@@ -1062,27 +1061,19 @@ T& CKeyList<T>::GetAt (int index) const
  */
 
 #ifdef __CSTRINGT_H__
-CRegDWORDCommon<CRegBase>;
 typedef CRegDWORDCommon<CRegBase> CRegDWORD;
-CRegStringCommon<CRegBase>;
 typedef CRegStringCommon<CRegBase> CRegString;
 
 #ifdef _MAP_
-CKeyList<CRegDWORD>;
 typedef CKeyList<CRegDWORD> CRegDWORDList;
-CKeyList<CRegString>;
 typedef CKeyList<CRegString> CRegStringList;
 #endif
 #endif
 
-CRegDWORDCommon<CRegStdBase>;
 typedef CRegDWORDCommon<CRegStdBase> CRegStdDWORD;
-CRegStringCommon<CRegStdBase>;
 typedef CRegStringCommon<CRegStdBase> CRegStdString;
 
 #ifdef _MAP_
-CKeyList<CRegStdDWORD>;
 typedef CKeyList<CRegStdDWORD> CRegStdDWORDList;
-CKeyList<CRegStdString>;
 typedef CKeyList<CRegStdString> CRegStdStringList;
 #endif

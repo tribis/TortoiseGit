@@ -74,7 +74,7 @@ public:
     * \param sPath    The path to search in.
     * \param pPattern The filename pattern - default all files.
     */
-   CSimpleFileFind(const CString &sPath, LPCTSTR pPattern = _T("*.*"));
+   CSimpleFileFind(const CString& sPath, LPCTSTR pPattern = L"*.*");
    ~CSimpleFileFind();
 
    /**
@@ -208,10 +208,10 @@ public:
    inline BOOL IsDots() const
    {
       return IsDirectory()
-          && m_FindFileData.cFileName[0] == _T('.')
-          && ( (m_FindFileData.cFileName[1] == 0)
-            || (m_FindFileData.cFileName[1] == _T('.')
-             && m_FindFileData.cFileName[2] == 0) );
+          && m_FindFileData.cFileName[0] == L'.'
+          && ( (m_FindFileData.cFileName[1] == L'\0')
+            || (m_FindFileData.cFileName[1] == L'.'
+          && m_FindFileData.cFileName[2] == L'\0'));
    }
 };
 
@@ -277,7 +277,7 @@ public:
     *                result is unspecified).
     * \param  pbIsDirectory Pointer to a bool variable which will hold
     *                TRUE if the \c result path is a directory, FALSE
-    *                if it's a file. Pass NULL if you don't need that information.
+    *                if it's a file. Pass nullptr if you don't need that information.
     * \param  bRecurse if the last result was a directory, specifies whether to
     *                recurse into that directory or skip it.
     * \return TRUE iff a file was found, false at end of the iteration.

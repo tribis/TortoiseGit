@@ -1,6 +1,7 @@
-// TortoiseIDiff - an image diff viewer in TortoiseSVN
+﻿// TortoiseGitIDiff - an image diff viewer in TortoiseSVN
 
-// Copyright (C) 2006-2013 - TortoiseSVN
+// Copyright (C) 2006-2013, 2018 - TortoiseSVN
+// Copyright (C) 2016, 2018 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -22,6 +23,8 @@
 #include "PicWindow.h"
 #include <math.h>
 #include <memory>
+#include "../Utils/DPIAware.h"
+#include "../Utils/LoadIconEx.h"
 
 #pragma comment(lib, "Msimg32.lib")
 #pragma comment(lib, "shell32.lib")
@@ -37,12 +40,12 @@ bool CPicWindow::RegisterAndCreateWindow(HWND hParent)
     wcx.cbClsExtra = 0;
     wcx.cbWndExtra = 0;
     wcx.hInstance = hResource;
-    wcx.hCursor = LoadCursor(NULL, IDC_ARROW);
-    wcx.lpszClassName = _T("TortoiseGitIDiffPicWindow");
-    wcx.hIcon = LoadIcon(hResource, MAKEINTRESOURCE(IDI_TORTOISEIDIFF));
+    wcx.hCursor = LoadCursor(nullptr, IDC_ARROW);
+    wcx.lpszClassName = L"TortoiseGitIDiffPicWindow";
+    wcx.hIcon = LoadIconEx(hResource, MAKEINTRESOURCE(IDI_TORTOISEIDIFF), GetSystemMetrics(SM_CXICON), GetSystemMetrics(SM_CYICON));
     wcx.hbrBackground = (HBRUSH)(COLOR_WINDOW+1);
     wcx.lpszMenuName = MAKEINTRESOURCE(IDC_TORTOISEIDIFF);
-    wcx.hIconSm = LoadIcon(wcx.hInstance, MAKEINTRESOURCE(IDI_TORTOISEIDIFF));
+    wcx.hIconSm = LoadIconEx(wcx.hInstance, MAKEINTRESOURCE(IDI_TORTOISEIDIFF));
     RegisterWindow(&wcx);
     if (CreateEx(WS_EX_ACCEPTFILES | WS_EX_CLIENTEDGE, WS_CHILD | WS_HSCROLL | WS_VSCROLL | WS_VISIBLE, hParent))
     {
@@ -56,14 +59,15 @@ bool CPicWindow::RegisterAndCreateWindow(HWND hParent)
 
 void CPicWindow::PositionTrackBar()
 {
+    const auto slider_width = CDPIAware::Instance().ScaleX(SLIDER_WIDTH);
     RECT rc;
     GetClientRect(&rc);
     HWND slider = m_AlphaSlider.GetWindow();
     if ((pSecondPic)&&(m_blend == BLEND_ALPHA))
     {
-        MoveWindow(slider, 0, rc.top-4+SLIDER_WIDTH, SLIDER_WIDTH, rc.bottom-rc.top-SLIDER_WIDTH+8, true);
+        MoveWindow(slider, 0, rc.top - CDPIAware::Instance().ScaleY(4) + slider_width, slider_width, rc.bottom - rc.top - slider_width + CDPIAware::Instance().ScaleX(8), true);
         ShowWindow(slider, SW_SHOW);
-        MoveWindow(hwndAlphaToggleBtn, 0, rc.top-4, SLIDER_WIDTH, SLIDER_WIDTH, true);
+        MoveWindow(hwndAlphaToggleBtn, 0, rc.top - CDPIAware::Instance().ScaleY(4), slider_width, slider_width, true);
         ShowWindow(hwndAlphaToggleBtn, SW_SHOW);
     }
     else
@@ -87,18 +91,18 @@ LRESULT CALLBACK CPicWindow::WinMsgHandler(HWND hwnd, UINT uMsg, WPARAM wParam, 
             TOOLINFO ti;
             RECT rect;                  // for client area coordinates
 
-            hwndTT = CreateWindowEx(NULL,
+            hwndTT = CreateWindowEx(0,
                 TOOLTIPS_CLASS,
-                NULL,
+                nullptr,
                 WS_POPUP | TTS_NOPREFIX | TTS_ALWAYSTIP,
                 CW_USEDEFAULT,
                 CW_USEDEFAULT,
                 CW_USEDEFAULT,
                 CW_USEDEFAULT,
                 hwnd,
-                NULL,
+                nullptr,
                 hResource,
-                NULL
+                nullptr
                 );
 
             SetWindowPos(hwndTT,
@@ -131,7 +135,7 @@ LRESULT CALLBACK CPicWindow::WinMsgHandler(HWND hwnd, UINT uMsg, WPARAM wParam, 
         break;
     case WM_SETFOCUS:
     case WM_KILLFOCUS:
-        InvalidateRect(*this, NULL, FALSE);
+        InvalidateRect(*this, nullptr, FALSE);
         break;
     case WM_ERASEBKGND:
         return 1;
@@ -149,7 +153,7 @@ LRESULT CALLBACK CPicWindow::WinMsgHandler(HWND hwnd, UINT uMsg, WPARAM wParam, 
             if (LOWORD(wParam) == TB_THUMBTRACK)
             {
                 // while tracking, only redraw after 50 milliseconds
-                ::SetTimer(*this, TIMER_ALPHASLIDER, 50, NULL);
+                ::SetTimer(*this, TIMER_ALPHASLIDER, 50, nullptr);
             }
             else
                 SetBlendAlpha(m_blend, SendMessage(m_AlphaSlider.GetWindow(), TBM_GETPOS, 0, 0) / 16.0f);
@@ -226,7 +230,7 @@ LRESULT CALLBACK CPicWindow::WinMsgHandler(HWND hwnd, UINT uMsg, WPARAM wParam, 
     case WM_LBUTTONUP:
         bDragging = false;
         ReleaseCapture();
-        InvalidateRect(*this, NULL, FALSE);
+        InvalidateRect(*this, nullptr, FALSE);
         break;
     case WM_MOUSELEAVE:
         ptPanStart.x = -1;
@@ -243,7 +247,7 @@ LRESULT CALLBACK CPicWindow::WinMsgHandler(HWND hwnd, UINT uMsg, WPARAM wParam, 
             mevt.hwndTrack = *this;
             ::TrackMouseEvent(&mevt);
             POINT pt = {((int)(short)LOWORD(lParam)), ((int)(short)HIWORD(lParam))};
-            if (pt.y < HEADER_HEIGHT)
+            if (pt.y < CDPIAware::Instance().ScaleY(HEADER_HEIGHT))
             {
                 ClientToScreen(*this, &pt);
                 if ((abs(m_lastTTPos.x - pt.x) > 20)||(abs(m_lastTTPos.y - pt.y) > 10))
@@ -299,14 +303,14 @@ LRESULT CALLBACK CPicWindow::WinMsgHandler(HWND hwnd, UINT uMsg, WPARAM wParam, 
                     }
                 }
                 SetupScrollBars();
-                InvalidateRect(*this, NULL, TRUE);
+                InvalidateRect(*this, nullptr, TRUE);
                 UpdateWindow(*this);
                 if (pTheOtherPic && (bLinkedPositions) && ((wParam & MK_SHIFT)==0))
                 {
                     pTheOtherPic->nHScrollPos = nHScrollPos;
                     pTheOtherPic->nVScrollPos = nVScrollPos;
                     pTheOtherPic->SetupScrollBars();
-                    InvalidateRect(*pTheOtherPic, NULL, TRUE);
+                    InvalidateRect(*pTheOtherPic, nullptr, TRUE);
                     UpdateWindow(*pTheOtherPic);
                 }
             }
@@ -348,9 +352,9 @@ LRESULT CALLBACK CPicWindow::WinMsgHandler(HWND hwnd, UINT uMsg, WPARAM wParam, 
             // we only use the first file dropped (if multiple files are dropped)
             if (DragQueryFile(hDrop, 0, szFileName, _countof(szFileName)))
             {
-                SetPic(szFileName, _T(""), bMainPic);
+                SetPic(szFileName, L"", bMainPic);
                 FitImageInWindow();
-                InvalidateRect(*this, NULL, TRUE);
+                InvalidateRect(*this, nullptr, TRUE);
             }
         }
         break;
@@ -391,7 +395,7 @@ LRESULT CALLBACK CPicWindow::WinMsgHandler(HWND hwnd, UINT uMsg, WPARAM wParam, 
                     case BN_DOUBLECLICKED:
                         {
                             SendMessage(hwndAlphaToggleBtn, BM_SETSTATE, 1, 0);
-                            SetTimer(*this, ID_ALPHATOGGLETIMER, 1000, NULL);
+                            SetTimer(*this, ID_ALPHATOGGLETIMER, 1000, nullptr);
                         }
                         break;
                     case BN_CLICKED:
@@ -406,14 +410,14 @@ LRESULT CALLBACK CPicWindow::WinMsgHandler(HWND hwnd, UINT uMsg, WPARAM wParam, 
                 {
                     m_blend = BLEND_ALPHA;
                     PositionTrackBar();
-                    InvalidateRect(*this, NULL, TRUE);
+                    InvalidateRect(*this, nullptr, TRUE);
                 }
                 break;
             case BLENDXOR_ID:
                 {
                     m_blend = BLEND_XOR;
                     PositionTrackBar();
-                    InvalidateRect(*this, NULL, TRUE);
+                    InvalidateRect(*this, nullptr, TRUE);
                 }
                 break;
             case SELECTBUTTON_ID:
@@ -435,8 +439,8 @@ LRESULT CALLBACK CPicWindow::WinMsgHandler(HWND hwnd, UINT uMsg, WPARAM wParam, 
                         nCurrentFrame = 1;
                     long delay = picture.SetActiveFrame(nCurrentFrame);
                     delay = max(100, delay);
-                    SetTimer(*this, ID_ANIMATIONTIMER, delay, NULL);
-                    InvalidateRect(*this, NULL, FALSE);
+                    SetTimer(*this, ID_ANIMATIONTIMER, delay, nullptr);
+                    InvalidateRect(*this, nullptr, FALSE);
                 }
                 break;
             case TIMER_ALPHASLIDER:
@@ -463,12 +467,12 @@ LRESULT CALLBACK CPicWindow::WinMsgHandler(HWND hwnd, UINT uMsg, WPARAM wParam, 
                     LPTOOLTIPTEXT lpttt = (LPTOOLTIPTEXT) lParam;
                     lpttt->hinst = hResource;
                     TCHAR stringbuf[MAX_PATH] = {0};
-                    _stprintf_s(stringbuf, _T("%i%% alpha"), (int)(SendMessage(m_AlphaSlider.GetWindow(),TBM_GETPOS,0,0)/16.0f*100.0f));
-                    _tcscpy_s(lpttt->lpszText, 80, stringbuf);
+                    swprintf_s(stringbuf, L"%i%% alpha", (int)(SendMessage(m_AlphaSlider.GetWindow(),TBM_GETPOS, 0, 0) / 16.0f * 100.0f));
+                    wcscpy_s(lpttt->lpszText, 80, stringbuf);
                 }
                 else if (pNMHDR->idFrom == (UINT_PTR)hwndAlphaToggleBtn)
                 {
-                    _stprintf_s(m_wszTip, (TCHAR const *)ResString(hResource, IDS_ALPHABUTTONTT), (int)(SendMessage(m_AlphaSlider.GetWindow(),TBM_GETPOS,0,0)/16.0f*100.0f));
+                    swprintf_s(m_wszTip, (TCHAR const*)ResString(hResource, IDS_ALPHABUTTONTT), (int)(SendMessage(m_AlphaSlider.GetWindow(),TBM_GETPOS, 0, 0) / 16.0f * 100.0f));
                     if (pNMHDR->code == TTN_NEEDTEXTW)
                     {
                         NMTTDISPINFOW* pTTTW = (NMTTDISPINFOW*)pNMHDR;
@@ -478,7 +482,7 @@ LRESULT CALLBACK CPicWindow::WinMsgHandler(HWND hwnd, UINT uMsg, WPARAM wParam, 
                     {
                         NMTTDISPINFOA* pTTTA = (NMTTDISPINFOA*)pNMHDR;
                         pTTTA->lpszText = m_szTip;
-                        ::WideCharToMultiByte(CP_ACP, 0, m_wszTip, -1, m_szTip, 8192, NULL, NULL);
+                        ::WideCharToMultiByte(CP_ACP, 0, m_wszTip, -1, m_szTip, 8192, nullptr, nullptr);
                     }
                 }
                 else
@@ -493,7 +497,7 @@ LRESULT CALLBACK CPicWindow::WinMsgHandler(HWND hwnd, UINT uMsg, WPARAM wParam, 
                     {
                         NMTTDISPINFOA* pTTTA = (NMTTDISPINFOA*)pNMHDR;
                         pTTTA->lpszText = m_szTip;
-                        ::WideCharToMultiByte(CP_ACP, 0, m_wszTip, -1, m_szTip, 8192, NULL, NULL);
+                        ::WideCharToMultiByte(CP_ACP, 0, m_wszTip, -1, m_szTip, 8192, nullptr, nullptr);
                     }
                 }
             }
@@ -522,7 +526,7 @@ void CPicWindow::NextImage()
     if (nCurrentFrame > picture.GetNumberOfFrames(0))
         nCurrentFrame = picture.GetNumberOfFrames(0);
     picture.SetActiveFrame(nCurrentFrame >= nCurrentDimension ? nCurrentFrame : nCurrentDimension);
-    InvalidateRect(*this, NULL, FALSE);
+    InvalidateRect(*this, nullptr, FALSE);
     PositionChildren();
 }
 
@@ -535,7 +539,7 @@ void CPicWindow::PrevImage()
     if (nCurrentFrame < 1)
         nCurrentFrame = 1;
     picture.SetActiveFrame(nCurrentFrame >= nCurrentDimension ? nCurrentFrame : nCurrentDimension);
-    InvalidateRect(*this, NULL, FALSE);
+    InvalidateRect(*this, nullptr, FALSE);
     PositionChildren();
 }
 
@@ -544,7 +548,7 @@ void CPicWindow::Animate(bool bStart)
     if (bStart)
     {
         SendMessage(hwndPlayBtn, BM_SETIMAGE, (WPARAM)IMAGE_ICON, (LPARAM)hStop);
-        SetTimer(*this, ID_ANIMATIONTIMER, 0, NULL);
+        SetTimer(*this, ID_ANIMATIONTIMER, 0, nullptr);
     }
     else
     {
@@ -553,7 +557,7 @@ void CPicWindow::Animate(bool bStart)
     }
 }
 
-void CPicWindow::SetPic(tstring path, tstring title, bool bFirst)
+void CPicWindow::SetPic(const tstring& path, const tstring& title, bool bFirst)
 {
     bMainPic = bFirst;
     picpath=path;pictitle=title;
@@ -566,29 +570,30 @@ void CPicWindow::SetPic(tstring path, tstring title, bool bFirst)
     {
         picscale = 100;
         PositionChildren();
-        InvalidateRect(*this, NULL, FALSE);
+        InvalidateRect(*this, nullptr, FALSE);
     }
 }
 
 void CPicWindow::DrawViewTitle(HDC hDC, RECT * rect)
 {
-    HFONT hFont = NULL;
-    hFont = CreateFont(-MulDiv(pSecondPic ? 8 : 10, GetDeviceCaps(hDC, LOGPIXELSY), 72), 0, 0, 0, FW_DONTCARE, false, false, false, ANSI_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH, _T("MS Shell Dlg"));
+    const auto header_height = CDPIAware::Instance().ScaleY(HEADER_HEIGHT);
+    HFONT hFont = nullptr;
+    hFont = CreateFont(-CDPIAware::Instance().PointsToPixelsY(pSecondPic ? 8 : 10), 0, 0, 0, FW_DONTCARE, false, false, false, ANSI_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH, L"MS Shell Dlg");
     HFONT hFontOld = (HFONT)SelectObject(hDC, (HGDIOBJ)hFont);
 
     RECT textrect;
     textrect.left = rect->left;
     textrect.top = rect->top;
     textrect.right = rect->right;
-    textrect.bottom = rect->top + HEADER_HEIGHT;
+    textrect.bottom = rect->top + header_height;
     if (HasMultipleImages())
-        textrect.bottom += HEADER_HEIGHT;
+        textrect.bottom += header_height;
 
     COLORREF crBk, crFg;
     crBk = ::GetSysColor(COLOR_SCROLLBAR);
     crFg = ::GetSysColor(COLOR_WINDOWTEXT);
     SetBkColor(hDC, crBk);
-    ::ExtTextOut(hDC, 0, 0, ETO_OPAQUE, &textrect, NULL, 0, NULL);
+    ::ExtTextOut(hDC, 0, 0, ETO_OPAQUE, &textrect, nullptr, 0, nullptr);
 
     if (GetFocus() == *this)
         DrawEdge(hDC, &textrect, EDGE_BUMP, BF_RECT);
@@ -607,9 +612,9 @@ void CPicWindow::DrawViewTitle(HDC hDC, RECT * rect)
     {
         TCHAR buf[MAX_PATH] = {0};
         if (nFrames > 1)
-            _stprintf_s(buf, (const TCHAR *)ResString(hResource, IDS_DIMENSIONSANDFRAMES), nCurrentFrame, nFrames);
+            swprintf_s(buf, (const TCHAR *)ResString(hResource, IDS_DIMENSIONSANDFRAMES), nCurrentFrame, nFrames);
         else
-            _stprintf_s(buf, (const TCHAR *)ResString(hResource, IDS_DIMENSIONSANDFRAMES), nCurrentDimension, nDimensions);
+            swprintf_s(buf, (const TCHAR *)ResString(hResource, IDS_DIMENSIONSANDFRAMES), nCurrentDimension, nDimensions);
         imgnumstring = buf;
     }
 
@@ -617,7 +622,7 @@ void CPicWindow::DrawViewTitle(HDC hDC, RECT * rect)
     if (GetTextExtentPoint32(hDC, realtitle.c_str(), (int)realtitle.size(), &stringsize))
     {
         int nStringLength = stringsize.cx;
-        int texttop = pSecondPic ? textrect.top + (HEADER_HEIGHT/2) - stringsize.cy : textrect.top + (HEADER_HEIGHT/2) - stringsize.cy/2;
+        int texttop = pSecondPic ? textrect.top + (header_height /2) - stringsize.cy : textrect.top + (header_height /2) - stringsize.cy/2;
         ExtTextOut(hDC,
             max(textrect.left + ((textrect.right-textrect.left)-nStringLength)/2, 1),
             texttop,
@@ -625,7 +630,7 @@ void CPicWindow::DrawViewTitle(HDC hDC, RECT * rect)
             &textrect,
             realtitle.c_str(),
             (UINT)realtitle.size(),
-            NULL);
+            nullptr);
         if (pSecondPic)
         {
             realtitle = (pictitle2.empty() ? picpath2 : pictitle2);
@@ -636,7 +641,7 @@ void CPicWindow::DrawViewTitle(HDC hDC, RECT * rect)
                 &textrect,
                 realtitle.c_str(),
                 (UINT)realtitle.size(),
-                NULL);
+                nullptr);
         }
     }
     if (HasMultipleImages())
@@ -647,12 +652,12 @@ void CPicWindow::DrawViewTitle(HDC hDC, RECT * rect)
 
             ExtTextOut(hDC,
                 max(textrect.left + ((textrect.right-textrect.left)-nStringLength)/2, 1),
-                textrect.top + HEADER_HEIGHT + (HEADER_HEIGHT/2) - stringsize.cy/2,
+                textrect.top + header_height + (header_height /2) - stringsize.cy/2,
                 ETO_CLIPPED,
                 &textrect,
                 imgnumstring.c_str(),
                 (UINT)imgnumstring.size(),
-                NULL);
+                nullptr);
         }
     }
     SelectObject(hDC, (HGDIOBJ)hFontOld);
@@ -798,7 +803,7 @@ void CPicWindow::OnVScroll(UINT nSBCode, UINT nPos)
     }
     SetupScrollBars();
     PositionChildren();
-    InvalidateRect(*this, NULL, TRUE);
+    InvalidateRect(*this, nullptr, TRUE);
 }
 
 void CPicWindow::OnHScroll(UINT nSBCode, UINT nPos)
@@ -843,7 +848,7 @@ void CPicWindow::OnHScroll(UINT nSBCode, UINT nPos)
     }
     SetupScrollBars();
     PositionChildren();
-    InvalidateRect(*this, NULL, TRUE);
+    InvalidateRect(*this, nullptr, TRUE);
 }
 
 void CPicWindow::OnMouseWheel(short fwKeys, short zDelta)
@@ -882,15 +887,15 @@ void CPicWindow::OnMouseWheel(short fwKeys, short zDelta)
         // control means adjusting the scale factor
         Zoom(zDelta>0, true);
         PositionChildren();
-        InvalidateRect(*this, NULL, FALSE);
-        SetWindowPos(*this, NULL, 0, 0, 0, 0, SWP_FRAMECHANGED|SWP_NOSIZE|SWP_NOREPOSITION|SWP_NOMOVE);
+        InvalidateRect(*this, nullptr, FALSE);
+        SetWindowPos(*this, nullptr, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOSIZE | SWP_NOREPOSITION | SWP_NOMOVE);
         UpdateWindow(*this);
         if ((bLinkedPositions || bOverlap) && pTheOtherPic)
         {
             pTheOtherPic->nHScrollPos = nHScrollPos;
             pTheOtherPic->nVScrollPos = nVScrollPos;
             pTheOtherPic->SetupScrollBars();
-            InvalidateRect(*pTheOtherPic, NULL, TRUE);
+            InvalidateRect(*pTheOtherPic, nullptr, TRUE);
             UpdateWindow(*pTheOtherPic);
         }
     }
@@ -907,13 +912,13 @@ void CPicWindow::OnMouseWheel(short fwKeys, short zDelta)
 void CPicWindow::GetClientRect(RECT * pRect)
 {
     ::GetClientRect(*this, pRect);
-    pRect->top += HEADER_HEIGHT;
+    pRect->top += CDPIAware::Instance().ScaleY(HEADER_HEIGHT);
     if (HasMultipleImages())
     {
-        pRect->top += HEADER_HEIGHT;
+        pRect->top += CDPIAware::Instance().ScaleY(HEADER_HEIGHT);
     }
     if (pSecondPic)
-        pRect->left += SLIDER_WIDTH;
+        pRect->left += CDPIAware::Instance().ScaleX(SLIDER_WIDTH);
 }
 
 void CPicWindow::GetClientRectWithScrollbars(RECT * pRect)
@@ -924,13 +929,13 @@ void CPicWindow::GetClientRectWithScrollbars(RECT * pRect)
     pRect->bottom = pRect->bottom-pRect->top;
     pRect->top = 0;
     pRect->left = 0;
-    pRect->top += HEADER_HEIGHT;
+    pRect->top += CDPIAware::Instance().ScaleY(HEADER_HEIGHT);
     if (HasMultipleImages())
     {
-        pRect->top += HEADER_HEIGHT;
+        pRect->top += CDPIAware::Instance().ScaleY(HEADER_HEIGHT);
     }
     if (pSecondPic)
-        pRect->left += SLIDER_WIDTH;
+        pRect->left += CDPIAware::Instance().ScaleX(SLIDER_WIDTH);
 };
 
 
@@ -1006,7 +1011,7 @@ void CPicWindow::SetZoom(int Zoom, bool centermouse, bool inzoom)
 
     SetupScrollBars();
     PositionChildren();
-    InvalidateRect(*this, NULL, TRUE);
+    InvalidateRect(*this, nullptr, TRUE);
 }
 
 void CPicWindow::Zoom(bool in, bool centermouse)
@@ -1057,10 +1062,11 @@ void CPicWindow::FitImageInWindow()
 
     GetClientRectWithScrollbars(&rect);
 
+    const auto border = CDPIAware::Instance().ScaleX(2);
     if (rect.right-rect.left)
     {
         int Zoom = 100;
-        if (((rect.right - rect.left) > picture.m_Width+2)&&((rect.bottom - rect.top)> picture.m_Height+2))
+        if (((rect.right - rect.left) > picture.m_Width + border) && ((rect.bottom - rect.top) > picture.m_Height + border))
         {
             // image is smaller than the window
             Zoom = 100;
@@ -1068,13 +1074,13 @@ void CPicWindow::FitImageInWindow()
         else
         {
             // image is bigger than the window
-            int xscale = (rect.right-rect.left-2)*100/picture.m_Width;
-            int yscale = (rect.bottom-rect.top-2)*100/picture.m_Height;
+            int xscale = (rect.right - rect.left - border) * 100 / picture.m_Width;
+            int yscale = (rect.bottom - rect.top - border) * 100 / picture.m_Height;
             Zoom = min(yscale, xscale);
         }
         if (pSecondPic)
         {
-            if (((rect.right - rect.left) > pSecondPic->m_Width+2)&&((rect.bottom - rect.top)> pSecondPic->m_Height+2))
+            if (((rect.right - rect.left) > pSecondPic->m_Width + border) && ((rect.bottom - rect.top) > pSecondPic->m_Height + border))
             {
                 // image is smaller than the window
                 if (pTheOtherPic)
@@ -1083,8 +1089,8 @@ void CPicWindow::FitImageInWindow()
             else
             {
                 // image is bigger than the window
-                int xscale = (rect.right-rect.left-2)*100/pSecondPic->m_Width;
-                int yscale = (rect.bottom-rect.top-2)*100/pSecondPic->m_Height;
+                int xscale = (rect.right - rect.left - border) * 100 / pSecondPic->m_Width;
+                int yscale = (rect.bottom - rect.top - border) * 100 / pSecondPic->m_Height;
                 if (pTheOtherPic)
                     pTheOtherPic->SetZoom(min(yscale, xscale), false);
             }
@@ -1095,19 +1101,20 @@ void CPicWindow::FitImageInWindow()
     }
     CenterImage();
     PositionChildren();
-    InvalidateRect(*this, NULL, TRUE);
+    InvalidateRect(*this, nullptr, TRUE);
 }
 
 void CPicWindow::CenterImage()
 {
     RECT rect;
     GetClientRectWithScrollbars(&rect);
-    long width = picture.m_Width*picscale/100 + 2;
-    long height = picture.m_Height*picscale/100 + 2;
+    const auto border = CDPIAware::Instance().ScaleX(2);
+    long width = picture.m_Width*picscale / 100 + border;
+    long height = picture.m_Height*picscale / 100 + border;
     if (pSecondPic && pTheOtherPic)
     {
-        width = max(width, pSecondPic->m_Width*pTheOtherPic->GetZoom()/100 + 2);
-        height = max(height, pSecondPic->m_Height*pTheOtherPic->GetZoom()/100 + 2);
+        width = max(width, pSecondPic->m_Width*pTheOtherPic->GetZoom() / 100 + border);
+        height = max(height, pSecondPic->m_Height*pTheOtherPic->GetZoom() / 100 + border);
     }
 
     bool bPicWidthBigger = (int(width) > (rect.right-rect.left));
@@ -1144,7 +1151,7 @@ void CPicWindow::FitHeights(bool bFit)
 void CPicWindow::ShowPicWithBorder(HDC hdc, const RECT &bounds, CPicture &pic, int scale)
 {
     ::SetBkColor(hdc, transparentColor);
-    ::ExtTextOut(hdc, 0, 0, ETO_OPAQUE, &bounds, NULL, 0, NULL);
+    ::ExtTextOut(hdc, 0, 0, ETO_OPAQUE, &bounds, nullptr, 0, nullptr);
 
     RECT picrect;
     picrect.left =  bounds.left - nHScrollPos;
@@ -1164,15 +1171,17 @@ void CPicWindow::ShowPicWithBorder(HDC hdc, const RECT &bounds, CPicture &pic, i
 
     pic.Show(hdc, picrect);
 
+    const auto bordersize = CDPIAware::Instance().ScaleX(1);
+
     RECT border;
-    border.left = picrect.left-1;
-    border.top = picrect.top-1;
-    border.right = picrect.right+1;
-    border.bottom = picrect.bottom+1;
+    border.left = picrect.left - bordersize;
+    border.top = picrect.top - bordersize;
+    border.right = picrect.right + bordersize;
+    border.bottom = picrect.bottom + bordersize;
 
     HPEN hPen = CreatePen(PS_SOLID, 1, GetSysColor(COLOR_3DDKSHADOW));
     HPEN hOldPen = (HPEN)SelectObject(hdc, hPen);
-    MoveToEx(hdc, border.left, border.top, NULL);
+    MoveToEx(hdc, border.left, border.top, nullptr);
     LineTo(hdc, border.left, border.bottom);
     LineTo(hdc, border.right, border.bottom);
     LineTo(hdc, border.right, border.top);
@@ -1191,20 +1200,22 @@ void CPicWindow::Paint(HWND hwnd)
     if (IsRectEmpty(&rect))
         return;
 
+    const auto slider_width = CDPIAware::Instance().ScaleX(SLIDER_WIDTH);
+    const auto border = CDPIAware::Instance().ScaleX(4);
     ::GetClientRect(*this, &fullrect);
     hdc = BeginPaint(hwnd, &ps);
     {
         // Exclude the alpha control and button
         if ((pSecondPic)&&(m_blend == BLEND_ALPHA))
-            ExcludeClipRect(hdc, 0, m_inforect.top-4, SLIDER_WIDTH, m_inforect.bottom+4);
+            ExcludeClipRect(hdc, 0, m_inforect.top - border, slider_width, m_inforect.bottom + border);
 
         CMyMemDC memDC(hdc);
         if ((pSecondPic)&&(m_blend != BLEND_ALPHA))
         {
             // erase the place where the alpha slider would be
             ::SetBkColor(memDC, transparentColor);
-            RECT bounds = {0, m_inforect.top-4, SLIDER_WIDTH, m_inforect.bottom+4};
-            ::ExtTextOut(memDC, 0, 0, ETO_OPAQUE, &bounds, NULL, 0, NULL);
+            RECT bounds = { 0, m_inforect.top - border, slider_width, m_inforect.bottom + border };
+            ::ExtTextOut(memDC, 0, 0, ETO_OPAQUE, &bounds, nullptr, 0, nullptr);
         }
 
         GetClientRect(&rect);
@@ -1216,14 +1227,14 @@ void CPicWindow::Paint(HWND hwnd)
                 HDC secondhdc = CreateCompatibleDC(hdc);
                 HBITMAP hBitmap = CreateCompatibleBitmap(hdc, rect.right - rect.left, rect.bottom - rect.top);
                 HBITMAP hOldBitmap = (HBITMAP)SelectObject(secondhdc, hBitmap);
-                SetWindowOrgEx(secondhdc, rect.left, rect.top, NULL);
+                SetWindowOrgEx(secondhdc, rect.left, rect.top, nullptr);
 
                 if ((pSecondPic)&&(m_blend != BLEND_ALPHA))
                 {
                     // erase the place where the alpha slider would be
                     ::SetBkColor(secondhdc, transparentColor);
-                    RECT bounds = {0, m_inforect.top-4, SLIDER_WIDTH, m_inforect.bottom+4};
-                    ::ExtTextOut(secondhdc, 0, 0, ETO_OPAQUE, &bounds, NULL, 0, NULL);
+                    RECT bounds = { 0, m_inforect.top - border, slider_width, m_inforect.bottom + border };
+                    ::ExtTextOut(secondhdc, 0, 0, ETO_OPAQUE, &bounds, nullptr, 0, nullptr);
                 }
                 if (pTheOtherPic)
                     ShowPicWithBorder(secondhdc, rect, *pSecondPic, pTheOtherPic->GetZoom());
@@ -1272,21 +1283,21 @@ void CPicWindow::Paint(HWND hwnd)
                 HPEN hPen = CreatePen(PS_SOLID, 1, GetSysColor(/*COLOR_ACTIVEBORDER*/COLOR_HIGHLIGHT));
                 HPEN hOldPen = (HPEN)SelectObject(memDC, hPen);
                 int xpos = rect.left - pTheOtherPic->nHScrollPos - 1;
-                MoveToEx(memDC, xpos, rect.top, NULL);
+                MoveToEx(memDC, xpos, rect.top, nullptr);
                 LineTo(memDC, xpos, rect.bottom);
                 xpos = rect.left - pTheOtherPic->nHScrollPos + pTheOtherPic->picture.m_Width*pTheOtherPic->GetZoom()/100 + 1;
                 if (bFitWidths && m_linkedWidth)
                     xpos = rect.left + pTheOtherPic->m_linkedWidth + 1;
-                MoveToEx(memDC, xpos, rect.top, NULL);
+                MoveToEx(memDC, xpos, rect.top, nullptr);
                 LineTo(memDC, xpos, rect.bottom);
 
                 int ypos = rect.top - pTheOtherPic->nVScrollPos - 1;
-                MoveToEx(memDC, rect.left, ypos, NULL);
+                MoveToEx(memDC, rect.left, ypos, nullptr);
                 LineTo(memDC, rect.right, ypos);
                 ypos = rect.top - pTheOtherPic->nVScrollPos + pTheOtherPic->picture.m_Height*pTheOtherPic->GetZoom()/100 + 1;
                 if (bFitHeights && m_linkedHeight)
                     ypos = rect.top - pTheOtherPic->m_linkedHeight + 1;
-                MoveToEx(memDC, rect.left, ypos, NULL);
+                MoveToEx(memDC, rect.left, ypos, nullptr);
                 LineTo(memDC, rect.right, ypos);
 
                 SelectObject(memDC, hOldPen);
@@ -1295,8 +1306,8 @@ void CPicWindow::Paint(HWND hwnd)
 
             int sliderwidth = 0;
             if ((pSecondPic)&&(m_blend == BLEND_ALPHA))
-                sliderwidth = SLIDER_WIDTH;
-            m_inforect.left = rect.left+4+sliderwidth;
+                sliderwidth = slider_width;
+            m_inforect.left = rect.left + border + sliderwidth;
             m_inforect.top = rect.top;
             m_inforect.right = rect.right+sliderwidth;
             m_inforect.bottom = rect.bottom;
@@ -1309,7 +1320,6 @@ void CPicWindow::Paint(HWND hwnd)
                 // set the font
                 NONCLIENTMETRICS metrics = {0};
                 metrics.cbSize = sizeof(NONCLIENTMETRICS);
-
                 SystemParametersInfo(SPI_GETNONCLIENTMETRICS, 0, &metrics, FALSE);
                 HFONT hFont = CreateFontIndirect(&metrics.lfStatusFont);
                 HFONT hFontOld = (HFONT)SelectObject(memDC, (HGDIOBJ)hFont);
@@ -1317,16 +1327,16 @@ void CPicWindow::Paint(HWND hwnd)
                 DrawText(memDC, infostring.get(), -1, &m_inforect, DT_EDITCONTROL | DT_EXPANDTABS | DT_LEFT | DT_VCENTER | DT_CALCRECT);
 
                 // the text should be drawn with a four pixel offset to the window borders
-                m_inforect.top = rect.bottom - (m_inforect.bottom-m_inforect.top) - 4;
+                m_inforect.top = rect.bottom - (m_inforect.bottom-m_inforect.top) - border;
                 m_inforect.bottom = rect.bottom-4;
 
                 // first draw an edge rectangle
                 RECT edgerect;
-                edgerect.left = m_inforect.left-4;
-                edgerect.top = m_inforect.top-4;
-                edgerect.right = m_inforect.right+4;
-                edgerect.bottom = m_inforect.bottom+4;
-                ::ExtTextOut(memDC, 0, 0, ETO_OPAQUE, &edgerect, NULL, 0, NULL);
+                edgerect.left = m_inforect.left - border;
+                edgerect.top = m_inforect.top - border;
+                edgerect.right = m_inforect.right + border;
+                edgerect.bottom = m_inforect.bottom + border;
+                ::ExtTextOut(memDC, 0, 0, ETO_OPAQUE, &edgerect, nullptr, 0, nullptr);
                 DrawEdge(memDC, &edgerect, EDGE_BUMP, BF_RECT | BF_SOFT);
 
                 SetTextColor(memDC, GetSysColor(COLOR_WINDOWTEXT));
@@ -1338,7 +1348,8 @@ void CPicWindow::Paint(HWND hwnd)
         else
         {
             SetBkColor(memDC, ::GetSysColor(COLOR_WINDOW));
-            ::ExtTextOut(memDC, 0, 0, ETO_OPAQUE, &rect, NULL, 0, NULL);
+            SetTextColor(memDC, ::GetSysColor(COLOR_WINDOWTEXT));
+            ::ExtTextOut(memDC, 0, 0, ETO_OPAQUE, &rect, nullptr, 0, nullptr);
             SIZE stringsize;
             ResString str = ResString(hResource, IDS_INVALIDIMAGEINFO);
 
@@ -1349,7 +1360,7 @@ void CPicWindow::Paint(HWND hwnd)
             HFONT hFont = CreateFontIndirect(&metrics.lfStatusFont);
             HFONT hFontOld = (HFONT)SelectObject(memDC, (HGDIOBJ)hFont);
 
-            if (GetTextExtentPoint32(memDC, str, (int)_tcslen(str), &stringsize))
+            if (GetTextExtentPoint32(memDC, str, (int)wcslen(str), &stringsize))
             {
                 int nStringLength = stringsize.cx;
 
@@ -1359,8 +1370,8 @@ void CPicWindow::Paint(HWND hwnd)
                     ETO_CLIPPED,
                     &rect,
                     str,
-                    (UINT)_tcslen(str),
-                    NULL);
+                    (UINT)wcslen(str),
+                    nullptr);
             }
             SelectObject(memDC, (HGDIOBJ)hFontOld);
             DeleteObject(hFont);
@@ -1379,57 +1390,59 @@ bool CPicWindow::CreateButtons()
     InitCommonControlsEx(&icex);
 
     hwndLeftBtn = CreateWindowEx(0,
-                                _T("BUTTON"),
-                                (LPCTSTR)NULL,
+                                L"BUTTON",
+                                (LPCTSTR)nullptr,
                                 WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | BS_ICON | BS_FLAT,
                                 0, 0, 0, 0,
                                 (HWND)*this,
                                 (HMENU)LEFTBUTTON_ID,
                                 hResource,
-                                NULL);
+                                nullptr);
     if (hwndLeftBtn == INVALID_HANDLE_VALUE)
         return false;
-    hLeft = (HICON)LoadImage(hResource, MAKEINTRESOURCE(IDI_BACKWARD), IMAGE_ICON, 16, 16, LR_LOADTRANSPARENT);
+    int iconWidth = GetSystemMetrics(SM_CXSMICON);
+    int iconHeight = GetSystemMetrics(SM_CYSMICON);
+    hLeft = LoadIconEx(hResource, MAKEINTRESOURCE(IDI_BACKWARD), iconWidth, iconHeight);
     SendMessage(hwndLeftBtn, BM_SETIMAGE, (WPARAM)IMAGE_ICON, (LPARAM)hLeft);
     hwndRightBtn = CreateWindowEx(0,
-                                _T("BUTTON"),
-                                (LPCTSTR)NULL,
+                                L"BUTTON",
+                                (LPCTSTR)nullptr,
                                 WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | BS_ICON | BS_FLAT,
                                 0, 0, 0, 0,
                                 *this,
                                 (HMENU)RIGHTBUTTON_ID,
                                 hResource,
-                                NULL);
+                                nullptr);
     if (hwndRightBtn == INVALID_HANDLE_VALUE)
         return false;
-    hRight = (HICON)LoadImage(hResource, MAKEINTRESOURCE(IDI_FORWARD), IMAGE_ICON, 16, 16, LR_LOADTRANSPARENT);
+    hRight = LoadIconEx(hResource, MAKEINTRESOURCE(IDI_FORWARD), iconWidth, iconHeight);
     SendMessage(hwndRightBtn, BM_SETIMAGE, (WPARAM)IMAGE_ICON, (LPARAM)hRight);
     hwndPlayBtn = CreateWindowEx(0,
-                                _T("BUTTON"),
-                                (LPCTSTR)NULL,
+                                L"BUTTON",
+                                (LPCTSTR)nullptr,
                                 WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | BS_ICON | BS_FLAT,
                                 0, 0, 0, 0,
                                 *this,
                                 (HMENU)PLAYBUTTON_ID,
                                 hResource,
-                                NULL);
+                                nullptr);
     if (hwndPlayBtn == INVALID_HANDLE_VALUE)
         return false;
-    hPlay = (HICON)LoadImage(hResource, MAKEINTRESOURCE(IDI_START), IMAGE_ICON, 16, 16, LR_LOADTRANSPARENT);
-    hStop = (HICON)LoadImage(hResource, MAKEINTRESOURCE(IDI_STOP), IMAGE_ICON, 16, 16, LR_LOADTRANSPARENT);
+    hPlay = LoadIconEx(hResource, MAKEINTRESOURCE(IDI_START), iconWidth, iconHeight);
+    hStop = LoadIconEx(hResource, MAKEINTRESOURCE(IDI_STOP), iconWidth, iconHeight);
     SendMessage(hwndPlayBtn, BM_SETIMAGE, (WPARAM)IMAGE_ICON, (LPARAM)hPlay);
     hwndAlphaToggleBtn = CreateWindowEx(0,
-                                _T("BUTTON"),
-                                (LPCTSTR)NULL,
+                                L"BUTTON",
+                                (LPCTSTR)nullptr,
                                 WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | BS_ICON | BS_FLAT | BS_NOTIFY | BS_PUSHLIKE,
                                 0, 0, 0, 0,
                                 (HWND)*this,
                                 (HMENU)ALPHATOGGLEBUTTON_ID,
                                 hResource,
-                                NULL);
+                                nullptr);
     if (hwndAlphaToggleBtn == INVALID_HANDLE_VALUE)
         return false;
-    hAlphaToggle = (HICON)LoadImage(hResource, MAKEINTRESOURCE(IDI_ALPHATOGGLE), IMAGE_ICON, 16, 16, LR_LOADTRANSPARENT);
+    hAlphaToggle = LoadIconEx(hResource, MAKEINTRESOURCE(IDI_ALPHATOGGLE), iconWidth, iconHeight);
     SendMessage(hwndAlphaToggleBtn, BM_SETIMAGE, (WPARAM)IMAGE_ICON, (LPARAM)hAlphaToggle);
 
     TOOLINFO ti = {0};
@@ -1447,14 +1460,14 @@ bool CPicWindow::CreateButtons()
     SendMessage(hwndTT, TTM_ADDTOOL, 0, (LPARAM) (LPTOOLINFO) &ti);
     ResString sSelect(hResource, IDS_SELECT);
     hwndSelectBtn = CreateWindowEx(0,
-                                   _T("BUTTON"),
+                                   L"BUTTON",
                                    sSelect,
                                    WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
                                    0, 0, 0, 0,
                                    *this,
                                    (HMENU)SELECTBUTTON_ID,
                                    hResource,
-                                   NULL);
+                                   nullptr);
     if (hwndPlayBtn == INVALID_HANDLE_VALUE)
         return false;
 
@@ -1463,14 +1476,18 @@ bool CPicWindow::CreateButtons()
 
 void CPicWindow::PositionChildren()
 {
+    const auto header_height = CDPIAware::Instance().ScaleY(HEADER_HEIGHT);
+    const auto selBorder = CDPIAware::Instance().ScaleX(100);
     RECT rect;
     ::GetClientRect(*this, &rect);
     if (HasMultipleImages())
     {
-        SetWindowPos(hwndLeftBtn, HWND_TOP, rect.left+3, rect.top + HEADER_HEIGHT + (HEADER_HEIGHT-16)/2, 16, 16, SWP_FRAMECHANGED|SWP_SHOWWINDOW);
-        SetWindowPos(hwndRightBtn, HWND_TOP, rect.left+23, rect.top + HEADER_HEIGHT + (HEADER_HEIGHT-16)/2, 16, 16, SWP_FRAMECHANGED|SWP_SHOWWINDOW);
+        int iconWidth = GetSystemMetrics(SM_CXSMICON);
+        int iconHeight = GetSystemMetrics(SM_CYSMICON);
+        SetWindowPos(hwndLeftBtn, HWND_TOP, rect.left + iconWidth / 4, rect.top + header_height + (header_height -iconHeight)/2, iconWidth, iconHeight, SWP_FRAMECHANGED | SWP_SHOWWINDOW);
+        SetWindowPos(hwndRightBtn, HWND_TOP, rect.left + iconWidth + iconWidth / 2, rect.top + header_height + (header_height - iconHeight) / 2, iconWidth, iconHeight, SWP_FRAMECHANGED | SWP_SHOWWINDOW);
         if (nFrames > 1)
-            SetWindowPos(hwndPlayBtn, HWND_TOP, rect.left+43, rect.top + HEADER_HEIGHT + (HEADER_HEIGHT-16)/2, 16, 16, SWP_FRAMECHANGED|SWP_SHOWWINDOW);
+            SetWindowPos(hwndPlayBtn, HWND_TOP, rect.left + iconWidth * 2 + iconWidth / 2, rect.top + header_height + (header_height - iconHeight) / 2, iconWidth, iconHeight, SWP_FRAMECHANGED | SWP_SHOWWINDOW);
         else
             ShowWindow(hwndPlayBtn, SW_HIDE);
     }
@@ -1481,7 +1498,7 @@ void CPicWindow::PositionChildren()
         ShowWindow(hwndPlayBtn, SW_HIDE);
     }
     if (bSelectionMode)
-        SetWindowPos(hwndSelectBtn, HWND_TOP, rect.right-100, rect.bottom-HEADER_HEIGHT, 100, HEADER_HEIGHT, SWP_FRAMECHANGED|SWP_SHOWWINDOW);
+        SetWindowPos(hwndSelectBtn, HWND_TOP, rect.right - selBorder, rect.bottom - header_height, selBorder, header_height, SWP_FRAMECHANGED | SWP_SHOWWINDOW);
     else
         ShowWindow(hwndSelectBtn, SW_HIDE);
     PositionTrackBar();
@@ -1489,7 +1506,7 @@ void CPicWindow::PositionChildren()
 
 bool CPicWindow::HasMultipleImages()
 {
-    return (((nDimensions > 1)||(nFrames > 1))&&(pSecondPic == NULL));
+    return (((nDimensions > 1) || (nFrames > 1)) && (!pSecondPic));
 }
 
 void CPicWindow::CreateTrackbar(HWND hwndParent)
@@ -1497,14 +1514,14 @@ void CPicWindow::CreateTrackbar(HWND hwndParent)
     HWND hwndTrack = CreateWindowEx(
         0,                                  // no extended styles
         TRACKBAR_CLASS,                     // class name
-        _T("Trackbar Control"),             // title (caption)
+        L"Trackbar Control",             // title (caption)
         WS_CHILD | WS_VISIBLE | TBS_VERT | TBS_TOOLTIPS | TBS_AUTOTICKS,                // style
         10, 10,                             // position
         200, 30,                            // size
         hwndParent,                         // parent window
         (HMENU)TRACKBAR_ID,                 // control identifier
         hInst,                              // instance
-        NULL                                // no WM_CREATE parameter
+        nullptr                             // no WM_CREATE parameter
         );
 
     SendMessage(hwndTrack, TBM_SETRANGE,
@@ -1528,7 +1545,7 @@ void CPicWindow::BuildInfoString(TCHAR * buf, int size, bool bTooltip)
     // translation might then need two again.
     if (pSecondPic && pTheOtherPic)
     {
-        _stprintf_s(buf, size,
+        swprintf_s(buf, size,
             (TCHAR const *)ResString(hResource, bTooltip ? IDS_DUALIMAGEINFOTT : IDS_DUALIMAGEINFO),
             picture.GetFileSizeAsText().c_str(), picture.GetFileSizeAsText(false).c_str(),
             picture.m_Width, picture.m_Height,
@@ -1543,7 +1560,7 @@ void CPicWindow::BuildInfoString(TCHAR * buf, int size, bool bTooltip)
     }
     else
     {
-        _stprintf_s(buf, size,
+        swprintf_s(buf, size,
             (TCHAR const *)ResString(hResource, bTooltip ? IDS_IMAGEINFOTT : IDS_IMAGEINFO),
             picture.GetFileSizeAsText().c_str(), picture.GetFileSizeAsText(false).c_str(),
             picture.m_Width, picture.m_Height,

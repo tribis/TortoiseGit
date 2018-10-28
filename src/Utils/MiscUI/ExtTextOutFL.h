@@ -27,7 +27,7 @@
 HRESULT TextOutFL(HDC hdc, int x, int y, LPCWSTR psz, int cch)
 {
 	ATL::CComPtr<IMLangFontLink2> pfl;
-	HRESULT hr = pfl.CoCreateInstance(CLSID_CMultiLanguage, NULL, CLSCTX_ALL);
+	HRESULT hr = pfl.CoCreateInstance(CLSID_CMultiLanguage, nullptr, CLSCTX_ALL);
 	if (FAILED(hr))
 		return hr;
 
@@ -49,14 +49,10 @@ HRESULT TextOutFL(HDC hdc, int x, int y, LPCWSTR psz, int cch)
 			long cchActual;
 			hr = pfl->GetStrCodePages(psz, cch, dwFontCodePages, &dwActualCodePages, &cchActual);
 			if (FAILED(hr))
-			{
 				break;
-			}
 
 			if (dwActualCodePages & dwFontCodePages)
-			{
 				TextOut(hdc, 0, 0, psz, cchActual);
-			}
 			else
 			{
 				HFONT hfLinked;
@@ -86,7 +82,7 @@ HRESULT TextOutFL(HDC hdc, int x, int y, LPCWSTR psz, int cch)
 	if (!(dwAlignOrig & TA_UPDATECP))
 	{
 		SetTextAlign(hdc, dwAlignOrig);
-		MoveToEx(hdc, ptOrig.x, ptOrig.y, NULL);
+		MoveToEx(hdc, ptOrig.x, ptOrig.y, nullptr);
 	}
 
 	return hr;
@@ -95,8 +91,6 @@ HRESULT TextOutFL(HDC hdc, int x, int y, LPCWSTR psz, int cch)
 void TextOutTryFL(HDC hdc, int x, int y, LPCWSTR psz, int cch)
 {
 	if (FAILED(TextOutFL(hdc, x, y, psz, cch)))
-	{
 		TextOut(hdc, x, y, psz, cch);
-	}
 }
 

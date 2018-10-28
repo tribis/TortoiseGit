@@ -41,13 +41,13 @@
     <ClCompile>
       <AdditionalIncludeDirectories>$(ProjectDir);..\..\ext\gitdll;..\..\ext\libgit2\include;..\Git;..\TortoiseProc;..\..\ext\scintilla\include;..\Utils;..\Utils\MiscUI;..\..\ext\hunspell;..\..\ext\ResizableLib;..\Resources;..\TortoiseMerge;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>HUNSPELL_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <ExceptionHandling>Async</ExceptionHandling>
+      <ExceptionHandling>SyncCThrow</ExceptionHandling>
     </ClCompile>
     <ResourceCompile>
       <AdditionalIncludeDirectories>$(IntDir);..\TortoiseShell;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <Link>
-      <AdditionalDependencies>Crypt32.lib;gdiplus.lib;shfolder.lib;shell32.lib;comctl32.lib;ws2_32.lib;rpcrt4.lib;shlwapi.lib;wininet.lib;version.lib;UxTheme.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>gdiplus.lib;comctl32.lib;shlwapi.lib;UxTheme.lib;wininet.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -58,14 +58,14 @@
     <ClCompile Include="..\Git\MassiveGitTaskBase.cpp" />
     <ClCompile Include="..\Git\TGitPath.cpp" />
     <ClCompile Include="..\TortoiseProc\Colors.cpp" />
+    <ClCompile Include="..\TortoiseProc\ColumnManager.cpp" />
     <ClCompile Include="..\TortoiseProc\GravatarPictureBox.cpp" />
     <ClCompile Include="..\Utils\CmdLineParser.cpp" />
     <ClCompile Include="..\Utils\CommonAppUtils.cpp" />
     <ClCompile Include="..\Utils\DebugOutput.cpp" />
+    <ClCompile Include="..\Utils\LoadIconEx.cpp" />
     <ClCompile Include="..\Utils\MiscUI\FilterEdit.cpp" />
-    <ClCompile Include="..\Utils\MiscUI\HintListCtrl.cpp" />
     <ClCompile Include="..\Utils\MiscUI\HistoryCombo.cpp" />
-    <ClCompile Include="..\Utils\MiscUI\HTMLFormatter.cpp" />
     <ClCompile Include="..\Utils\MiscUI\IconBitmapUtils.cpp" />
     <ClCompile Include="..\Utils\MiscUI\IconMenu.cpp" />
     <ClCompile Include="..\Utils\MiscUI\MessageBox.cpp" />
@@ -84,7 +84,6 @@
     <ClCompile Include="..\TortoiseProc\FindDlg.cpp" />
     <ClCompile Include="..\TortoiseProc\GitLogCache.cpp" />
     <ClCompile Include="..\TortoiseProc\GitLogListBase.cpp" />
-    <ClCompile Include="..\TortoiseProc\GitStatusListCtrlHelpers.cpp" />
     <ClCompile Include="..\TortoiseProc\lanes.cpp" />
     <ClCompile Include="..\TortoiseProc\LogDataVector.cpp" />
     <ClCompile Include="LogListBlameAction.cpp" />
@@ -114,12 +113,17 @@
     <ClInclude Include="..\Git\MassiveGitTaskBase.h" />
     <ClInclude Include="..\Git\TGitPath.h" />
     <ClInclude Include="..\Resources\LoglistCommonResource.h" />
+    <ClInclude Include="..\TortoiseProc\ColumnManager.h" />
     <ClInclude Include="..\Utils\CmdLineParser.h" />
     <ClInclude Include="..\Utils\DebugOutput.h" />
+    <ClInclude Include="..\Utils\DPIAware.h" />
+    <ClInclude Include="..\Utils\LoadIconEx.h" />
+    <ClInclude Include="..\Utils\LruCache.h" />
+    <ClInclude Include="..\Utils\MiscUI\CommonDialogFunctions.h" />
     <ClInclude Include="..\Utils\MiscUI\FilterEdit.h" />
-    <ClInclude Include="..\Utils\MiscUI\HintListCtrl.h" />
+    <ClInclude Include="..\Utils\MiscUI\GestureEnabledControl.h" />
+    <ClInclude Include="..\Utils\MiscUI\HintCtrl.h" />
     <ClInclude Include="..\Utils\MiscUI\HistoryCombo.h" />
-    <ClInclude Include="..\Utils\MiscUI\HTMLFormatter.h" />
     <ClInclude Include="..\Utils\MiscUI\IconBitmapUtils.h" />
     <ClInclude Include="..\Utils\MiscUI\IconMenu.h" />
     <ClInclude Include="..\Utils\MiscUI\MessageBox.h" />
@@ -158,7 +162,6 @@
   </ItemGroup>
   <ItemGroup>
     <Image Include="..\Resources\copy.ico" />
-    <Image Include="..\Resources\menublame.ico" />
     <Image Include="..\Resources\menucompare.ico" />
     <Image Include="..\Resources\blameres\output_wnd.ico" />
     <Image Include="..\Resources\blameres\output_wnd_hc.ico" />
@@ -166,8 +169,7 @@
     <Image Include="..\Resources\blameres\properties_wnd_hc.ico" />
     <Image Include="..\Resources\blameres\Toolbar.bmp" />
     <Image Include="..\Resources\blameres\Toolbar256.bmp" />
-    <Image Include="..\Resources\blameres\TortoiseGitBlame.ico" />
-    <Image Include="..\Resources\blameres\TortoiseGitBlameDoc.ico" />
+    <Image Include="..\Resources\TortoiseGitBlame.ico" />
     <Image Include="..\Resources\menulog.ico" />
   </ItemGroup>
   <ItemGroup>

@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2009, 2015-2016 - TortoiseGit
+// Copyright (C) 2009, 2015-2016, 2018 - TortoiseGit
 // Copyright (C) 2007-2008 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -20,7 +20,6 @@
 #include "stdafx.h"
 #include "FormatPatchCommand.h"
 
-#include "MessageBox.h"
 #include "FormatPatchDlg.h"
 #include "Git.h"
 #include "ShellUpdater.h"
@@ -30,15 +29,15 @@
 bool FormatPatchCommand::Execute()
 {
 	CFormatPatchDlg dlg;
-//	dlg.m_bIsTag=TRUE;
-	CString startval = parser.GetVal(_T("startrev"));
-	CString endval = parser.GetVal(_T("endrev"));
+	CString startval = parser.GetVal(L"startrev");
+	CString endval = parser.GetVal(L"endrev");
 
 	if( endval.IsEmpty() && (!startval.IsEmpty()))
 	{
 		dlg.m_Since=startval;
+		dlg.m_From = startval + L"~1";
+		dlg.m_To = startval;
 		dlg.m_Radio = IDC_RADIO_SINCE;
-
 	}
 	else if( (!endval.IsEmpty()) && (!startval.IsEmpty()))
 	{
@@ -58,14 +57,14 @@ bool FormatPatchCommand::Execute()
 			range=g_Git.FixBranchName(dlg.m_Since);
 			break;
 		case IDC_RADIO_NUM:
-			range.Format(_T("-%d"),dlg.m_Num);
+			range.Format(L"-%d", dlg.m_Num);
 			break;
 		case IDC_RADIO_RANGE:
-			range.Format(_T("%s..%s"), (LPCTSTR)dlg.m_From, (LPCTSTR)dlg.m_To);
+			range.Format(L"%s..%s", (LPCTSTR)dlg.m_From, (LPCTSTR)dlg.m_To);
 			break;
 		}
-		dlg.m_Dir.Replace(_T('\\'),_T('/'));
-		cmd.Format(_T("git.exe format-patch%s -o \"%s\" %s"),
+		dlg.m_Dir.Replace(L'\\', L'/');
+		cmd.Format(L"git.exe format-patch%s -o \"%s\" %s",
 			dlg.m_bNoPrefix ? L" --no-prefix" : L"",
 			(LPCTSTR)dlg.m_Dir,
 			(LPCTSTR)range
@@ -81,9 +80,7 @@ bool FormatPatchCommand::Execute()
 		if(!progress.m_GitStatus)
 		{
 			if(dlg.m_bSendMail)
-			{
-				CAppUtils::SendPatchMail(cmd, progress.m_LogText, true);
-			}
+				CAppUtils::SendPatchMail(GetExplorerHWND(), cmd, progress.m_LogText);
 		}
 		return !progress.m_GitStatus;
 	}

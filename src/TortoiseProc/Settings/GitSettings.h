@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2013-2016 - TortoiseGit
+// Copyright (C) 2013-2018 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -18,10 +18,11 @@
 //
 
 #pragma once
-#include "../TortoiseProc.h"
+#include "TortoiseProc.h"
 #include "Git.h"
 #include "Tooltip.h"
-#include "../../Utils/UnicodeUtils.h"
+#include "UnicodeUtils.h"
+#include "TempFile.h"
 
 class CSettings;
 
@@ -70,7 +71,7 @@ protected:
 		{
 			CString title;
 			page->GetWindowText(title);
-			page->SetWindowText(title + _T(" - ") + proj);
+			page->SetWindowText(title + L" - " + proj);
 			page->GetDlgItem(IDC_RADIO_SETTINGS_LOCAL)->EnableWindow(TRUE);
 
 			m_cSaveTo.AddString(CString(MAKEINTRESOURCE(IDS_CONFIG_LOCAL)));
@@ -94,7 +95,7 @@ protected:
 
 		page->CheckRadioButton(IDC_RADIO_SETTINGS_EFFECTIVE, IDC_RADIO_SETTINGS_SYSTEM, IDC_RADIO_SETTINGS_EFFECTIVE + m_iConfigSource);
 
-		CMessageBox::ShowCheck(nullptr, IDS_HIERARCHICALCONFIG, IDS_APPNAME, MB_ICONINFORMATION | MB_OK, _T("HintHierarchicalConfig"), IDS_MSGBOX_DONOTSHOWAGAIN);
+		CMessageBox::ShowCheck(GetDialogHwnd(), IDS_HIERARCHICALCONFIG, IDS_APPNAME, MB_ICONINFORMATION | MB_OK, L"HintHierarchicalConfig", IDS_MSGBOX_DONOTSHOWAGAIN);
 
 		LoadData();
 	}
@@ -119,8 +120,8 @@ protected:
 		if (err)
 		{
 			CString msg;
-			msg.Format(IDS_PROC_SAVECONFIGFAILED, (LPCTSTR)key, (LPCTSTR)value);
-			CMessageBox::Show(nullptr, g_Git.GetLibGit2LastErr(msg), _T("TortoiseGit"), MB_OK | MB_ICONERROR);
+			msg.FormatMessage(IDS_PROC_SAVECONFIGFAILED, (LPCTSTR)key, (LPCTSTR)value);
+			CMessageBox::Show(GetDialogHwnd(), g_Git.GetLibGit2LastErr(msg), L"TortoiseGit", MB_OK | MB_ICONERROR);
 			return false;
 		}
 		return true;
@@ -128,44 +129,50 @@ protected:
 
 	void LoadData()
 	{
+		CAutoRepository repo(g_Git.GetGitRepository());
 		CAutoConfig config(true);
 		if (!m_bGlobal && (m_iConfigSource == CFG_SRC_EFFECTIVE || m_iConfigSource == CFG_SRC_LOCAL))
 		{
-			if (git_config_add_file_ondisk(config, CGit::GetGitPathStringA(g_Git.GetGitLocalConfig()), GIT_CONFIG_LEVEL_APP, FALSE)) // this needs to have the highest priority in order to override .tgitconfig settings
-				MessageBox(nullptr, g_Git.GetLibGit2LastErr(), _T("TortoiseGit"), MB_ICONEXCLAMATION);
+			if (git_config_add_file_ondisk(config, CGit::GetGitPathStringA(g_Git.GetGitLocalConfig()), GIT_CONFIG_LEVEL_APP, repo, FALSE)) // this needs to have the highest priority in order to override .tgitconfig settings
+				MessageBox(nullptr, g_Git.GetLibGit2LastErr(), L"TortoiseGit", MB_ICONEXCLAMATION);
 		}
 		if ((m_iConfigSource == CFG_SRC_EFFECTIVE && m_bHonorProjectConfig) || m_iConfigSource == CFG_SRC_PROJECT)
 		{
 			if (!m_bIsBareRepo)
 			{
-				if (git_config_add_file_ondisk(config, CGit::GetGitPathStringA(g_Git.CombinePath(L".tgitconfig")), GIT_CONFIG_LEVEL_LOCAL, FALSE)) // this needs to have the second highest priority
-					MessageBox(nullptr, g_Git.GetLibGit2LastErr(), _T("TortoiseGit"), MB_ICONEXCLAMATION);
+				if (git_config_add_file_ondisk(config, CGit::GetGitPathStringA(g_Git.CombinePath(L".tgitconfig")), GIT_CONFIG_LEVEL_LOCAL, nullptr, FALSE)) // this needs to have the second highest priority
+					MessageBox(nullptr, g_Git.GetLibGit2LastErr(), L"TortoiseGit", MB_ICONEXCLAMATION);
 			}
 			else
 			{
-				CString tmpFile = GetTempFile();
-				CTGitPath path(_T(".tgitconfig"));
-				if (g_Git.GetOneFile(_T("HEAD"), path, tmpFile) == 0)
+				CString tmpFile = CTempFiles::Instance().GetTempFilePath(true).GetWinPathString();
+				CTGitPath path(L".tgitconfig");
+				if (g_Git.GetOneFile(L"HEAD", path, tmpFile) == 0)
 				{
-					if (git_config_add_file_ondisk(config, CGit::GetGitPathStringA(tmpFile), GIT_CONFIG_LEVEL_LOCAL, FALSE)) // this needs to have the second highest priority
-						MessageBox(nullptr, g_Git.GetLibGit2LastErr(), _T("TortoiseGit"), MB_ICONEXCLAMATION);
+					if (git_config_add_file_ondisk(config, CGit::GetGitPathStringA(tmpFile), GIT_CONFIG_LEVEL_LOCAL, nullptr, FALSE)) // this needs to have the second highest priority
+						MessageBox(nullptr, g_Git.GetLibGit2LastErr(), L"TortoiseGit", MB_ICONEXCLAMATION);
 				}
 			}
 		}
 		if (m_iConfigSource == CFG_SRC_EFFECTIVE || m_iConfigSource == CFG_SRC_GLOBAL)
 		{
-			if (git_config_add_file_ondisk(config, CGit::GetGitPathStringA(g_Git.GetGitGlobalConfig()), GIT_CONFIG_LEVEL_GLOBAL, FALSE))
-				MessageBox(nullptr, g_Git.GetLibGit2LastErr(), _T("TortoiseGit"), MB_ICONEXCLAMATION);
+			if (git_config_add_file_ondisk(config, CGit::GetGitPathStringA(g_Git.GetGitGlobalConfig()), GIT_CONFIG_LEVEL_GLOBAL, repo, FALSE))
+				MessageBox(nullptr, g_Git.GetLibGit2LastErr(), L"TortoiseGit", MB_ICONEXCLAMATION);
 			else
 			{
-				if (git_config_add_file_ondisk(config, CGit::GetGitPathStringA(g_Git.GetGitGlobalXDGConfig()), GIT_CONFIG_LEVEL_XDG, FALSE))
-					MessageBox(nullptr, g_Git.GetLibGit2LastErr(), _T("TortoiseGit"), MB_ICONEXCLAMATION);
+				if (git_config_add_file_ondisk(config, CGit::GetGitPathStringA(g_Git.GetGitGlobalXDGConfig()), GIT_CONFIG_LEVEL_XDG, repo, FALSE))
+					MessageBox(nullptr, g_Git.GetLibGit2LastErr(), L"TortoiseGit", MB_ICONEXCLAMATION);
 			}
 		}
 		if (m_iConfigSource == CFG_SRC_EFFECTIVE || m_iConfigSource == CFG_SRC_SYSTEM)
 		{
-			if (git_config_add_file_ondisk(config, CGit::GetGitPathStringA(g_Git.GetGitSystemConfig()), GIT_CONFIG_LEVEL_SYSTEM, FALSE))
-				MessageBox(nullptr, g_Git.GetLibGit2LastErr(), _T("TortoiseGit"), MB_ICONEXCLAMATION);
+			if (!g_Git.ms_bCygwinGit && !g_Git.ms_bMsys2Git)
+			{
+				if (git_config_add_file_ondisk(config, CGit::GetGitPathStringA(g_Git.GetGitProgramDataConfig()), GIT_CONFIG_LEVEL_PROGRAMDATA, repo, FALSE))
+					MessageBox(nullptr, g_Git.GetLibGit2LastErr(), L"TortoiseGit", MB_ICONEXCLAMATION);
+			}
+			if (git_config_add_file_ondisk(config, CGit::GetGitPathStringA(g_Git.GetGitSystemConfig()), GIT_CONFIG_LEVEL_SYSTEM, repo, FALSE))
+				MessageBox(nullptr, g_Git.GetLibGit2LastErr(), L"TortoiseGit", MB_ICONEXCLAMATION);
 		}
 
 		LoadDataImpl(config);
@@ -181,7 +188,7 @@ protected:
 			dest.LoadString(storeTo);
 			CString msg;
 			msg.Format(IDS_WARNUSERSAFEDIFFERENT, (LPCTSTR)dest);
-			if (CMessageBox::Show(nullptr, msg, _T("TortoiseGit"), 2, IDI_QUESTION, CString(MAKEINTRESOURCE(IDS_SAVEBUTTON)), CString(MAKEINTRESOURCE(IDS_ABORTBUTTON))) == 2)
+			if (CMessageBox::Show(GetDialogHwnd(), msg, L"TortoiseGit", 2, IDI_QUESTION, CString(MAKEINTRESOURCE(IDS_SAVEBUTTON)), CString(MAKEINTRESOURCE(IDS_ABORTBUTTON))) == 2)
 				return false;
 		}
 		return true;
@@ -196,25 +203,25 @@ protected:
 		{
 			if (!WarnUserSafeToDifferentDestination(IDS_CONFIG_GLOBAL))
 				return FALSE;
-			err = git_config_add_file_ondisk(config, CGit::GetGitPathStringA(g_Git.GetGitGlobalXDGConfig()), GIT_CONFIG_LEVEL_XDG, FALSE);
+			err = git_config_add_file_ondisk(config, CGit::GetGitPathStringA(g_Git.GetGitGlobalXDGConfig()), GIT_CONFIG_LEVEL_XDG, nullptr, FALSE);
 			if (!err && (PathFileExists(g_Git.GetGitGlobalConfig()) || !PathFileExists(g_Git.GetGitGlobalXDGConfig())))
-				err = git_config_add_file_ondisk(config, CGit::GetGitPathStringA(g_Git.GetGitGlobalConfig()), GIT_CONFIG_LEVEL_GLOBAL, FALSE);
+				err = git_config_add_file_ondisk(config, CGit::GetGitPathStringA(g_Git.GetGitGlobalConfig()), GIT_CONFIG_LEVEL_GLOBAL, nullptr, FALSE);
 		}
 		else if (m_cSaveTo.GetCurSel() == 1 && !m_bIsBareRepo && m_bHonorProjectConfig)
 		{
 			if (!WarnUserSafeToDifferentDestination(IDS_CONFIG_PROJECT))
 				return FALSE;
-			err = git_config_add_file_ondisk(config, CGit::GetGitPathStringA(g_Git.CombinePath(L".tgitconfig")), GIT_CONFIG_LEVEL_APP, FALSE);
+			err = git_config_add_file_ondisk(config, CGit::GetGitPathStringA(g_Git.CombinePath(L".tgitconfig")), GIT_CONFIG_LEVEL_APP, nullptr, FALSE);
 		}
 		else
 		{
 			if (!WarnUserSafeToDifferentDestination(IDS_CONFIG_LOCAL))
 				return FALSE;
-			err = git_config_add_file_ondisk(config, CGit::GetGitPathStringA(g_Git.GetGitLocalConfig()), GIT_CONFIG_LEVEL_LOCAL, FALSE);
+			err = git_config_add_file_ondisk(config, CGit::GetGitPathStringA(g_Git.GetGitLocalConfig()), GIT_CONFIG_LEVEL_LOCAL, nullptr, FALSE);
 		}
 		if (err)
 		{
-			MessageBox(nullptr, g_Git.GetLibGit2LastErr(), _T("TortoiseGit"), MB_ICONEXCLAMATION);
+			MessageBox(nullptr, g_Git.GetLibGit2LastErr(), L"TortoiseGit", MB_ICONEXCLAMATION);
 			return FALSE;
 		}
 
@@ -224,12 +231,13 @@ protected:
 	virtual void LoadDataImpl(CAutoConfig& config) = 0;
 	virtual BOOL SafeDataImpl(CAutoConfig& config) = 0;
 	virtual void EnDisableControls() = 0;
+	virtual HWND GetDialogHwnd() const = 0;
 
 	static void AddTrueFalseToComboBox(CComboBox &combobox)
 	{
-		combobox.AddString(_T(""));
-		combobox.AddString(_T("true"));
-		combobox.AddString(_T("false"));
+		combobox.AddString(L"");
+		combobox.AddString(L"true");
+		combobox.AddString(L"false");
 	}
 
 	static void GetBoolConfigValueComboBox(CAutoConfig& config, const CString &key, CComboBox &combobox)

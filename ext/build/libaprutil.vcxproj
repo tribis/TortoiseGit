@@ -45,9 +45,9 @@ if errorlevel 1 type apu.hw &gt;..\apr-util\include\apu.hw
 </Command>
     </PreBuildEvent>
     <ClCompile>
-      <AdditionalIncludeDirectories>..\apr-util\include;..\apr\include;..\apr-util\include\private;..\apr-util\dbm\sdbm;..\apr-util\xml\expat\lib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\apr-util\include;..\apr\include;..\apr-util\include\private;..\apr-util\dbm\sdbm;..\expat\expat\lib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>APU_DECLARE_EXPORT;APU_USE_SDBM;XML_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+      <WarningLevel>Level2</WarningLevel>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
     </ClCompile>
     <ResourceCompile>
@@ -56,7 +56,6 @@ if errorlevel 1 type apu.hw &gt;..\apr-util\include\apu.hw
     </ResourceCompile>
     <Link>
       <AdditionalDependencies>ws2_32.lib;mswsock.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <BaseAddress>0x6EE60000</BaseAddress>
     </Link>
     <PostBuildEvent>
       <Message>Embed .manifest</Message>

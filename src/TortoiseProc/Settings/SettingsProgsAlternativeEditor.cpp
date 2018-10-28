@@ -1,7 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
 // Copyright (C) 2003-2007 - TortoiseSVN
-// Copyright (C) 2011,2013-2015 - TortoiseGit
+// Copyright (C) 2011, 2013-2016, 2018 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -28,7 +28,7 @@ CSettingsProgsAlternativeEditor::CSettingsProgsAlternativeEditor()
 	: ISettingsPropPage(CSettingsProgsAlternativeEditor::IDD)
 	, m_iAlternativeEditor(0)
 {
-	m_regAlternativeEditorPath = CRegString(_T("Software\\TortoiseGit\\AlternativeEditor"));
+	m_regAlternativeEditorPath = CRegString(L"Software\\TortoiseGit\\AlternativeEditor");
 }
 
 CSettingsProgsAlternativeEditor::~CSettingsProgsAlternativeEditor()
@@ -80,8 +80,13 @@ void CSettingsProgsAlternativeEditor::OnEnChangeAlternativeEditor()
 
 void CSettingsProgsAlternativeEditor::OnBnClickedAlternativeEditorBrowse()
 {
-	if (CAppUtils::FileOpenSave(m_sAlternativeEditorPath, NULL, IDS_SETTINGS_SELECTDIFFVIEWER, IDS_PROGRAMSFILEFILTER, true, m_hWnd))
+	UpdateData();
+	CString filename = m_sAlternativeEditorPath;
+	if (!PathFileExists(filename))
+		filename.Empty();
+	if (CAppUtils::FileOpenSave(filename, nullptr, IDS_SETTINGS_SELECTDIFFVIEWER, IDS_PROGRAMSFILEFILTER, true, m_hWnd))
 	{
+		m_sAlternativeEditorPath = filename;
 		UpdateData(FALSE);
 		SetModified();
 	}
@@ -110,8 +115,8 @@ BOOL CSettingsProgsAlternativeEditor::OnInitDialog()
 BOOL CSettingsProgsAlternativeEditor::OnApply()
 {
 	UpdateData();
-	if (m_iAlternativeEditor == 0 && !m_sAlternativeEditorPath.IsEmpty() && m_sAlternativeEditorPath.Left(1) != _T("#"))
-		m_sAlternativeEditorPath = _T("#") + m_sAlternativeEditorPath;
+	if (m_iAlternativeEditor == 0 && !m_sAlternativeEditorPath.IsEmpty() && m_sAlternativeEditorPath.Left(1) != L"#")
+		m_sAlternativeEditorPath = L'#' + m_sAlternativeEditorPath;
 
 	m_regAlternativeEditorPath = m_sAlternativeEditorPath;
 	SetModified(FALSE);
@@ -121,9 +126,9 @@ BOOL CSettingsProgsAlternativeEditor::OnApply()
 void CSettingsProgsAlternativeEditor::CheckProgComment()
 {
 	UpdateData();
-	if (m_iAlternativeEditor == 0 && !m_sAlternativeEditorPath.IsEmpty() && m_sAlternativeEditorPath.Left(1) != _T("#"))
-		m_sAlternativeEditorPath = _T("#") + m_sAlternativeEditorPath;
+	if (m_iAlternativeEditor == 0 && !m_sAlternativeEditorPath.IsEmpty() && m_sAlternativeEditorPath.Left(1) != L"#")
+		m_sAlternativeEditorPath = L'#' + m_sAlternativeEditorPath;
 	else if (m_iAlternativeEditor == 1)
-		m_sAlternativeEditorPath.TrimLeft('#');
+		m_sAlternativeEditorPath.TrimLeft(L'#');
 	UpdateData(FALSE);
 }

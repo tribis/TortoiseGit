@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2011-2015 - TortoiseGit
+// Copyright (C) 2011-2016 - TortoiseGit
 // Copyright (C) 2006 - Stefan Kueng
 
 // This program is free software; you can redistribute it and/or
@@ -20,13 +20,13 @@
 #include "stdafx.h"
 #include "resource.h"
 #include "FindDlg.h"
-
+#include "StringUtils.h"
 
 // CFindDlg dialog
 
 IMPLEMENT_DYNAMIC(CFindDlg, CResizableStandAloneDialog)
 
-CFindDlg::CFindDlg(CWnd* pParent /*=NULL*/)
+CFindDlg::CFindDlg(CWnd* pParent /*=nullptr*/)
 	: CResizableStandAloneDialog(CFindDlg::IDD, pParent)
 	, m_bTerminating(false)
 	, m_bFindNext(false)
@@ -39,8 +39,8 @@ CFindDlg::CFindDlg(CWnd* pParent /*=NULL*/)
 	, m_regMatchCase(L"Software\\TortoiseGit\\LogDialog\\FindMatchCase", FALSE)
 	, m_regWholeWord(L"Software\\TortoiseGit\\LogDialog\\FindWholeWord", FALSE)
 	, m_regRegex(L"Software\\TortoiseGit\\LogDialog\\FindRegex", FALSE)
+	, m_pParent(pParent)
 {
-	m_pParent = pParent;
 }
 
 CFindDlg::~CFindDlg()
@@ -74,7 +74,7 @@ void CFindDlg::OnCancel()
 	m_bTerminating = true;
 
 	CWnd *parent = m_pParent;
-	if(parent == NULL)
+	if (!parent)
 		parent = GetParent();
 
 	if (parent)
@@ -103,7 +103,7 @@ void CFindDlg::OnOK()
 	m_FindString = m_FindCombo.GetString();
 
 	CWnd *parent = m_pParent;
-	if(parent == NULL)
+	if (!parent)
 		parent = GetParent();
 
 	if (parent)
@@ -113,7 +113,7 @@ void CFindDlg::OnOK()
 
 BOOL CFindDlg::OnInitDialog()
 {
-	CDialog::OnInitDialog();
+	__super::OnInitDialog();
 	m_FindMsg = RegisterWindowMessage(FINDMSGSTRING);
 
 	m_bMatchCase = (BOOL)(DWORD)m_regMatchCase;
@@ -122,7 +122,7 @@ BOOL CFindDlg::OnInitDialog()
 	UpdateData(FALSE);
 
 	m_FindCombo.SetCaseSensitive(TRUE);
-	m_FindCombo.LoadHistory(_T("Software\\TortoiseGit\\History\\Find"), _T("Search"));
+	m_FindCombo.LoadHistory(L"Software\\TortoiseGit\\History\\Find", L"Search");
 	m_FindCombo.SetCurSel(0);
 	m_FindCombo.SetFocus();
 
@@ -136,7 +136,7 @@ BOOL CFindDlg::OnInitDialog()
 	this->AddAnchor(IDC_LIST_REF, TOP_LEFT, BOTTOM_RIGHT);
 	this->AddOthersToAnchor();
 
-	EnableSaveRestore(_T("FindDlg"));
+	EnableSaveRestore(L"FindDlg");
 
 	CImageList *imagelist = new CImageList();
 	imagelist->Create(IDB_BITMAP_REFTYPE,16,3,RGB(255,255,255));
@@ -145,7 +145,9 @@ BOOL CFindDlg::OnInitDialog()
 	CRect rect;
 	m_ctrlRefList.GetClientRect(&rect);
 
-	this->m_ctrlRefList.InsertColumn(0,_T("Ref"),0, rect.Width()-50);
+	this->m_ctrlRefList.InsertColumn(0, L"Ref", 0, rect.Width() - 50);
+	if (CRegDWORD(L"Software\\TortoiseGit\\FullRowSelect", TRUE))
+		m_ctrlRefList.SetExtendedStyle(m_ctrlRefList.GetExtendedStyle() | LVS_EX_FULLROWSELECT);
 	RefreshList();
 	return FALSE;
 }
@@ -154,7 +156,7 @@ void CFindDlg::RefreshList()
 {
 	m_RefList.clear();
 	if (g_Git.GetRefList(m_RefList))
-		MessageBox(g_Git.GetGitLastErr(_T("Could not get all refs.")), _T("TortoiseGit"), MB_ICONERROR);
+		MessageBox(g_Git.GetGitLastErr(L"Could not get all refs."), L"TortoiseGit", MB_ICONERROR);
 	AddToList();
 }
 
@@ -175,11 +177,11 @@ void CFindDlg::AddToList()
 	{
 		int nImage = -1;
 		CString ref = m_RefList[i];
-		if(ref.Find(_T("refs/tags")) == 0)
+		if (CStringUtils::StartsWith(ref, L"refs/tags/"))
 			nImage = 0;
-		else if(ref.Find(_T("refs/remotes"))==0)
+		else if (CStringUtils::StartsWith(ref, L"refs/remotes/"))
 			nImage = 2;
-		else if(ref.Find(_T("refs/heads"))== 0)
+		else if (CStringUtils::StartsWith(ref, L"refs/heads/"))
 			nImage = 1;
 
 		if(ref.Find(filter)>=0)
@@ -195,7 +197,7 @@ void CFindDlg::OnNMClickListRef(NMHDR *pNMHDR, LRESULT *pResult)
 	this->m_bIsRef =true;
 
 	CWnd *parent = m_pParent;
-	if(parent == NULL)
+	if (!parent)
 		parent = GetParent();
 
 	if (parent)
@@ -208,7 +210,7 @@ void CFindDlg::OnNMClickListRef(NMHDR *pNMHDR, LRESULT *pResult)
 
 void CFindDlg::OnEnChangeEditFilter()
 {
-	SetTimer(IDT_FILTER, 1000, NULL);
+	SetTimer(IDT_FILTER, 1000, nullptr);
 }
 
 void CFindDlg::OnTimer(UINT_PTR nIDEvent)

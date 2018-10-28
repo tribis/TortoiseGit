@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "..\targetver.h"
+#include "../targetver.h"
 
 #define ISOLATION_AWARE_ENABLED 1
 
@@ -14,10 +14,7 @@
 #include <windows.h>
 
 #include <commctrl.h>
-#pragma warning(push)
-#pragma warning(disable: 4091)
 #include <ShlObj.h>
-#pragma warning(pop)
 #include <Shlwapi.h>
 #include <tchar.h>
 #include <wininet.h>

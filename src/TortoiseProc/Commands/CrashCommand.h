@@ -33,12 +33,12 @@ public:
 	/**
 	 * Executes the command.
 	 */
-	virtual bool			Execute()
+	virtual bool			Execute() override
 	{
-		crasher.Enable(!parser.HasKey(_T("nocustom")));
-		CMessageBox::Show(NULL, _T("You are testing the crashhandler.\n<ct=0x0000FF>Do NOT send the crashreport!!!!</ct>"), _T("TortoiseGit"), MB_ICONINFORMATION);
+		crasher.Enable(!parser.HasKey(L"nocustom"));
+		CMessageBox::Show(hwndExplorer, L"You are testing the crashhandler.\n<ct=0x0000FF>Do NOT send the crashreport!!!!</ct>", L"TortoiseGit", MB_ICONINFORMATION);
 		CrashProgram();
-		CMessageBox::Show(NULL, IDS_ERR_NOCOMMAND, IDS_APPNAME, MB_ICONERROR);
+		CMessageBox::Show(hwndExplorer, IDS_ERR_NOCOMMAND, IDS_APPNAME, MB_ICONERROR);
 		return true;
 	}
 
@@ -46,7 +46,7 @@ public:
 	{
 		// this function is to test the crash reporting utility
 		int * a;
-		a = NULL;
+		a = nullptr;
 		*a = 7;
 	}
 };

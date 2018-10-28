@@ -51,14 +51,14 @@ int CSerialPatch::Parse(const CString& pathfile, bool parseBody)
 		one = m_Body.Tokenize("\n", start);
 		if (one.GetLength()>6)
 			CGit::StringAppend(&m_Author, (BYTE*)(LPCSTR)one + 6, CP_UTF8, one.GetLength() - 6);
-		m_Author.TrimRight(L"\r");
+		m_Author.TrimRight(L'\r');
 
 		if (start == -1)
 			return -1;
 		one = m_Body.Tokenize("\n", start);
 		if (one.GetLength()>6)
 			CGit::StringAppend(&m_Date, (BYTE*)(LPCSTR)one + 6, CP_UTF8, one.GetLength() - 6);
-		m_Date.TrimRight(L"\r");
+		m_Date.TrimRight(L'\r');
 
 		if (start == -1)
 			return -1;
@@ -66,12 +66,12 @@ int CSerialPatch::Parse(const CString& pathfile, bool parseBody)
 		if (one.GetLength()>9)
 		{
 			CGit::StringAppend(&m_Subject, (BYTE*)(LPCSTR)one + 9, CP_UTF8, one.GetLength() - 9);
-			while (m_Body.GetLength() > start && m_Body.GetAt(start) == _T(' '))
+			while (m_Body.GetLength() > start && m_Body.GetAt(start) == L' ')
 			{
 				one = m_Body.Tokenize("\n", start);
 				CGit::StringAppend(&m_Subject, (BYTE*)(LPCSTR)one, CP_UTF8, one.GetLength());
 			}
-			m_Subject.TrimRight(L"\r");
+			m_Subject.TrimRight(L'\r');
 		}
 
 		if (!parseBody)

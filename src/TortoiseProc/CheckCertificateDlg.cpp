@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2014-2015 - TortoiseGit
+// Copyright (C) 2014-2016 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -24,7 +24,7 @@
 #include <WinCrypt.h>
 
 IMPLEMENT_DYNAMIC(CCheckCertificateDlg, CStandAloneDialog)
-CCheckCertificateDlg::CCheckCertificateDlg(CWnd* pParent /*=NULL*/)
+CCheckCertificateDlg::CCheckCertificateDlg(CWnd* pParent /*=nullptr*/)
 : CStandAloneDialog(CCheckCertificateDlg::IDD, pParent)
 , cert(nullptr)
 {
@@ -52,7 +52,7 @@ void CCheckCertificateDlg::OnBnClickedOk()
 
 static CString getCertificateHash(HCRYPTPROV hCryptProv, ALG_ID algId, BYTE* certificate, size_t len)
 {
-	CString readable = _T("unknown");
+	CString readable = L"unknown";
 
 	if (!hCryptProv)
 		return readable;
@@ -76,15 +76,9 @@ static CString getCertificateHash(HCRYPTPROV hCryptProv, ALG_ID algId, BYTE* cer
 
 	readable.Empty();
 	for (const BYTE* it = pHash.get(); it < pHash.get() + hashLen; ++it)
-	{
-		CString tmp;
-		tmp.Format(L"%02X", *it);
-		if (!readable.IsEmpty())
-			readable += L":";
-		readable += tmp;
-	}
+		readable.AppendFormat(L"%02X:", *it);
 
-	return readable;
+	return readable.TrimRight(L":");
 }
 
 BOOL CCheckCertificateDlg::OnInitDialog()
@@ -118,7 +112,7 @@ BOOL CCheckCertificateDlg::OnInitDialog()
 
 void CCheckCertificateDlg::OnBnClickedOpencert()
 {
-	CTGitPath tempFile = CTempFiles::Instance().GetTempFilePath(true, CTGitPath(_T("certificate.der")));
+	CTGitPath tempFile = CTempFiles::Instance().GetTempFilePath(true, CTGitPath(L"certificate.der"));
 	
 	try
 	{
@@ -128,7 +122,7 @@ void CCheckCertificateDlg::OnBnClickedOpencert()
 	}
 	catch (CFileException* e)
 	{
-		MessageBox(_T("Could not write to file."), _T("TortoiseGit"), MB_ICONERROR);
+		MessageBox(L"Could not write to file.", L"TortoiseGit", MB_ICONERROR);
 		e->Delete();
 		return;
 	}

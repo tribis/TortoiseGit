@@ -27,7 +27,7 @@ class CBisectStartDlg : public CHorizontalResizableStandAloneDialog
 	DECLARE_DYNAMIC(CBisectStartDlg)
 
 public:
-	CBisectStartDlg(CWnd* pParent = NULL);   // standard constructor
+	CBisectStartDlg(CWnd* pParent = nullptr);   // standard constructor
 	virtual ~CBisectStartDlg();
 
 	// Dialog Data
@@ -37,9 +37,9 @@ public:
 	CString			m_sFirstBad;
 
 protected:
-	virtual BOOL OnInitDialog();
+	virtual BOOL OnInitDialog() override;
 
-	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
+	virtual void DoDataExchange(CDataExchange* pDX) override;    // DDX/DDV support
 
 	DECLARE_MESSAGE_MAP()
 

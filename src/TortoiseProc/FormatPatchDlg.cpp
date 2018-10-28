@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2014, 2016 - TortoiseGit
+// Copyright (C) 2008-2014, 2016-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -32,15 +32,19 @@
 
 IMPLEMENT_DYNAMIC(CFormatPatchDlg, CHorizontalResizableStandAloneDialog)
 
-CFormatPatchDlg::CFormatPatchDlg(CWnd* pParent /*=NULL*/)
+CFormatPatchDlg::CFormatPatchDlg(CWnd* pParent /*=nullptr*/)
 	: CHorizontalResizableStandAloneDialog(CFormatPatchDlg::IDD, pParent)
-	, m_regSendMail(_T("Software\\TortoiseGit\\TortoiseProc\\FormatPatch\\SendMail"), 0)
-	, m_regNoPrefix(_T("Software\\TortoiseGit\\TortoiseProc\\FormatPatch\\NoPrefix"), FALSE)
+	, m_regSendMail(L"Software\\TortoiseGit\\TortoiseProc\\FormatPatch\\SendMail", 0)
+	, m_regNoPrefix(L"Software\\TortoiseGit\\TortoiseProc\\FormatPatch\\NoPrefix", FALSE)
+	, m_Num(1)
 {
-	m_Num=1;
 	this->m_bSendMail = m_regSendMail;
 	this->m_Radio = IDC_RADIO_SINCE;
 	m_bNoPrefix = m_regNoPrefix;
+
+	CString workingDir = g_Git.m_CurrentDir;
+	workingDir.Replace(L':', L'_');
+	m_regSince = CRegString(L"Software\\TortoiseGit\\History\\FormatPatch\\" + workingDir + L"\\Since");
 }
 
 CFormatPatchDlg::~CFormatPatchDlg()
@@ -86,6 +90,12 @@ BOOL CFormatPatchDlg::OnInitDialog()
 	CHorizontalResizableStandAloneDialog::OnInitDialog();
 	CAppUtils::MarkWindowAsUnpinnable(m_hWnd);
 
+	AdjustControlSize(IDC_RADIO_SINCE);
+	AdjustControlSize(IDC_RADIO_NUM);
+	AdjustControlSize(IDC_RADIO_RANGE);
+	AdjustControlSize(IDC_CHECK_SENDMAIL);
+	AdjustControlSize(IDC_CHECK_NOPREFIX);
+
 	AddAnchor(IDC_GROUP_DIR, TOP_LEFT, TOP_RIGHT);
 	AddAnchor(IDC_COMBOBOXEX_DIR,TOP_LEFT, TOP_RIGHT);
 	AddAnchor(IDC_BUTTON_DIR, TOP_RIGHT);
@@ -107,12 +117,6 @@ BOOL CFormatPatchDlg::OnInitDialog()
 	AddAnchor(IDHELP, BOTTOM_RIGHT);
 	AddAnchor(IDC_BUTTON_REF,TOP_RIGHT);
 
-	AdjustControlSize(IDC_RADIO_SINCE);
-	AdjustControlSize(IDC_RADIO_NUM);
-	AdjustControlSize(IDC_RADIO_RANGE);
-	AdjustControlSize(IDC_CHECK_SENDMAIL);
-	AdjustControlSize(IDC_CHECK_NOPREFIX);
-
 	this->AddOthersToAnchor();
 
 	CString sWindowTitle;
@@ -120,24 +124,26 @@ BOOL CFormatPatchDlg::OnInitDialog()
 	CAppUtils::SetWindowTitle(m_hWnd, g_Git.m_CurrentDir, sWindowTitle);
 
 	m_cDir.SetPathHistory(TRUE);
-	m_cDir.LoadHistory(_T("Software\\TortoiseGit\\History\\FormatPatchURLS"), _T("path"));
+	m_cDir.LoadHistory(L"Software\\TortoiseGit\\History\\FormatPatchURLS", L"path");
 	m_cDir.AddString(g_Git.m_CurrentDir);
 
 	STRING_VECTOR list;
-	g_Git.GetBranchList(list,NULL,CGit::BRANCH_ALL_F);
+	g_Git.GetBranchList(list, nullptr, CGit::BRANCH_ALL_F);
 	m_cSince.SetMaxHistoryItems((int)list.size());
 	m_cSince.SetList(list);
 
-	if(!m_Since.IsEmpty())
+	if (!m_Since.IsEmpty())
 		m_cSince.SetWindowText(m_Since);
+	else
+		m_cSince.SetWindowText((CString)m_regSince);
 
-	m_cFrom.LoadHistory(_T("Software\\TortoiseGit\\History\\FormatPatchFromURLS"), _T("ver"));
+	m_cFrom.LoadHistory(L"Software\\TortoiseGit\\History\\FormatPatchFromURLS", L"ver");
 	m_cFrom.SetCurSel(0);
 
 	if(!m_From.IsEmpty())
 		m_cFrom.SetWindowText(m_From);
 
-	m_cTo.LoadHistory(_T("Software\\TortoiseGit\\History\\FormatPatchToURLS"), _T("ver"));
+	m_cTo.LoadHistory(L"Software\\TortoiseGit\\History\\FormatPatchToURLS", L"ver");
 	m_cTo.SetCurSel(0);
 
 	if(!m_To.IsEmpty())
@@ -151,7 +157,7 @@ BOOL CFormatPatchDlg::OnInitDialog()
 	if (g_Git.IsInitRepos())
 		DialogEnableWindow(IDOK, FALSE);
 
-	EnableSaveRestore(_T("FormatPatchDlg"));
+	EnableSaveRestore(L"FormatPatchDlg");
 	return TRUE;
 }
 // CFormatPatchDlg message handlers
@@ -178,9 +184,10 @@ void CFormatPatchDlg::OnBnClickedButtonFrom()
 	dlg.SetParams(CTGitPath(), CTGitPath(), revision, revision, 0);
 	// tell the dialog to use mode for selecting revisions
 	dlg.SetSelect(true);
+	dlg.ShowWorkingTreeChanges(false);
 	// only one revision must be selected however
 	dlg.SingleSelection(true);
-	if ( dlg.DoModal() == IDOK )
+	if (dlg.DoModal() == IDOK && !dlg.GetSelectedHash().empty())
 	{
 		m_cFrom.AddString(dlg.GetSelectedHash().at(0).ToString());
 		CheckRadioButton(IDC_RADIO_SINCE, IDC_RADIO_RANGE, IDC_RADIO_RANGE);
@@ -198,7 +205,7 @@ void CFormatPatchDlg::OnBnClickedButtonTo()
 	dlg.SetSelect(true);
 	// only one revision must be selected however
 	dlg.SingleSelection(true);
-	if ( dlg.DoModal() == IDOK )
+	if (dlg.DoModal() == IDOK && !dlg.GetSelectedHash().empty())
 	{
 		m_cTo.AddString(dlg.GetSelectedHash().at(0).ToString());
 		CheckRadioButton(IDC_RADIO_SINCE, IDC_RADIO_RANGE, IDC_RADIO_RANGE);
@@ -213,6 +220,9 @@ void CFormatPatchDlg::OnBnClickedOk()
 	m_cTo.SaveHistory();
 	this->UpdateData(TRUE);
 	this->m_Radio=GetCheckedRadioButton(IDC_RADIO_SINCE,IDC_RADIO_RANGE);
+
+	if (m_Radio == IDC_RADIO_SINCE && !m_Since.IsEmpty())
+		m_regSince = m_Since;
 
 	m_regSendMail=this->m_bSendMail;
 	m_regNoPrefix = m_bNoPrefix;
@@ -249,7 +259,7 @@ void CFormatPatchDlg::OnBnClickedRadio()
 
 void CFormatPatchDlg::OnBnClickedButtonRef()
 {
-	if(CBrowseRefsDlg::PickRefForCombo(&m_cSince, gPickRef_NoTag))
+	if (CBrowseRefsDlg::PickRefForCombo(m_cSince, gPickRef_NoTag))
 	{
 		CheckRadioButton(IDC_RADIO_SINCE, IDC_RADIO_RANGE, IDC_RADIO_SINCE);
 		OnBnClickedRadio();
@@ -259,5 +269,5 @@ void CFormatPatchDlg::OnBnClickedButtonUnifieddiff()
 {
 	UpdateData(TRUE);
 	m_regNoPrefix = m_bNoPrefix;
-	CAppUtils::StartShowUnifiedDiff(m_hWnd, CTGitPath(), GitRev::GetHead(), CTGitPath(), GitRev::GetWorkingCopy(), false, false, false, false, false, !!m_bNoPrefix);
+	CAppUtils::StartShowUnifiedDiff(m_hWnd, CTGitPath(), GitRev::GetHead(), CTGitPath(), GitRev::GetWorkingCopy(), !!(GetAsyncKeyState(VK_SHIFT) & 0x8000), false, false, false, false, !!m_bNoPrefix);
 }

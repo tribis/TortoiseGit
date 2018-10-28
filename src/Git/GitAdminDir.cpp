@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2017 - TortoiseGit
 // Copyright (C) 2003-2008 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -22,14 +22,7 @@
 #include "GitAdminDir.h"
 #include "Git.h"
 #include "SmartHandle.h"
-
-GitAdminDir::GitAdminDir()
-{
-}
-
-GitAdminDir::~GitAdminDir()
-{
-}
+#include "PathUtils.h"
 
 CString GitAdminDir::GetSuperProjectRoot(const CString& path)
 {
@@ -37,30 +30,22 @@ CString GitAdminDir::GetSuperProjectRoot(const CString& path)
 
 	do
 	{
-		if (CGit::GitPathFileExists(projectroot + _T("\\.git")))
+		if (CGit::GitPathFileExists(projectroot + L"\\.git"))
 		{
-			if (CGit::GitPathFileExists(projectroot + _T("\\.gitmodules")))
+			if (CGit::GitPathFileExists(projectroot + L"\\.gitmodules"))
 				return projectroot;
 			else
-				return _T("");
+				return L"";
 		}
 
-		projectroot = projectroot.Left(projectroot.ReverseFind('\\'));
+		projectroot.Truncate(max(0, projectroot.ReverseFind(L'\\')));
 
 		// don't check for \\COMPUTERNAME\.git
-		if (projectroot[0] == _T('\\') && projectroot[1] == _T('\\') && projectroot.Find(_T('\\'), 2) < 0)
-			return _T("");
+		if (projectroot[0] == L'\\' && projectroot[1] == L'\\' && projectroot.Find(L'\\', 2) < 0)
+			return L"";
 	}while(projectroot.ReverseFind('\\')>0);
 
-	return _T("");
-
-}
-
-CString GitAdminDir::GetGitTopDir(const CString& path)
-{
-	CString str;
-	HasAdminDir(path,!!PathIsDirectory(path),&str);
-	return str;
+	return L"";
 }
 
 bool GitAdminDir::IsWorkingTreeOrBareRepo(const CString& path)
@@ -78,7 +63,7 @@ bool GitAdminDir::HasAdminDir(const CString& path,CString* ProjectTopDir)
 	return HasAdminDir(path, !!PathIsDirectory(path),ProjectTopDir);
 }
 
-bool GitAdminDir::HasAdminDir(const CString& path, bool bDir, CString* ProjectTopDir)
+bool GitAdminDir::HasAdminDir(const CString& path, bool bDir, CString* ProjectTopDir, bool* IsAdminDirPath)
 {
 	if (path.IsEmpty())
 		return false;
@@ -88,78 +73,106 @@ bool GitAdminDir::HasAdminDir(const CString& path, bool bDir, CString* ProjectTo
 		// e.g "C:\"
 		if (path.GetLength() <= 3)
 			return false;
-		sDirName = path.Left(path.ReverseFind(_T('\\')));
+		sDirName.Truncate(max(0, sDirName.ReverseFind(L'\\')));
 	}
 
 	// a .git dir or anything inside it should be left out, only interested in working copy files -- Myagi
-	{
 	int n = 0;
 	for (;;)
 	{
-		n = sDirName.Find(_T("\\.git"), n);
+		n = sDirName.Find(L"\\.git", n);
 		if (n < 0)
-		{
 			break;
-		}
 
 		// check for actual .git dir (and not .gitignore or something else), continue search if false match
 		n += 5;
-		if (sDirName[n] == _T('\\') || sDirName[n] == 0)
+		if (sDirName[n] == L'\\' || sDirName[n] == 0)
 		{
+			if (IsAdminDirPath)
+				*IsAdminDirPath = true;
 			return false;
 		}
-	}
 	}
 
 	for (;;)
 	{
-		if(CGit::GitPathFileExists(sDirName + _T("\\.git")))
+		if (CGit::GitPathFileExists(sDirName + L"\\.git"))
 		{
 			if(ProjectTopDir)
 			{
 				*ProjectTopDir=sDirName;
 				// Make sure to add the trailing slash to root paths such as 'C:'
-				if (sDirName.GetLength() == 2 && sDirName[1] == _T(':'))
-					(*ProjectTopDir) += _T("\\");
+				if (sDirName.GetLength() == 2 && sDirName[1] == L':')
+					(*ProjectTopDir) += L'\\';
 			}
 			return true;
 		}
 		else if (IsBareRepo(sDirName))
 			return false;
 
-		int x = sDirName.ReverseFind(_T('\\'));
+		int x = sDirName.ReverseFind(L'\\');
 		if (x < 2)
 			break;
 
-		sDirName = sDirName.Left(x);
+		sDirName.Truncate(x);
 		// don't check for \\COMPUTERNAME\.git
-		if (sDirName[0] == _T('\\') && sDirName[1] == _T('\\') && sDirName.Find(_T('\\'), 2) < 0)
+		if (sDirName[0] == L'\\' && sDirName[1] == L'\\' && sDirName.Find(L'\\', 2) < 0)
 			break;
 	}
 
 	return false;
-
 }
 /**
  * Returns the .git-path (if .git is a file, read the repository path and return it)
  * adminDir always ends with "\"
  */
-bool GitAdminDir::GetAdminDirPath(const CString &projectTopDir, CString& adminDir)
+bool GitAdminDir::GetAdminDirPath(const CString& projectTopDir, CString& adminDir, bool* isWorktree)
 {
-	if (IsBareRepo(projectTopDir))
+	CString wtAdminDir;
+	if (!GetWorktreeAdminDirPath(projectTopDir, wtAdminDir))
+		return false;
+
+	CString pathToCommonDir = wtAdminDir + L"commondir";
+	if (!PathFileExists(pathToCommonDir))
 	{
-		adminDir = projectTopDir;
-		adminDir.TrimRight('\\');
-		adminDir.Append(_T("\\"));
+		adminDir = wtAdminDir;
+		if (isWorktree)
+			*isWorktree = false;
 		return true;
 	}
 
-	CString sDotGitPath = projectTopDir + _T("\\") + GetAdminDirName();
+	CAutoFILE pFile = _wfsopen(pathToCommonDir, L"rb", SH_DENYWR);
+	if (!pFile)
+		return false;
+
+	int size = 65536;
+	CStringA commonDirA;
+	int length = (int)fread(commonDirA.GetBufferSetLength(size), sizeof(char), size, pFile);
+	commonDirA.ReleaseBuffer(length);
+	CString commonDir = CUnicodeUtils::GetUnicode(commonDirA);
+	commonDir.TrimRight(L"\r\n");
+	commonDir.Replace(L'/', L'\\');
+	if (PathIsRelative(commonDir))
+		adminDir = CPathUtils::BuildPathWithPathDelimiter(wtAdminDir + commonDir);
+	else
+		adminDir = CPathUtils::BuildPathWithPathDelimiter(commonDir);
+	if (isWorktree)
+		*isWorktree = true;
+	return true;
+}
+
+bool GitAdminDir::GetWorktreeAdminDirPath(const CString& projectTopDir, CString& adminDir)
+{
+	if (IsBareRepo(projectTopDir))
+	{
+		adminDir = CPathUtils::BuildPathWithPathDelimiter(projectTopDir);
+		return true;
+	}
+
+	CString sDotGitPath = CPathUtils::BuildPathWithPathDelimiter(projectTopDir) + GetAdminDirName();
 	if (CTGitPath(sDotGitPath).IsDirectory())
 	{
-		sDotGitPath.TrimRight('\\');
-		sDotGitPath.Append(_T("\\"));
-		adminDir = sDotGitPath;
+		adminDir = CPathUtils::BuildPathWithPathDelimiter(sDotGitPath);
 		return true;
 	}
 	else
@@ -167,36 +180,36 @@ bool GitAdminDir::GetAdminDirPath(const CString &projectTopDir, CString& adminDi
 		CString result = ReadGitLink(projectTopDir, sDotGitPath);
 		if (result.IsEmpty())
 			return false;
-		adminDir = result + _T("\\");
+		adminDir = CPathUtils::BuildPathWithPathDelimiter(result);
 		return true;
 	}
 }
 
 CString GitAdminDir::ReadGitLink(const CString& topDir, const CString& dotGitPath)
 {
-	CAutoFILE pFile = _tfsopen(dotGitPath, _T("r"), SH_DENYWR);
+	CAutoFILE pFile = _wfsopen(dotGitPath, L"r", SH_DENYWR);
 
 	if (!pFile)
-		return _T("");
+		return L"";
 
 	int size = 65536;
 	auto buffer = std::make_unique<char[]>(size);
 	int length = (int)fread(buffer.get(), sizeof(char), size, pFile);
 	CStringA gitPathA(buffer.get(), length);
-	if (length < 8 || gitPathA.Left(8) != "gitdir: ")
-		return _T("");
+	if (length < 8 || !CStringUtils::StartsWith(gitPathA, "gitdir: "))
+		return L"";
 	CString gitPath = CUnicodeUtils::GetUnicode(gitPathA);
 	// trim after converting to UTF-16, because CStringA trim does not work when having UTF-8 chars
-	gitPath = gitPath.Trim().Mid(8); // 8 = len("gitdir: ")
+	gitPath = gitPath.Trim().Mid((int)wcslen(L"gitdir: "));
 	gitPath.Replace('/', '\\');
-	gitPath.TrimRight('\\');
-	if (!gitPath.IsEmpty() && gitPath[0] == _T('.'))
+	if (!gitPath.IsEmpty() && gitPath[0] == L'.')
 	{
-		gitPath = topDir + _T("\\") + gitPath;
+		gitPath = CPathUtils::BuildPathWithPathDelimiter(topDir) + gitPath;
 		CString adminDir;
 		PathCanonicalize(CStrBuf(adminDir, MAX_PATH), gitPath);
 		return adminDir;
 	}
+	CPathUtils::TrimTrailingPathDelimiter(gitPath);
 	return gitPath;
 }
 
@@ -208,7 +221,7 @@ bool GitAdminDir::IsAdminDirPath(const CString& path)
 	CString lowerpath = path;
 	lowerpath.MakeLower();
 	int ind1 = 0;
-	while ((ind1 = lowerpath.Find(_T("\\.git"), ind1))>=0)
+	while ((ind1 = lowerpath.Find(L"\\.git", ind1)) >= 0)
 	{
 		int ind = ind1++;
 		if (ind == (lowerpath.GetLength() - 5))
@@ -216,7 +229,7 @@ bool GitAdminDir::IsAdminDirPath(const CString& path)
 			bIsAdminDir = true;
 			break;
 		}
-		else if (lowerpath.Find(_T("\\.git\\"), ind)>=0)
+		else if (lowerpath.Find(L"\\.git\\", ind) >= 0)
 		{
 			bIsAdminDir = true;
 			break;
@@ -235,16 +248,16 @@ bool GitAdminDir::IsBareRepo(const CString& path)
 		return false;
 
 	// don't check for \\COMPUTERNAME\HEAD
-	if (path[0] == _T('\\') && path[1] == _T('\\'))
+	if (path[0] == L'\\' && path[1] == L'\\')
 	{
-		if (path.Find(_T('\\'), 2) < 0)
+		if (path.Find(L'\\', 2) < 0)
 			return false;
 	}
 
-	if (!PathFileExists(path + _T("\\HEAD")) || !PathFileExists(path + _T("\\config")))
+	if (!PathFileExists(path + L"\\HEAD") || !PathFileExists(path + L"\\config"))
 		return false;
 
-	if (!PathFileExists(path + _T("\\objects\\")) || !PathFileExists(path + _T("\\refs\\")))
+	if (!PathFileExists(path + L"\\objects\\") || !PathFileExists(path + L"\\refs\\"))
 		return false;
 
 	return true;

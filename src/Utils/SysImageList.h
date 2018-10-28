@@ -1,6 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2003-2006,2009-2010,2015 - TortoiseSVN
+// Copyright (C) 2017 - TortoiseGit
+// Copyright (C) 2003-2006,2009-2010,2015,2017 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -56,26 +57,21 @@ public:
 	/**
 	 * Returns the icon index for a directory.
 	 */
-	int GetDirIconIndex() const;
+	int GetDirIconIndex();
 	/**
 	 * Returns the icon index for a directory that's open (e.g. for a tree control)
 	 */
-	int GetDirOpenIconIndex() const;
+	int GetDirOpenIconIndex();
 	/**
 	 * Returns the icon index for a file which has no special icon associated.
 	 */
-	int GetDefaultIconIndex() const;
-	/**
-	 * Returns the icon index for the specified \a file. Only the file extension
-	 * is used to determine the file's icon.
-	 */
-	int GetFileIconIndex(const CString& file) const;
-
+	int GetDefaultIconIndex();
 	/**
 	 * Get the index for a Git-style path file.
 	 * Uses a cache to speed things up
 	 */
-	int GetPathIconIndex(const CTGitPath& file) const;
+	int GetPathIconIndex(const CTGitPath& file);
+	int GetPathIconIndex(const CString& file);
 
 	/**
 	 * Adds an icon to the image list and returns the index of the
@@ -84,12 +80,20 @@ public:
 	int AddIcon(const HICON hIcon);
 
 private:
+	/**
+	 * Returns the icon index for the specified \a file. Only the file extension
+	 * is used to determine the file's icon.
+	 */
+	int GetFileIconIndex(const CString& file);
+	int GetFileIcon(LPCTSTR file, DWORD attributes, UINT extraFlags);
+
 	static CSysImageList *instance;
 
-	typedef std::map<CString, int> IconIndexMap;
-	mutable IconIndexMap m_indexCache;
-
-	int GetFileIcon(LPCTSTR file, DWORD attributes, UINT extraFlags) const;
+	HIMAGELIST hSystemImageList;
+	mutable std::map<CString, int> m_indexCache;
+	int m_dirIconIndex;
+	int m_dirOpenIconIndex;
+	int m_defaultIconIndex;
 };
 
 

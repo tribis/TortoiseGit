@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2013 - TortoiseGit
+// Copyright (C) 2009-2013, 2016, 2018 - TortoiseGit
 // Copyright (C) 2007-2008 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -23,8 +23,8 @@
 
 bool MergeCommand::Execute()
 {
-	if (parser.HasKey(_T("abort")))
-		return !!CAppUtils::MergeAbort();
+	if (parser.HasKey(L"abort"))
+		return !!CAppUtils::MergeAbort(GetExplorerHWND());
 
-	return !!CAppUtils::Merge();
+	return !!CAppUtils::Merge(GetExplorerHWND());
 }

@@ -31,7 +31,7 @@ STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE |
     WS_CAPTION
 EXSTYLE WS_EX_APPWINDOW
 CAPTION "Cache"
-FONT 8, "MS Shell Dlg", 0, 0, 0x1
+FONT 9, "MS Shell Dlg 2", 400, 0, 0x1
 BEGIN
     DEFPUSHBUTTON   "Run Status Test",IDOK,161,106,73,16
     PUSHBUTTON      "Cancel",IDCANCEL,38,106,50,16
@@ -73,7 +73,7 @@ BEGIN
             VALUE "CompanyName", "TODO: <Company name>"
             VALUE "FileDescription", "TODO: <File description>"
             VALUE "FileVersion", "1.0.0.1"
-            VALUE "InternalName", "Cache.exe"
+            VALUE "InternalName", "Cache"
             VALUE "LegalCopyright", "TODO: (c) <Company name>.  All rights reserved."
             VALUE "OriginalFilename", "Cache.exe"
             VALUE "ProductName", "TODO: <Product name>"
@@ -146,7 +146,7 @@ BEGIN
     "#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)\r\n"
     "LANGUAGE 9, 1\r\n"
     "#pragma code_page(1252)\r\n"
-    "#include ""res\\Cache.rc2""  // non-Microsoft Visual C++ edited resources\r\n"
+    "#include ""res/Cache.rc2""  // non-Microsoft Visual C++ edited resources\r\n"
     "#include ""afxres.rc""         // Standard components\r\n"
     "#endif\r\n"
     "\0"
@@ -181,7 +181,7 @@ IDR_MAINFRAME           ICON                    "res\\Cache.ico"
 #if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)
 LANGUAGE 9, 1
 #pragma code_page(1252)
-#include "res\Cache.rc2"  // non-Microsoft Visual C++ edited resources
+#include "res/Cache.rc2"  // non-Microsoft Visual C++ edited resources
 #include "afxres.rc"         // Standard components
 #endif
 

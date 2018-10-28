@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -22,16 +22,19 @@
 #include "stdafx.h"
 #include "TortoiseProc.h"
 #include "PatchViewDlg.h"
+#include "CommonAppUtils.h"
+#include "StringUtils.h"
 
 // CPatchViewDlg dialog
 
 IMPLEMENT_DYNAMIC(CPatchViewDlg, CDialog)
 
-CPatchViewDlg::CPatchViewDlg(CWnd* pParent /*=NULL*/)
+CPatchViewDlg::CPatchViewDlg(CWnd* pParent /*=nullptr*/)
 	: CDialog(CPatchViewDlg::IDD, pParent)
 	, m_ParentDlg(nullptr)
 	, m_hAccel(nullptr)
 	, m_bShowFindBar(false)
+	, m_nPopupSave(0)
 {
 }
 
@@ -49,6 +52,7 @@ BEGIN_MESSAGE_MAP(CPatchViewDlg, CDialog)
 	ON_WM_SIZE()
 	ON_WM_MOVING()
 	ON_WM_CLOSE()
+	ON_WM_DESTROY()
 	ON_COMMAND(IDM_SHOWFINDBAR, OnShowFindBar)
 	ON_COMMAND(IDM_FINDEXIT, OnEscape)
 	ON_COMMAND(IDM_FINDNEXT, OnFindNext)
@@ -57,6 +61,7 @@ BEGIN_MESSAGE_MAP(CPatchViewDlg, CDialog)
 	ON_REGISTERED_MESSAGE(CFindBar::WM_FINDNEXT, OnFindNextMessage)
 	ON_REGISTERED_MESSAGE(CFindBar::WM_FINDPREV, OnFindPrevMessage)
 	ON_REGISTERED_MESSAGE(CFindBar::WM_FINDRESET, OnFindResetMessage)
+	ON_WM_SYSCOLORCHANGE()
 END_MESSAGE_MAP()
 
 // CPatchViewDlg message handlers
@@ -68,6 +73,8 @@ BOOL CPatchViewDlg::OnInitDialog()
 	m_ctrlPatchView.Init(-1);
 
 	m_ctrlPatchView.SetUDiffStyle();
+
+	m_ctrlPatchView.RegisterContextMenuHandler(this);
 
 	m_hAccel = LoadAccelerators(AfxGetResourceHandle(), MAKEINTRESOURCE(IDR_ACC_PATCHVIEW));
 
@@ -234,4 +241,41 @@ LRESULT CPatchViewDlg::OnFindResetMessage(WPARAM, LPARAM)
 {
 	OnFindReset();
 	return 0;
+}
+
+void CPatchViewDlg::OnSysColorChange()
+{
+	__super::OnSysColorChange();
+
+	m_ctrlPatchView.SetUDiffStyle();
+}
+
+void CPatchViewDlg::OnDestroy()
+{
+	__super::OnDestroy();
+	CRect rect;
+	GetWindowRect(&rect);
+	CRegStdDWORD(L"Software\\TortoiseGit\\TortoiseProc\\PatchDlgWidth") = rect.Width();
+	m_ctrlPatchView.ClearContextMenuHandlers();
+}
+
+// CSciEditContextMenuInterface
+void CPatchViewDlg::InsertMenuItems(CMenu& mPopup, int& nCmd)
+{
+	CString sMenuItemText;
+	sMenuItemText.LoadString(IDS_REPOBROWSE_SAVEAS);
+	m_nPopupSave = nCmd++;
+	mPopup.AppendMenu(MF_STRING | MF_ENABLED, m_nPopupSave, sMenuItemText);
+}
+
+bool CPatchViewDlg::HandleMenuItemClick(int cmd, CSciEdit*)
+{
+	if (cmd == m_nPopupSave)
+	{
+		CString filename;
+		if (CCommonAppUtils::FileOpenSave(filename, nullptr, 0, IDS_PATCHFILEFILTER, false, GetSafeHwnd(), L"diff"))
+			CStringUtils::WriteStringToTextFile(filename, m_ctrlPatchView.GetText());
+		return true;
+	}
+	return false;
 }

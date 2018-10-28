@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2009,2012-2016 - TortoiseGit
+// Copyright (C) 2008-2009, 2012-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -26,6 +26,9 @@
 #include "GitLoglist.h"
 #include "GitProgressList.h"
 #include "GitRefCompareList.h"
+#include "GitTagCompareList.h"
+#include "SyncTabCtrl.h"
+#include "GestureEnabledControl.h"
 
 // CSyncDlg dialog
 #define IDC_SYNC_TAB 0x1000000
@@ -38,6 +41,7 @@
 #define IDC_OUT_CHANGELIST	0x6
 #define IDC_CMD_GIT_PROG	0x7
 #define IDC_REFLIST			0x8
+#define IDC_TAGCOMPARELIST	0x9
 
 #define IDT_INPUT		108
 
@@ -46,7 +50,7 @@ class CSyncDlg : public CResizableStandAloneDialog,public CBranchCombox
 	DECLARE_DYNAMIC(CSyncDlg)
 
 public:
-	CSyncDlg(CWnd* pParent = NULL);   // standard constructor
+	CSyncDlg(CWnd* pParent = nullptr);   // standard constructor
 	virtual ~CSyncDlg();
 
 // Dialog Data
@@ -61,12 +65,12 @@ public:
 			GIT_COMMAND_STASH
 		};
 protected:
-	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
+	virtual void DoDataExchange(CDataExchange* pDX) override;    // DDX/DDV support
 	BRANCH_COMBOX_EVENT_HANDLE();
 
-	virtual BOOL OnInitDialog();
+	virtual BOOL OnInitDialog() override;
 	afx_msg void OnBnClickedButtonManage();
-	virtual BOOL PreTranslateMessage(MSG* pMsg);
+	virtual BOOL PreTranslateMessage(MSG* pMsg) override;
 	afx_msg void OnCbnEditchangeComboboxex();
 	afx_msg void OnBnClickedButtonPull();
 	afx_msg void OnBnClickedButtonPush();
@@ -74,6 +78,7 @@ protected:
 	afx_msg void OnBnClickedButtonEmail();
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
 	afx_msg void OnDestroy();
+	afx_msg LRESULT OnThemeChanged();
 
 	afx_msg LRESULT	OnTaskbarBtnCreated(WPARAM wParam, LPARAM lParam);
 	CComPtr<ITaskbarList3>	m_pTaskbarList;
@@ -85,7 +90,7 @@ protected:
 	CRegDWORD			m_regSubmoduleButton;
 	CRegDWORD			m_regAutoLoadPutty;
 
-	CMFCTabCtrl			m_ctrlTabCtrl;
+	CSyncTabCtrl		m_ctrlTabCtrl;
 
 	BOOL				m_bInited;
 
@@ -98,8 +103,9 @@ protected:
 	CGitStatusListCtrl	m_InChangeFileList;
 	CGitStatusListCtrl	m_ConflictFileList;
 
-	CRichEditCtrl		m_ctrlCmdOut;
+	CGestureEnabledControlTmpl<CRichEditCtrl>	m_ctrlCmdOut;
 	CGitRefCompareList	m_refList;
+	CGitTagCompareList	m_tagCompareList;
 
 	CTGitPathList		m_arOutChangeList;
 	CTGitPathList		m_arInChangeList;
@@ -114,8 +120,8 @@ protected:
 
 	void				ParserCmdOutput(char ch);
 
-	virtual void LocalBranchChange(){FetchOutList();};
-	virtual void RemoteBranchChange(){};
+	virtual void LocalBranchChange() override { FetchOutList(); };
+	virtual void RemoteBranchChange() override {};
 
 	void ShowTab(int windowid)
 	{
@@ -127,7 +133,7 @@ protected:
 
 	bool IsURL();
 
-	void SetRemote(CString remote)
+	virtual void SetRemote(CString remote) override
 	{
 		if(!remote.IsEmpty())
 		{
@@ -142,6 +148,7 @@ protected:
 	}
 
 	std::vector<CString> m_GitCmdList;
+	STRING_VECTOR	m_remotelist;
 
 	volatile bool	m_bAbort;
 	bool			m_bDone;
@@ -182,8 +189,9 @@ protected:
 		g_Git.GetCommitDiffList(rev1,rev2,*pGitList);
 		pCtrlList->m_Rev1=rev1;
 		pCtrlList->m_Rev2=rev2;
-		pCtrlList->Show(0,*pGitList);
 		pCtrlList->SetEmptyString(CString(MAKEINTRESOURCE(IDS_COMPAREREV_NODIFF)));
+		pCtrlList->UpdateWithGitPathList(*pGitList);
+		pCtrlList->Show(GITSLC_SHOWALL);
 		return;
 	}
 
@@ -201,7 +209,7 @@ public:
 	int				m_seq;
 
 protected:
-	static UINT		ProgressThreadEntry(LPVOID pVoid){ return ((CSyncDlg*)pVoid) ->ProgressThread(); };
+	static UINT		ProgressThreadEntry(LPVOID pVoid) { return reinterpret_cast<CSyncDlg*>(pVoid)->ProgressThread(); };
 	UINT			ProgressThread();
 
 	CHistoryCombo	m_ctrlURL;
@@ -219,14 +227,17 @@ protected:
 	void EnableControlButton(bool bEnabled=true);
 	afx_msg void OnBnClickedButtonCommit();
 
-	virtual void OnOK();
-	void	OnCancel();
+	virtual void	OnOK() override;
+	virtual void	OnCancel() override;
 	void	Refresh();
 	bool	AskSetTrackedBranch();
 
 	afx_msg void OnBnClickedButtonSubmodule();
 	afx_msg void OnBnClickedButtonStash();
-	afx_msg void OnLvnInLogListColumnClick(NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void OnBnClickedCheckForce();
 	afx_msg void OnBnClickedLog();
+	afx_msg void OnEnscrollLog();
+	afx_msg void OnEnLinkLog(NMHDR* pNMHDR, LRESULT* pResult);
+
+	friend class CSyncTabCtrl;
 };

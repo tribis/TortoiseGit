@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2016 - TortoiseGit
+// Copyright (C) 2008-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -21,6 +21,7 @@
 #include "StandAloneDlg.h"
 #include "Git.h"
 #include "MenuButton.h"
+#include "GestureEnabledControl.h"
 
 #define MSG_PROGRESSDLG_UPDATE_UI	(WM_USER+121)
 
@@ -49,10 +50,8 @@ public:
 	}
 
 	PostCmd(UINT msgId, PostCmdAction action)
-	: icon(0)
-	, action(action)
+	: PostCmd(0, msgId, action)
 	{
-		label.LoadString(msgId);
 	}
 
 	PostCmd(UINT icon, CString label, PostCmdAction action)
@@ -63,9 +62,7 @@ public:
 	}
 
 	PostCmd(CString label, PostCmdAction action)
-	: icon(0)
-	, action(action)
-	, label(label)
+	: PostCmd(0, label, action)
 	{
 	}
 
@@ -82,11 +79,11 @@ class CProgressDlg : public CResizableStandAloneDialog
 {
 	DECLARE_DYNAMIC(CProgressDlg)
 public:
-	CProgressDlg(CWnd* pParent = NULL); // standard constructor
+	CProgressDlg(CWnd* pParent = nullptr); // standard constructor
 	virtual ~CProgressDlg();
 
 private:
-	virtual BOOL OnInitDialog();
+	virtual BOOL OnInitDialog() override;
 
 	// Dialog Data
 	enum { IDD = IDD_GITPROGRESS };
@@ -117,7 +114,7 @@ private:
 
 	CProgressCtrl			m_Progress;
 
-	CRichEditCtrl			m_Log;
+	CGestureEnabledControlTmpl<CRichEditCtrl> m_Log;
 	CAnimateCtrl			m_Animate;
 	CStatic					m_CurrentWork;
 	CWinThread*				m_pThread;
@@ -126,7 +123,7 @@ private:
 	bool					m_bDone;
 	ULONGLONG				m_startTick;
 
-	virtual void			DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
+	virtual void			DoDataExchange(CDataExchange* pDX) override;    // DDX/DDV support
 	static UINT				ProgressThreadEntry(LPVOID pVoid);
 	UINT					ProgressThread();
 
@@ -134,6 +131,7 @@ private:
 
 	void					ParserCmdOutput(char ch);
 	void					RemoveLastLine(CString &str);
+	static const int		s_iProgressLinesLimit;
 
 	LRESULT					OnProgressUpdateUI(WPARAM wParam,LPARAM lParam);
 
@@ -142,6 +140,9 @@ private:
 
 	void					OnCancel();
 	afx_msg void			OnClose();
+
+	afx_msg void			OnEnscrollLog();
+	afx_msg void			OnEnLinkLog(NMHDR* pNMHDR, LRESULT* pResult);
 
 	CGitGuardedByteArray	m_Databuf;
 	virtual CString Convert2UnionCode(char *buff, int size=-1)
@@ -156,13 +157,13 @@ private:
 	DECLARE_MESSAGE_MAP()
 
 	//Share with Sync Dailog
-	static int	FindPercentage(CString &log);
+	static int ParsePercentage(CString &log, int pos);
 
 	static void	ClearESC(CString &str);
 
 public:
 	static void	ParserCmdOutput(CRichEditCtrl &log,CProgressCtrl &progressctrl,HWND m_hWnd,CComPtr<ITaskbarList3> m_pTaskbarList,
-									CStringA &oneline, char ch,CWnd *CurrentWork=NULL);
+									CStringA& oneline, char ch, CWnd* CurrentWork = nullptr);
 
 	/**
 	 *@param dirlist if empty, the current directory of param git is used; otherwise each entry in param cmdlist uses the corresponding entry in param dirlist
@@ -177,7 +178,7 @@ private:
 	afx_msg void OnBnClickedOk();
 	afx_msg void OnBnClickedButton1();
 
-	virtual BOOL PreTranslateMessage(MSG* pMsg);
+	virtual BOOL PreTranslateMessage(MSG* pMsg) override;
 
 	typedef struct {
 		int id;
@@ -186,15 +187,15 @@ private:
 	} ACCELLERATOR;
 	std::map<TCHAR, ACCELLERATOR>	m_accellerators;
 	HACCEL							m_hAccel;
-	virtual LRESULT DefWindowProc(UINT message, WPARAM wParam, LPARAM lParam);
+	virtual LRESULT DefWindowProc(UINT message, WPARAM wParam, LPARAM lParam) override;
 };
 
 class CCommitProgressDlg:public CProgressDlg
 {
 public:
-	CCommitProgressDlg(CWnd* pParent = NULL):CProgressDlg(pParent)
+	CCommitProgressDlg(CWnd* pParent = nullptr) : CProgressDlg(pParent)
 	{
 	}
 
-	virtual CString Convert2UnionCode(char *buff, int size=-1);
+	virtual CString Convert2UnionCode(char* buff, int size = -1) override;
 };

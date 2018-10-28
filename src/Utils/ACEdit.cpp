@@ -1,7 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
 // Copyright (c) 2003 by Andreas Kapust <info@akinstaller.de>; <http://www.codeproject.com/Articles/2607/AutoComplete-without-IAutoComplete>
-// Copyright (C) 2009,2012-2013,2015 - TortoiseGit
+// Copyright (C) 2009, 2012-2013, 2015-2016, 2018 - TortoiseGit
 
 // Licensed under: The Code Project Open License (CPOL); <http://www.codeproject.com/info/cpol10.aspx>
 
@@ -11,7 +11,7 @@
 #include "stdafx.h"
 #include "ACEdit.h"
 #include  <io.h>
-
+#include "StringUtils.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -29,13 +29,13 @@ CACEdit::CACEdit()
 {
 	m_iMode = _MODE_STANDARD_;
 	m_iType = -1;
-	m_pEdit = NULL;
+	m_pEdit = nullptr;
 	m_CursorMode = false;
-	m_PrefixChar = 0;
-	m_szDrive[0] = 0;
-	m_szDir[0] = 0;
-	m_szFname[0] = 0;
-	m_szExt[0] = 0;
+	m_PrefixChar = L'\0';
+	m_szDrive[0] = L'\0';
+	m_szDir[0] = L'\0';
+	m_szFname[0] = L'\0';
+	m_szExt[0] = L'\0';
 }
 
 /*********************************************************************/
@@ -76,7 +76,7 @@ void CACEdit::SetMode(int iMode)
 		m_iMode |= _MODE_STANDARD_;
 
 	if(iMode & _MODE_FILESYSTEM_)
-		m_SeparationStr = _T("\\");
+		m_SeparationStr = L'\\';
 
 	// Vers. 1.2
 	if(iMode & _MODE_FIND_ALL_)
@@ -95,32 +95,28 @@ void CACEdit::Init()
 	GetWindowRect(rcWnd);
 
 	VERIFY(m_Liste.CreateEx(WS_EX_TOOLWINDOW,
-		szClassName,NULL,
+		szClassName, nullptr,
 		WS_THICKFRAME | WS_CHILD | WS_BORDER |
 		WS_CLIPSIBLINGS | WS_OVERLAPPED,
 		CRect(rcWnd.left, rcWnd.top +20, rcWnd.left+ 200, rcWnd.top+200),
 		GetDesktopWindow(),
-		0x3E8, NULL));
+		0x3E8, nullptr));
 
 	CString m_ClassName;
-	::GetClassName(GetSafeHwnd(), m_ClassName.GetBuffer(32), 32);
-	m_ClassName.ReleaseBuffer();
+	::GetClassName(GetSafeHwnd(), CStrBuf(m_ClassName, 32), 32);
 
-	if (m_ClassName.Compare(_T("Edit")) == 0)
-	{
+	if (m_ClassName.Compare(L"Edit") == 0)
 		m_iType = _EDIT_;
-	}
 	else
 	{
-		if (m_ClassName.Compare(_T("ComboBox")) == 0)
+		if (m_ClassName.Compare(L"ComboBox") == 0)
 		{
 			m_iType = _COMBOBOX_;
 
 			m_pEdit = (CEdit*)GetWindow(GW_CHILD);
 			VERIFY(m_pEdit);
-			::GetClassName(m_pEdit->GetSafeHwnd(), m_ClassName.GetBuffer(32), 32);
-			m_ClassName.ReleaseBuffer();
-			VERIFY(m_ClassName.Compare(_T("Edit")) == 0);
+			::GetClassName(m_pEdit->GetSafeHwnd(), CStrBuf(m_ClassName, 32), 32);
+			VERIFY(m_ClassName.Compare(L"Edit") == 0);
 		}
 	}
 
@@ -196,7 +192,7 @@ void CACEdit::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
 
 bool CACEdit::HandleKey(UINT nChar, bool m_bFromChild)
 {
-	if (nChar == VK_ESCAPE ||nChar == VK_RETURN)
+	if (nChar == VK_ESCAPE || nChar == VK_RETURN && !m_Liste.IsWindowVisible())
 	{
 		m_Liste.ShowWindow(false);
 		return true;
@@ -204,7 +200,7 @@ bool CACEdit::HandleKey(UINT nChar, bool m_bFromChild)
 
 	if (nChar == VK_DOWN || nChar == VK_UP
 		|| nChar == VK_PRIOR || nChar == VK_NEXT
-		|| nChar == VK_HOME || nChar == VK_END)
+		|| nChar == VK_HOME || nChar == VK_END || nChar == VK_RETURN)
 	{
 		/*
 		** Vers. 1.1
@@ -238,28 +234,35 @@ bool CACEdit::HandleKey(UINT nChar, bool m_bFromChild)
 
 				if(m_iMode & _MODE_FILESYSTEM_)
 				{
-					if (m_EditText.Right(1) == _T('\\'))
+					if (CStringUtils::EndsWith(m_EditText, L'\\'))
 						m_EditText = m_EditText.Mid(0,m_EditText.GetLength()-1);
 				}
 
-				m_Liste.SelectItem(-1);
-				SetWindowText(m_EditText);
-				pos = m_EditText.GetLength();
-
-				if(m_iType == _COMBOBOX_)
+				if (nChar != VK_RETURN)
+					m_Liste.SelectItem(m_Liste.GetSelectedItem());
+				else
 				{
-					m_pEdit->SetSel(pos,pos,true);
-					m_pEdit->SetModify(true);
-				}
+					m_Liste.SelectItem(-1);
+					SetWindowText(m_EditText);
+					pos = m_EditText.GetLength();
 
-				if(m_iType == _EDIT_)
-				{
-					((CEdit*)this)->SetSel(pos,pos,true);
-					((CEdit*)this)->SetModify(true);
+					if (m_iType == _COMBOBOX_)
+					{
+						m_pEdit->SetSel(pos, pos, true);
+						m_pEdit->SetModify(true);
+					}
+
+					if (m_iType == _EDIT_)
+					{
+						((CEdit*)this)->SetSel(pos, pos, true);
+						((CEdit*)this)->SetModify(true);
+					}
 				}
 
 				GetParent()->SendMessage(ENAC_UPDATE, WM_KEYDOWN, GetDlgCtrlID());
 				m_CursorMode = false;
+				if (nChar == VK_RETURN)
+					m_Liste.ShowWindow(false);
 				return true;
 			}
 
@@ -288,34 +291,40 @@ bool CACEdit::HandleKey(UINT nChar, bool m_bFromChild)
 				else
 					m_Text += m_Liste.GetString();
 
-				m_Liste.SelectItem(-1);
-				m_Text += m_EditText.Mid(right);
-				len = m_Liste.GetString().GetLength();
-
-				m_Text += this->m_SeparationStr;
-
-				SetWindowText(m_Text);
-				GetParent()->SendMessage(ENAC_UPDATE, WM_KEYDOWN, GetDlgCtrlID());
-
-				right = FindSepLeftPos2(pos2-1);
-				left -= right;
-				len += right;
-
-				left+=m_SeparationStr.GetLength();
-
-				if(m_iType == _EDIT_)
+				if (nChar != VK_RETURN)
+					m_Liste.SelectItem(m_Liste.GetSelectedItem());
+				else
 				{
-					((CEdit*)this)->SetModify(true);
-					((CEdit*)this)->SetSel(left+len,left+len,false);
-				}
+					m_Liste.SelectItem(-1);
+					m_Text += m_EditText.Mid(right);
+					len = m_Liste.GetString().GetLength();
 
-				if(m_iType == _COMBOBOX_)
-				{
-					m_pEdit->SetModify(true);
-					m_pEdit->SetSel(left,left+len,true);
-				}
+					m_Text += this->m_SeparationStr;
 
+					SetWindowText(m_Text);
+					GetParent()->SendMessage(ENAC_UPDATE, WM_KEYDOWN, GetDlgCtrlID());
+
+					right = FindSepLeftPos2(pos2 - 1);
+					left -= right;
+					len += right;
+
+					left += m_SeparationStr.GetLength();
+
+					if (m_iType == _EDIT_)
+					{
+						((CEdit*)this)->SetModify(true);
+						((CEdit*)this)->SetSel(left + len, left + len, false);
+					}
+
+					if (m_iType == _COMBOBOX_)
+					{
+						m_pEdit->SetModify(true);
+						m_pEdit->SetSel(left, left + len, true);
+					}
+				}
 				m_CursorMode = false;
+				if (nChar == VK_RETURN)
+					m_Liste.ShowWindow(false);
 				return true;
 			}
 		}
@@ -466,9 +475,7 @@ LRESULT CACEdit::OnUpdateFromList(WPARAM lParam, LPARAM /*wParam*/)
 	UpdateData(true);
 
 	if(lParam == WM_KEYDOWN)
-	{
-		HandleKey(VK_DOWN,true);
-	}
+		HandleKey(VK_RETURN, true);
 	return 0;
 }
 
@@ -512,25 +519,25 @@ void CACEdit::ReadDirectory(CString m_Dir)
 
 	// Wenn mittem im Pfad,
 	// vorheriges Verzeichnis einlesen.
-	if (m_Dir.Right(1) != _T('\\'))
+	if (!CStringUtils::EndsWith(m_Dir, L'\\'))
 	{
-		_tsplitpath_s(m_Dir, m_szDrive, m_szDir, m_szFname, m_szExt);
-		m_Dir.Format(_T("%s%s"),m_szDrive, m_szDir);
+		_wsplitpath_s(m_Dir, m_szDrive, m_szDir, m_szFname, m_szExt);
+		m_Dir.Format(L"%s%s",m_szDrive, m_szDir);
 	}
 
-	//ist hübscher
+	//ist hÃ¼bscher
 	ch = (TCHAR)towupper(m_Dir.GetAt(0));
 	m_Dir.SetAt(0,ch);
 
 	CString m_Name,m_File,m_Dir1 = m_Dir;
-	if (m_Dir.Right(1) != _T('\\'))
-		m_Dir += _T("\\");
+	if (!CStringUtils::EndsWith(m_Dir, L'\\'))
+		m_Dir += L'\\';
 
 	if(m_LastDirectory.CompareNoCase(m_Dir) == 0 && m_Liste.m_SearchList.GetSize())
 		return;
 
 	m_LastDirectory = m_Dir;
-	m_Dir += _T("*.*");
+	m_Dir += L"*.*";
 
 	BOOL bContinue = FoundFiles.FindFile(m_Dir);
 	if(bContinue)
@@ -550,8 +557,8 @@ void CACEdit::ReadDirectory(CString m_Dir)
 			if(FoundFiles.IsDots())
 				continue;
 
-			if (m_File.Right(1) != _T('\\'))
-				m_File += _T("\\");
+			if (!CStringUtils::EndsWith(m_File, L'\\'))
+				m_File += L'\\';
 		}
 
 		if(!FoundFiles.IsDirectory())
@@ -565,8 +572,8 @@ void CACEdit::ReadDirectory(CString m_Dir)
 		else
 		{
 			m_Name = m_Dir1;
-			if (m_Name.Right(1) != _T('\\'))
-				m_Name += _T("\\");
+			if (!CStringUtils::EndsWith(m_Name, L'\\'))
+				m_Name += L'\\';
 
 			m_Name += m_File;
 		}
@@ -575,7 +582,6 @@ void CACEdit::ReadDirectory(CString m_Dir)
 	}
 	FoundFiles.Close();
 	return;
-
 }
 
 /*********************************************************************/

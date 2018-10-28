@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2011-2015 - TortoiseGit
+// Copyright (C) 2011-2017 - TortoiseGit
 // Copyright (C) 2006-2008, 2015 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -18,11 +18,8 @@
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 //
 #pragma once
-#include <map>
 #include "registry.h"
 #include "TGitPath.h"
-#include "GitRev.h"
-#include "GitStatus.h"
 
 /**
  * \ingroup TortoiseProc
@@ -37,6 +34,7 @@ typedef enum hooktype
 	issue_tracker_hook,
 	pre_push_hook,
 	post_push_hook,
+	pre_rebase_hook,
 } hooktype;
 
 /**
@@ -69,6 +67,7 @@ typedef struct hookcmd
 	CString			commandline;
 	bool			bWait;
 	bool			bShow;
+	bool			bEnabled;
 } hookcmd;
 
 typedef std::map<hookkey, hookcmd>::iterator hookiterator;
@@ -112,7 +111,13 @@ public:
 	 * Adds a new hook script. To make the change persistent, call Save().
 	 */
 	void				Add(hooktype ht, const CTGitPath& Path, LPCTSTR szCmd,
-							bool bWait, bool bShow);
+							bool bWait, bool bShow, bool bEnabled);
+
+	/**
+	* Toggles the hook script identified by \c key. Returns whether the status has changed.
+	* To make the change persistent call Save().
+	*/
+	bool				SetEnabled(const hookkey& key, bool bEnabled);
 
 	/// returns the string representation of the hook type.
 	static CString		GetHookTypeString(hooktype t);
@@ -159,22 +164,14 @@ public:
 	 * Executes the Post-Commit-Hook that first matches the path in
 	 * \c workingTree.
 	 * \param workingTree working tree root directory
-	 * \param pathList a list of paths to look for the hook scripts
-	 * \param message the commit message
-	 * \param rev the revision the commit was done to
-	 * \param exitcode on return, contains the exit code of the hook script
-	 * \param error the data the hook script outputs to stderr
-	 * \remark the string "%PATHS% in the command line of the hook script is
-	 * replaced with the path to a temporary file which contains a list of files
-	 * in \c pathList, separated by newlines. The hook script can parse this
-	 * file to get all the paths the commit is about to be done on.
+	 * \param amend commit was amend
 	 */
-	bool				PostCommit(const CString& workingTree, const CTGitPathList& pathList,
-									const GitRev& rev, const CString& message,
-									DWORD& exitcode, CString& error);
+	bool	PostCommit(const CString& workingTree, bool amend, DWORD& exitcode, CString& error);
 
 	bool	PrePush(const CString& workingTree, DWORD& exitcode, CString& error);
 	bool	PostPush(const CString& workingTree, DWORD& exitcode, CString& error);
+
+	bool	PreRebase(const CString& workingTree, const CString& upstream, const CString& rebasedBranch, DWORD& exitcode, CString& error);
 
 	bool	IsHookPresent(hooktype t, const CString& workingTree) const;
 

@@ -22,7 +22,7 @@
 #include "URLDlg.h"
 
 IMPLEMENT_DYNAMIC(CURLDlg, CResizableStandAloneDialog)
-CURLDlg::CURLDlg(CWnd* pParent /*=NULL*/)
+CURLDlg::CURLDlg(CWnd* pParent /*=nullptr*/)
 	: CResizableStandAloneDialog(CURLDlg::IDD, pParent)
 {
 	m_height = 0;
@@ -49,7 +49,7 @@ BOOL CURLDlg::OnInitDialog()
 	CResizableStandAloneDialog::OnInitDialog();
 
 	m_URLCombo.SetURLHistory(TRUE);
-	m_URLCombo.LoadHistory(_T("Software\\TortoiseGit\\History\\repoURLS"), _T("url"));
+	m_URLCombo.LoadHistory(L"Software\\TortoiseGit\\History\\repoURLS", L"url");
 	m_URLCombo.SetCurSel(0);
 	m_URLCombo.SetFocus();
 
@@ -60,7 +60,7 @@ BOOL CURLDlg::OnInitDialog()
 	AddAnchor(IDC_URLCOMBO, TOP_LEFT, TOP_RIGHT);
 	AddAnchor(IDOK, BOTTOM_RIGHT);
 	AddAnchor(IDCANCEL, BOTTOM_RIGHT);
-	EnableSaveRestore(_T("URLDlg"));
+	EnableSaveRestore(L"URLDlg");
 	return FALSE;
 }
 

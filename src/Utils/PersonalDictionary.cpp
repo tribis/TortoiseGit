@@ -1,6 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2003-2006, 2008, 2014 - TortoiseSVN
+// Copyright (C) 2011-2016 - TortoiseGit
+// Copyright (C) 2003-2006, 2008, 2014, 2016 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -19,17 +20,33 @@
 
 #include "stdafx.h"
 #include <fstream>
+#include <codecvt>
 #include "PersonalDictionary.h"
 #include "PathUtils.h"
 
-CPersonalDictionary::CPersonalDictionary(LONG lLanguage /* = 0*/) :
-	m_bLoaded(false)
+CPersonalDictionary::CPersonalDictionary(LONG lLanguage /* = 0*/)
+	: m_bLoaded(false)
+	, m_lLanguage(lLanguage)
 {
-	m_lLanguage = lLanguage;
 }
 
 CPersonalDictionary::~CPersonalDictionary()
 {
+}
+
+template<class T>
+static void OpenFileStream(T& file, LONG lLanguage, std::ios_base::openmode openmode = 0)
+{
+	TCHAR path[MAX_PATH] = { 0 };		//MAX_PATH ok here.
+	swprintf_s(path, L"%s%ld.dic", (LPCTSTR)CPathUtils::GetAppDataDirectory(), !lLanguage ? GetUserDefaultLCID() : lLanguage);
+
+	char filepath[MAX_PATH + 1] = { 0 };
+	WideCharToMultiByte(CP_ACP, 0, path, -1, filepath, _countof(filepath) - 1, nullptr, nullptr);
+
+	std::locale ulocale(std::locale(), new std::codecvt_utf8<wchar_t>);
+	file.imbue(ulocale);
+
+	file.open(filepath, openmode);
 }
 
 bool CPersonalDictionary::Load()
@@ -39,21 +56,9 @@ bool CPersonalDictionary::Load()
 
 	if (m_bLoaded)
 		return true;
-	TCHAR path[MAX_PATH] = {0};		//MAX_PATH ok here.
-	_tcscpy_s (path, CPathUtils::GetAppDataDirectory());
-
-	if (m_lLanguage==0)
-		m_lLanguage = GetUserDefaultLCID();
-
-	TCHAR sLang[10] = { 0 };
-	_stprintf_s(sLang, 10, _T("%ld"), m_lLanguage);
-	_tcscat_s(path, MAX_PATH, sLang);
-	_tcscat_s(path, MAX_PATH, _T(".dic"));
 
 	std::wifstream File;
-	char filepath[MAX_PATH + 1] = { 0 };
-	WideCharToMultiByte(CP_ACP, NULL, path, -1, filepath, MAX_PATH, NULL, NULL);
-	File.open(filepath);
+	OpenFileStream(File, m_lLanguage);
 	if (!File.good())
 	{
 		return false;
@@ -62,6 +67,9 @@ bool CPersonalDictionary::Load()
 	{
 		File.getline(line, _countof(line));
 		sWord = line;
+		sWord.TrimRight();
+		if (sWord.IsEmpty())
+			continue;
 		dict.insert(sWord);
 	} while (File.gcount() > 0);
 	File.close();
@@ -73,7 +81,7 @@ bool CPersonalDictionary::AddWord(const CString& sWord)
 {
 	if (!m_bLoaded)
 		Load();
-	if (sWord.GetLength() >= PDICT_MAX_WORD_LENGTH)
+	if (sWord.GetLength() >= PDICT_MAX_WORD_LENGTH || sWord.IsEmpty())
 		return false;
 	dict.insert(sWord);
 	return true;
@@ -95,25 +103,10 @@ bool CPersonalDictionary::Save()
 {
 	if (!m_bLoaded)
 		return false;
-	TCHAR path[MAX_PATH] = { 0 };		//MAX_PATH ok here.
-	_tcscpy_s (path, CPathUtils::GetAppDataDirectory());
-
-	if (m_lLanguage==0)
-		m_lLanguage = GetUserDefaultLCID();
-
-	TCHAR sLang[10] = { 0 };
-	_stprintf_s(sLang, 10, _T("%ld"), m_lLanguage);
-	_tcscat_s(path, MAX_PATH, sLang);
-	_tcscat_s(path, MAX_PATH, _T(".dic"));
-
 	std::wofstream File;
-	char filepath[MAX_PATH + 1] = { 0 };
-	WideCharToMultiByte(CP_ACP, NULL, path, -1, filepath, MAX_PATH, NULL, NULL);
-	File.open(filepath, std::ios_base::binary);
+	OpenFileStream(File, m_lLanguage, std::ios::ios_base::binary);
 	for (const auto& line : dict)
-	{
-		File << (LPCTSTR)line << _T("\n");
-	}
+		File << (LPCTSTR)line << L"\n";
 	File.close();
 	return true;
 }

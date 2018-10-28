@@ -28,7 +28,7 @@
 // CAboutDlg dialog
 
 IMPLEMENT_DYNAMIC(CAboutDlg, CStandAloneDialog)
-CAboutDlg::CAboutDlg(CWnd* pParent /*=NULL*/)
+CAboutDlg::CAboutDlg(CWnd* pParent /*=nullptr*/)
 	: CStandAloneDialog(CAboutDlg::IDD, pParent)
 {
 }
@@ -62,11 +62,11 @@ BOOL CAboutDlg::OnInitDialog()
 	SetDlgItemText(IDC_VERSIONBOX, boxtitle);
 	const svn_version_t * diffver = svn_diff_version();
 	temp.Format(IDS_ABOUTVERSION, TGIT_VERMAJOR, TGIT_VERMINOR, TGIT_VERMICRO, TGIT_VERBUILD, _T(TGIT_PLATFORM), _T(TGIT_VERDATE),
-		diffver->major, diffver->minor, diffver->patch, CString(diffver->tag),
+		diffver->major, diffver->minor, diffver->patch, (LPCTSTR)CString(diffver->tag),
 		APR_MAJOR_VERSION, APR_MINOR_VERSION, APR_PATCH_VERSION,
 		APU_MAJOR_VERSION, APU_MINOR_VERSION, APU_PATCH_VERSION);
 	SetDlgItemText(IDC_VERSIONABOUT, temp);
-	this->SetWindowText(_T("TortoiseGitMerge"));
+	this->SetWindowText(L"TortoiseGitMerge");
 
 	CPictureHolder tmpPic;
 	tmpPic.CreateFromBitmap(IDB_LOGOFLIPPED);
@@ -74,11 +74,11 @@ BOOL CAboutDlg::OnInitDialog()
 	m_renderDest.Create32BitFromPicture(&tmpPic,468,64);
 
 	m_waterEffect.Create(468,64);
-	SetTimer(ID_EFFECTTIMER, 40, NULL);
-	SetTimer(ID_DROPTIMER, 300, NULL);
+	SetTimer(ID_EFFECTTIMER, 40, nullptr);
+	SetTimer(ID_DROPTIMER, 300, nullptr);
 
-	m_cWebLink.SetURL(_T("https://tortoisegit.org/"));
-	m_cSupportLink.SetURL(_T("http://tortoisesvn.tigris.org/contributors.html"));
+	m_cWebLink.SetURL(L"https://tortoisegit.org/");
+	m_cSupportLink.SetURL(L"http://tortoisesvn.tigris.org/contributors.html");
 
 	return TRUE;  // return TRUE unless you set the focus to a control
 	// EXCEPTION: OCX Property Pages should return FALSE
@@ -113,7 +113,7 @@ void CAboutDlg::OnMouseMove(UINT nFlags, CPoint point)
 	r.right = r.left + m_renderSrc.GetWidth();
 	r.bottom = r.top + m_renderSrc.GetHeight();
 
-	if(r.PtInRect(point) == TRUE)
+	if (r.PtInRect(point) != FALSE)
 	{
 		// dibs are drawn upside down...
 		point.y -= 20;

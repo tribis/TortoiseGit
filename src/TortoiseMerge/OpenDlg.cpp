@@ -27,11 +27,11 @@
 // COpenDlg dialog
 
 IMPLEMENT_DYNAMIC(COpenDlg, CStandAloneDialog)
-COpenDlg::COpenDlg(CWnd* pParent /*=NULL*/)
+COpenDlg::COpenDlg(CWnd* pParent /*=nullptr*/)
 	: CStandAloneDialog(COpenDlg::IDD, pParent)
 	, m_bFromClipboard(FALSE)
 	, m_cFormat(0)
-	, m_nextViewer(NULL)
+	, m_nextViewer(nullptr)
 {
 }
 
@@ -74,7 +74,7 @@ BOOL COpenDlg::OnInitDialog()
 {
 	CStandAloneDialog::OnInitDialog();
 
-	CRegDWORD lastRadioButton(_T("Software\\TortoiseGitMerge\\OpenRadio"), IDC_MERGERADIO);
+	CRegDWORD lastRadioButton(L"Software\\TortoiseGitMerge\\OpenRadio", IDC_MERGERADIO);
 	if (((DWORD)lastRadioButton != IDC_MERGERADIO)&&((DWORD)lastRadioButton != IDC_APPLYRADIO))
 		lastRadioButton = IDC_MERGERADIO;
 	GroupRadio((DWORD)lastRadioButton);
@@ -87,7 +87,7 @@ BOOL COpenDlg::OnInitDialog()
 	AutoCompleteOn(IDC_DIFFFILEEDIT);
 	AutoCompleteOn(IDC_DIRECTORYEDIT);
 
-	m_cFormat = RegisterClipboardFormat(_T("TGIT_UNIFIEDDIFF"));
+	m_cFormat = RegisterClipboardFormat(L"TGIT_UNIFIEDDIFF");
 	m_nextViewer = SetClipboardViewer();
 
 	return TRUE;  // return TRUE unless you set the focus to a control
@@ -119,7 +119,7 @@ void COpenDlg::OnBnClickedHelp()
 void COpenDlg::OnBrowseForFile(CString& filepath, UINT nFileFilter)
 {
 	UpdateData();
-	CCommonAppUtils::FileOpenSave(filepath, NULL, IDS_SELECTFILE, nFileFilter, true, m_hWnd);
+	CCommonAppUtils::FileOpenSave(filepath, nullptr, IDS_SELECTFILE, nFileFilter, true, m_hWnd);
 	UpdateData(FALSE);
 }
 
@@ -225,16 +225,16 @@ void COpenDlg::OnOK()
 			HGLOBAL hglb = GetClipboardData(m_cFormat);
 			LPCSTR lpstr = (LPCSTR)GlobalLock(hglb);
 
-			DWORD len = GetTempPath(0, NULL);
+			DWORD len = GetTempPath(0, nullptr);
 			auto path = std::make_unique<TCHAR[]>(len + 1);
 			auto tempF = std::make_unique<TCHAR[]>(len + 100);
 			GetTempPath (len+1, path.get());
-			GetTempFileName (path.get(), _T("tsm"), 0, tempF.get());
+			GetTempFileName(path.get(), L"tsm", 0, tempF.get());
 			CString sTempFile = CString(tempF.get());
 
 			FILE * outFile;
 			size_t patchlen = strlen(lpstr);
-			_tfopen_s(&outFile, sTempFile, _T("wb"));
+			_wfopen_s(&outFile, sTempFile, L"wb");
 			if(outFile)
 			{
 				size_t size = fwrite(lpstr, sizeof(char), patchlen, outFile);
@@ -258,10 +258,10 @@ void COpenDlg::OnOK()
 	{
 		CString sErr;
 		sErr.Format(IDS_ERR_PATCH_INVALIDPATCHFILE, (LPCTSTR)sFile);
-		MessageBox(sErr, NULL, MB_ICONERROR);
+		MessageBox(sErr, nullptr, MB_ICONERROR);
 		return;
 	}
-	CRegDWORD lastRadioButton(_T("Software\\TortoiseGitMerge\\OpenRadio"), IDC_MERGERADIO);
+	CRegDWORD lastRadioButton(L"Software\\TortoiseGitMerge\\OpenRadio", IDC_MERGERADIO);
 	lastRadioButton = GetCheckedRadioButton(IDC_MERGERADIO, IDC_APPLYRADIO);
 	CStandAloneDialog::OnOK();
 }

@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2011,2013-2015 - TortoiseGit
+// Copyright (C) 2008-2011, 2013-2016 - TortoiseGit
 // Copyright (C) 2003-2007,2011 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -26,12 +26,12 @@
 IMPLEMENT_DYNAMIC(CSettingsProgsDiff, ISettingsPropPage)
 CSettingsProgsDiff::CSettingsProgsDiff()
 	: ISettingsPropPage(CSettingsProgsDiff::IDD)
-	, m_dlgAdvDiff(_T("Diff"))
+	, m_dlgAdvDiff(L"Diff")
 	, m_iExtDiff(0)
 	, m_iDiffViewer(0)
 {
-	m_regDiffPath = CRegString(_T("Software\\TortoiseGit\\Diff"));
-	m_regDiffViewerPath = CRegString(_T("Software\\TortoiseGit\\DiffViewer"));
+	m_regDiffPath = CRegString(L"Software\\TortoiseGit\\Diff");
+	m_regDiffViewerPath = CRegString(L"Software\\TortoiseGit\\DiffViewer");
 }
 
 CSettingsProgsDiff::~CSettingsProgsDiff()
@@ -97,16 +97,14 @@ BOOL CSettingsProgsDiff::OnInitDialog()
 BOOL CSettingsProgsDiff::OnApply()
 {
 	UpdateData();
-	if (m_iExtDiff == 0 && !m_sDiffPath.IsEmpty() && m_sDiffPath.Left(1) != _T("#"))
-	{
-		m_sDiffPath = _T("#") + m_sDiffPath;
-	}
+	if (m_iExtDiff == 0 && !m_sDiffPath.IsEmpty() && m_sDiffPath.Left(1) != L"#")
+		m_sDiffPath = L'#' + m_sDiffPath;
 	m_regDiffPath = m_sDiffPath;
 
 	m_dlgAdvDiff.SaveData();
 
-	if (m_iDiffViewer == 0 && !m_sDiffViewerPath.IsEmpty() && m_sDiffViewerPath.Left(1) != _T("#"))
-		m_sDiffViewerPath = _T("#") + m_sDiffViewerPath;
+	if (m_iDiffViewer == 0 && !m_sDiffViewerPath.IsEmpty() && m_sDiffViewerPath.Left(1) != L"#")
+		m_sDiffViewerPath = L'#' + m_sDiffViewerPath;
 
 	m_regDiffViewerPath = m_sDiffViewerPath;
 
@@ -135,8 +133,13 @@ void CSettingsProgsDiff::OnBnClickedExtdiffOn()
 
 void CSettingsProgsDiff::OnBnClickedExtdiffbrowse()
 {
-	if (CAppUtils::FileOpenSave(m_sDiffPath, NULL, IDS_SETTINGS_SELECTDIFF, IDS_PROGRAMSFILEFILTER, true, m_hWnd))
+	UpdateData();
+	CString filename = m_sDiffPath;
+	if (!PathFileExists(filename))
+		filename.Empty();
+	if (CAppUtils::FileOpenSave(filename, nullptr, IDS_SETTINGS_SELECTDIFF, IDS_PROGRAMSFILEFILTER, true, m_hWnd))
 	{
+		m_sDiffPath = filename;
 		UpdateData(FALSE);
 		SetModified();
 	}
@@ -156,14 +159,14 @@ void CSettingsProgsDiff::OnEnChangeExtdiff()
 void CSettingsProgsDiff::CheckProgComment()
 {
 	UpdateData();
-	if (m_iExtDiff == 0 && !m_sDiffPath.IsEmpty() && m_sDiffPath.Left(1) != _T("#"))
-		m_sDiffPath = _T("#") + m_sDiffPath;
+	if (m_iExtDiff == 0 && !m_sDiffPath.IsEmpty() && m_sDiffPath.Left(1) != L"#")
+		m_sDiffPath = L'#' + m_sDiffPath;
 	else if (m_iExtDiff == 1)
-		m_sDiffPath.TrimLeft('#');
-	if (m_iDiffViewer == 0 && !m_sDiffViewerPath.IsEmpty() && m_sDiffViewerPath.Left(1) != _T("#"))
-		m_sDiffViewerPath = _T("#") + m_sDiffViewerPath;
+		m_sDiffPath.TrimLeft(L'#');
+	if (m_iDiffViewer == 0 && !m_sDiffViewerPath.IsEmpty() && m_sDiffViewerPath.Left(1) != L"#")
+		m_sDiffViewerPath = L'#' + m_sDiffViewerPath;
 	else if (m_iDiffViewer == 1)
-		m_sDiffViewerPath.TrimLeft('#');
+		m_sDiffViewerPath.TrimLeft(L'#');
 	UpdateData(FALSE);
 }
 
@@ -193,8 +196,13 @@ void CSettingsProgsDiff::OnEnChangeDiffviewer()
 
 void CSettingsProgsDiff::OnBnClickedDiffviewerbrowse()
 {
-	if (CAppUtils::FileOpenSave(m_sDiffViewerPath, NULL, IDS_SETTINGS_SELECTDIFFVIEWER, IDS_PROGRAMSFILEFILTER, true, m_hWnd))
+	UpdateData();
+	CString filename = m_sDiffViewerPath;
+	if (!PathFileExists(filename))
+		filename.Empty();
+	if (CAppUtils::FileOpenSave(filename, nullptr, IDS_SETTINGS_SELECTDIFFVIEWER, IDS_PROGRAMSFILEFILTER, true, m_hWnd))
 	{
+		m_sDiffViewerPath = filename;
 		UpdateData(FALSE);
 		SetModified();
 	}

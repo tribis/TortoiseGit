@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2012, 2014 - TortoiseGit
+// Copyright (C) 2008-2012, 2014, 2016-2017 - TortoiseGit
 // Copyright (C) 2003-2008 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -18,8 +18,7 @@
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 //
 #include "stdafx.h"
-#include <math.h>
-#include "..\Resources\LoglistCommonResource.h"
+#include "../Resources/LoglistCommonResource.h"
 #include "LoglistUtils.h"
 #include "registry.h"
 
@@ -51,8 +50,9 @@ CString CLoglistUtils::FormatDateAndTime(const CTime& cTime, DWORD option, bool 
 	}
 	else
 	{
+		static bool useSystemLocales = CRegDWORD(L"Software\\TortoiseGit\\UseSystemLocaleForDates", TRUE) != FALSE;
 		// should we use the locale settings for formatting the date/time?
-		if (CRegDWORD(_T("Software\\TortoiseGit\\UseSystemLocaleForDates"), TRUE))
+		if (useSystemLocales)
 		{
 			// yes
 			SYSTEMTIME sysTime;
@@ -60,12 +60,12 @@ CString CLoglistUtils::FormatDateAndTime(const CTime& cTime, DWORD option, bool 
 
 			TCHAR buf[100] = { 0 };
 
-			GetDateFormat(LOCALE_USER_DEFAULT, option, &sysTime, NULL, buf, _countof(buf) - 1);
+			GetDateFormat(LOCALE_USER_DEFAULT, option, &sysTime, nullptr, buf, _countof(buf) - 1);
 			CString datetime = buf;
 			if (bIncludeTime)
 			{
-				datetime += _T(" ");
-				GetTimeFormat(LOCALE_USER_DEFAULT, 0, &sysTime, NULL, buf, _countof(buf) - 1);
+				datetime += L' ';
+				GetTimeFormat(LOCALE_USER_DEFAULT, 0, &sysTime, nullptr, buf, _countof(buf) - 1);
 				datetime += buf;
 			}
 			return datetime;
@@ -74,13 +74,9 @@ CString CLoglistUtils::FormatDateAndTime(const CTime& cTime, DWORD option, bool 
 		{
 			// no, so fixed format
 			if (bIncludeTime)
-			{
-				return cTime.Format(_T("%Y-%m-%d %H:%M:%S"));
-			}
+				return cTime.Format(L"%Y-%m-%d %H:%M:%S");
 			else
-			{
-				return cTime.Format(_T("%Y-%m-%d"));
-			}
+				return cTime.Format(L"%Y-%m-%d");
 		}
 	}
 }

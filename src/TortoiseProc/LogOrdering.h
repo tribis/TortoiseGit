@@ -30,15 +30,15 @@ class CLogOrdering : public CDialog
 	DECLARE_DYNAMIC(CLogOrdering)
 
 public:
-	CLogOrdering(CWnd* pParent = NULL);
+	CLogOrdering(CWnd* pParent = nullptr);
 	virtual ~CLogOrdering();
 
 	enum { IDD = IDD_LOGORDERING };
 
 protected:
-	virtual void DoDataExchange(CDataExchange* pDX);
-	virtual BOOL OnInitDialog();
-	virtual void OnOK();
+	virtual void DoDataExchange(CDataExchange* pDX) override;
+	virtual BOOL OnInitDialog() override;
+	virtual void OnOK() override;
 
 	DECLARE_MESSAGE_MAP()
 

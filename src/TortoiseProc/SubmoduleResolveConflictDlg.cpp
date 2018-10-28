@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2012, 2014-2015 - TortoiseGit
+// Copyright (C) 2012-2018 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -18,6 +18,7 @@
 //
 #include "stdafx.h"
 #include "TortoiseProc.h"
+#include "Git.h"
 #include "AppUtils.h"
 #include "SubmoduleResolveConflictDlg.h"
 #include "LoglistCommonResource.h"
@@ -25,7 +26,7 @@
 #include "MessageBox.h"
 
 IMPLEMENT_DYNAMIC(CSubmoduleResolveConflictDlg, CHorizontalResizableStandAloneDialog)
-CSubmoduleResolveConflictDlg::CSubmoduleResolveConflictDlg(CWnd* pParent /*=NULL*/)
+CSubmoduleResolveConflictDlg::CSubmoduleResolveConflictDlg(CWnd* pParent /*=nullptr*/)
 	: CHorizontalResizableStandAloneDialog(CSubmoduleResolveConflictDlg::IDD, pParent)
 	, m_bBaseOK(false)
 	, m_bMineOK(false)
@@ -96,11 +97,11 @@ BOOL CSubmoduleResolveConflictDlg::OnInitDialog()
 	AddAnchor(IDC_THEIRSHASH, TOP_LEFT, TOP_RIGHT);
 	AddAnchor(IDC_THEIRSSUBJECT, TOP_LEFT, TOP_RIGHT);
 
-	EnableSaveRestore(_T("SubmoduleResolveConflictDlg"));
+	EnableSaveRestore(L"SubmoduleResolveConflictDlg");
 
 	CString fsPath = m_sPath;
-	fsPath.Replace('\\', '/');
-	CString title = _T("Submodule \"") + fsPath + _T("\"");
+	fsPath.Replace(L'\\', L'/');
+	CString title = L"Submodule \"" + fsPath + L'"';
 	GetDlgItem(IDC_SUBMODULEDIFFTITLE)->SetWindowText(title);
 
 	UpdateData(FALSE);
@@ -120,12 +121,13 @@ BOOL CSubmoduleResolveConflictDlg::OnInitDialog()
 	GetDlgItem(IDC_MINECHANGETYPE)->SetWindowText(changeTypeTable[m_nChangeTypeMine]);
 	GetDlgItem(IDC_THEIRSCHANGETYPE)->SetWindowText(changeTypeTable[m_nChangeTypeTheirs]);
 
+	GetDlgItem(IDC_FROMGROUP)->SetWindowText(m_sBaseTitle);
+	GetDlgItem(IDC_TOGROUP)->SetWindowText(m_sMineTitle);
+	GetDlgItem(IDC_TOGROUP2)->SetWindowText(m_sTheirsTitle);
+
 	DialogEnableWindow(IDC_LOG, m_bBaseOK);
 	DialogEnableWindow(IDC_LOG2, m_bMineOK && m_nChangeTypeMine != CGitDiff::DeleteSubmodule);
 	DialogEnableWindow(IDC_LOG3, m_bTheirsOK && m_nChangeTypeTheirs != CGitDiff::DeleteSubmodule);
-
-	DialogEnableWindow(IDC_BUTTON_UPDATE2, m_sBaseHash != GIT_REV_ZERO && m_sMineHash != GIT_REV_ZERO &&m_sTheirsHash != GIT_REV_ZERO);
-	DialogEnableWindow(IDC_BUTTON_UPDATE3, m_sBaseHash != GIT_REV_ZERO && m_sMineHash != GIT_REV_ZERO &&m_sTheirsHash != GIT_REV_ZERO);
 
 	return FALSE;
 }
@@ -153,10 +155,11 @@ HBRUSH CSubmoduleResolveConflictDlg::OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlC
 	return CHorizontalResizableStandAloneDialog::OnCtlColor(pDC, pWnd, nCtlColor);
 }
 
-void CSubmoduleResolveConflictDlg::SetDiff(const CString& path, bool revertTheirMy, const CString& baseHash, const CString& baseSubject, bool baseOK, const CString& mineHash, const CString& mineSubject, bool mineOK, CGitDiff::ChangeType mineChangeType, const CString& theirsHash, const CString& theirsSubject, bool theirsOK, CGitDiff::ChangeType theirsChangeType)
+void CSubmoduleResolveConflictDlg::SetDiff(const CString& path, bool revertTheirMy, const CString& baseTitle, const CString& mineTitle, const CString& theirsTitle, const CString& baseHash, const CString& baseSubject, bool baseOK, const CString& mineHash, const CString& mineSubject, bool mineOK, CGitDiff::ChangeType mineChangeType, const CString& theirsHash, const CString& theirsSubject, bool theirsOK, CGitDiff::ChangeType theirsChangeType)
 {
 	m_sPath = path;
 
+	m_sBaseTitle = baseTitle;
 	m_sBaseHash = baseHash;
 	m_sBaseSubject = baseSubject;
 	m_bBaseOK = baseOK;
@@ -165,11 +168,13 @@ void CSubmoduleResolveConflictDlg::SetDiff(const CString& path, bool revertTheir
 
 	if (!m_bRevertTheirMy)
 	{
+		m_sMineTitle = mineTitle;
 		m_sMineHash = mineHash;
 		m_sMineSubject = mineSubject;
 		m_bMineOK = mineOK;
 		m_nChangeTypeMine = mineChangeType;
 
+		m_sTheirsTitle = theirsTitle;
 		m_sTheirsHash = theirsHash;
 		m_sTheirsSubject = theirsSubject;
 		m_bTheirsOK = theirsOK;
@@ -177,11 +182,13 @@ void CSubmoduleResolveConflictDlg::SetDiff(const CString& path, bool revertTheir
 	}
 	else
 	{
+		m_sMineTitle = theirsTitle;
 		m_sMineHash = theirsHash;
 		m_sMineSubject = theirsSubject;
 		m_bMineOK = theirsOK;
 		m_nChangeTypeMine = theirsChangeType;
 
+		m_sTheirsTitle = mineTitle;
 		m_sTheirsHash = mineHash;
 		m_sTheirsSubject = mineSubject;
 		m_bTheirsOK = mineOK;
@@ -192,7 +199,7 @@ void CSubmoduleResolveConflictDlg::SetDiff(const CString& path, bool revertTheir
 void CSubmoduleResolveConflictDlg::ShowLog(CString hash)
 {
 	CString sCmd;
-	sCmd.Format(_T("/command:log /path:\"%s\" /endrev:%s"), (LPCTSTR)g_Git.CombinePath(m_sPath), (LPCTSTR)hash);
+	sCmd.Format(L"/command:log /path:\"%s\" /endrev:%s", (LPCTSTR)g_Git.CombinePath(m_sPath), (LPCTSTR)hash);
 	CAppUtils::RunTortoiseGitProc(sCmd, false, false);
 }
 
@@ -218,7 +225,7 @@ void CSubmoduleResolveConflictDlg::Resolve(const CString& path, bool useMine)
 
 	CTGitPath gitpath(path);
 	gitpath.m_Action = CTGitPath::LOGACTIONS_UNMERGED;
-	if (CAppUtils::ResolveConflict(gitpath, useMine ? CAppUtils::RESOLVE_WITH_MINE : CAppUtils::RESOLVE_WITH_THEIRS) == 0)
+	if (CAppUtils::ResolveConflict(GetSafeHwnd(), gitpath, useMine ? CAppUtils::RESOLVE_WITH_MINE : CAppUtils::RESOLVE_WITH_THEIRS) == 0)
 	{
 		m_bResolved = true;
 		EndDialog(0);

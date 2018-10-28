@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2012, 2014 - TortoiseGit
+// Copyright (C) 2012, 2014, 2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -26,19 +26,19 @@ class CSubmoduleResolveConflictDlg : public CHorizontalResizableStandAloneDialog
 	DECLARE_DYNAMIC(CSubmoduleResolveConflictDlg)
 
 public:
-	CSubmoduleResolveConflictDlg(CWnd* pParent = NULL);
+	CSubmoduleResolveConflictDlg(CWnd* pParent = nullptr);
 	virtual ~CSubmoduleResolveConflictDlg();
 
 	enum { IDD = IDD_RESOLVESUBMODULECONFLICT };
 
-	void SetDiff(const CString& path, bool revertTheirMy, const CString& baseHash, const CString& baseSubject, bool baseOK, const CString& mineHash, const CString& mineSubject, bool mineOK, CGitDiff::ChangeType mineChangeType, const CString& theirsHash, const CString& theirsSubject, bool theirsOK, CGitDiff::ChangeType theirsChangeType);
+	void SetDiff(const CString& path, bool revertTheirMy, const CString& baseTitle, const CString& mineTitle, const CString& theirsTitle, const CString& baseHash, const CString& baseSubject, bool baseOK, const CString& mineHash, const CString& mineSubject, bool mineOK, CGitDiff::ChangeType mineChangeType, const CString& theirsHash, const CString& theirsSubject, bool theirsOK, CGitDiff::ChangeType theirsChangeType);
 
 	bool m_bResolved;
 
 protected:
-	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
-	virtual BOOL OnInitDialog();
-	virtual HBRUSH OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor);
+	virtual void DoDataExchange(CDataExchange* pDX) override;    // DDX/DDV support
+	virtual BOOL OnInitDialog() override;
+	afx_msg HBRUSH OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor);
 
 	void Resolve(const CString& path, bool useMine);
 
@@ -53,6 +53,9 @@ protected:
 
 	CString	m_sPath;
 
+	CString m_sBaseTitle;
+	CString m_sMineTitle;
+	CString m_sTheirsTitle;
 	CString	m_sBaseHash;
 	CString	m_sBaseSubject;
 	bool	m_bBaseOK;

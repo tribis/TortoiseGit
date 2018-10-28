@@ -27,7 +27,7 @@ HRESULT SetAppID(LPCTSTR appID)
 {
 	HRESULT hRes = S_FALSE;
 	typedef HRESULT STDAPICALLTYPE SetCurrentProcessExplicitAppUserModelIDFN(PCWSTR AppID);
-	CAutoLibrary hShell = AtlLoadSystemLibraryUsingFullPath(_T("shell32.dll"));
+	CAutoLibrary hShell = AtlLoadSystemLibraryUsingFullPath(L"shell32.dll");
 	if (hShell)
 	{
 		SetCurrentProcessExplicitAppUserModelIDFN *pfnSetCurrentProcessExplicitAppUserModelID = (SetCurrentProcessExplicitAppUserModelIDFN*)GetProcAddress(hShell, "SetCurrentProcessExplicitAppUserModelID");
@@ -40,12 +40,13 @@ HRESULT SetAppID(LPCTSTR appID)
 HRESULT CreateShellLink(PCWSTR pszArguments, PCWSTR pszTitle, int iconIndex, IShellLink **ppsl)
 {
 	ATL::CComPtr<IShellLink> psl;
-	HRESULT hr = psl.CoCreateInstance(CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER);
+	HRESULT hr = psl.CoCreateInstance(CLSID_ShellLink, nullptr, CLSCTX_INPROC_SERVER);
 	if (FAILED(hr))
 		return hr;
 
 	WCHAR szAppPath[MAX_PATH] = {0};
-	if (GetModuleFileName(NULL, szAppPath, ARRAYSIZE(szAppPath)) == 0) {
+	if (GetModuleFileName(nullptr, szAppPath, ARRAYSIZE(szAppPath)) == 0)
+	{
 		hr = HRESULT_FROM_WIN32(GetLastError());
 		return hr;
 	}
@@ -85,7 +86,7 @@ HRESULT CreateShellLink(PCWSTR pszArguments, PCWSTR pszTitle, int iconIndex, ISh
 HRESULT CreateSeparatorLink(IShellLink **ppsl)
 {
 	ATL::CComPtr<IPropertyStore> pps;
-	HRESULT hr = pps.CoCreateInstance(CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER);
+	HRESULT hr = pps.CoCreateInstance(CLSID_ShellLink, nullptr, CLSCTX_INPROC_SERVER);
 	if (FAILED(hr))
 		return hr;
 
@@ -108,7 +109,6 @@ HRESULT CreateSeparatorLink(IShellLink **ppsl)
 
 bool IsItemInArray(IShellItem *psi, IObjectArray *poaRemoved)
 {
-
 	UINT cItems;
 	if (FAILED(poaRemoved->GetCount(&cItems)))
 		return false;
@@ -127,7 +127,7 @@ bool IsItemInArray(IShellItem *psi, IObjectArray *poaRemoved)
 void DeleteJumpList(LPCTSTR appID)
 {
 	ATL::CComPtr<ICustomDestinationList> pcdl;
-	HRESULT hr = pcdl.CoCreateInstance(CLSID_DestinationList, NULL, CLSCTX_INPROC_SERVER);
+	HRESULT hr = pcdl.CoCreateInstance(CLSID_DestinationList, nullptr, CLSCTX_INPROC_SERVER);
 	if (SUCCEEDED(hr)) {
 		pcdl->DeleteList(appID);
 	}

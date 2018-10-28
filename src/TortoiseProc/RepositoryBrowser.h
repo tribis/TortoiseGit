@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2009-2014 - TortoiseGit
+// Copyright (C) 2009-2014, 2016-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -22,6 +22,7 @@
 #include "StandAloneDlg.h"
 #include "GitHash.h"
 #include "GitStatusListCtrl.h"
+#include "GestureEnabledControl.h"
 
 #define REPOBROWSER_CTRL_MIN_WIDTH	20
 
@@ -33,8 +34,8 @@ class CShadowFilesTree
 {
 public:
 	CShadowFilesTree()
-	: m_hTree(NULL)
-	, m_pParent(NULL)
+	: m_hTree(nullptr)
+	, m_pParent(nullptr)
 	, m_bFolder(false)
 	, m_bLoaded(true)
 	, m_bSubmodule(false)
@@ -59,14 +60,14 @@ public:
 
 	CString	GetFullName() const
 	{
-		if (m_pParent == NULL)
+		if (!m_pParent)
 			return m_sName;
 
 		CString parentPath = m_pParent->GetFullName();
 		if (parentPath.IsEmpty())
 			return m_sName;
 		else
-			return m_pParent->GetFullName() + _T("/") + m_sName;
+			return m_pParent->GetFullName() + L'/' + m_sName;
 	}
 };
 typedef std::vector<CShadowFilesTree *> TShadowFilesTreeList;
@@ -76,7 +77,7 @@ class CRepositoryBrowser : public CResizableStandAloneDialog
 	DECLARE_DYNAMIC(CRepositoryBrowser)
 
 public:
-	CRepositoryBrowser(CString rev, CWnd* pParent = NULL);	// standard constructor
+	CRepositoryBrowser(CString rev, CWnd* pParent = nullptr);	// standard constructor
 	virtual ~CRepositoryBrowser();
 
 	// Dialog Data
@@ -124,17 +125,18 @@ public:
 	};
 
 private:
-	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV support
+	virtual void DoDataExchange(CDataExchange* pDX) override;	// DDX/DDV support
 
 	DECLARE_MESSAGE_MAP()
 
 	afx_msg void			OnOK();
 	afx_msg void			OnCancel();
 	afx_msg void			OnDestroy();
-	virtual BOOL			OnInitDialog();
+	virtual BOOL			OnInitDialog() override;
+	afx_msg void			OnSysColorChange();
 
-	CTreeCtrl				m_RepoTree;
-	CListCtrl				m_RepoList;
+	CGestureEnabledControlTmpl<CTreeCtrl>	m_RepoTree;
+	CGestureEnabledControlTmpl<CListCtrl>	m_RepoList;
 	ColumnManager			m_ColumnManager;
 
 	afx_msg void			OnLvnColumnclickRepoList(NMHDR *pNMHDR, LRESULT *pResult);
@@ -142,13 +144,16 @@ private:
 	bool					m_currSortDesc;
 
 	CShadowFilesTree		m_TreeRoot;
-	int						ReadTreeRecursive(git_repository &repo, const git_tree * tree, CShadowFilesTree * treeroot);
-	int						ReadTree(CShadowFilesTree * treeroot, const CString& root = L"");
+	int						ReadTreeRecursive(git_repository& repo, const git_tree* tree, CShadowFilesTree* treeroot, bool recursive);
+	int						ReadTree(CShadowFilesTree* treeroot, const CString& root = L"", bool recursive = false);
 	int						m_nIconFolder;
 	int						m_nOpenIconFolder;
 	int						m_nExternalOvl;
 	int						m_nExecutableOvl;
 	int						m_nSymlinkOvl;
+
+	CShadowFilesTree*		GetListEntry(int index);
+	CShadowFilesTree*		GetTreeEntry(HTREEITEM treeItem);
 
 	bool					m_bHasWC;
 
@@ -173,7 +178,7 @@ private:
 
 	afx_msg void			OnBnClickedButtonRevision();
 
-	virtual BOOL			PreTranslateMessage(MSG* pMsg);
+	virtual BOOL			PreTranslateMessage(MSG* pMsg) override;
 
 	CString					m_sMarkForDiffFilename;
 	CGitHash				m_sMarkForDiffVersion;
@@ -191,4 +196,8 @@ private:
 	afx_msg void			OnLButtonDown(UINT nFlags, CPoint point);
 	afx_msg void			OnLButtonUp(UINT nFlags, CPoint point);
 	afx_msg void			CopyHashToClipboard(TShadowFilesTreeList &selectedLeafs);
+	afx_msg void			OnLvnBegindragRepolist(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void			OnTvnBegindragRepotree(NMHDR* pNMHDR, LRESULT* pResult);
+	void					BeginDrag(const CWnd& window, CTGitPathList& files, const CString& root, POINT& point);
+	void					RecursivelyAdd(CTGitPathList& toExport, CShadowFilesTree* pTree);
 };

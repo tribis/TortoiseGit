@@ -1,7 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
 // Copyright (C) 2003-2011 - TortoiseSVN
-// Copyright (C) 2012-2015 - TortoiseGit
+// Copyright (C) 2012-2018 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -21,7 +21,6 @@
 #include "TortoiseProc.h"
 #include <gdiplus.h>
 #include "Revisiongraphdlg.h"
-#include "MessageBox.h"
 #include "Git.h"
 #include "TempFile.h"
 #include "UnicodeUtils.h"
@@ -36,6 +35,7 @@
 //#include "RevisionGraph/StandardLayout.h"
 //#include "RevisionGraph/ShowWC.h"
 //#include "RevisionGraph/ShowWCModification.h"
+#include "DPIAware.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -55,7 +55,6 @@ void CRevisionGraphWnd::InitView()
 
 void CRevisionGraphWnd::BuildPreview()
 {
-
 	m_Preview.DeleteObject();
 	if (!m_bShowOverview)
 		return;
@@ -69,8 +68,8 @@ void CRevisionGraphWnd::BuildPreview()
 	float origZoom = m_fZoomFactor;
 
 	CRect clientRect = GetClientRect();
-	CSize preViewSize (max (REVGRAPH_PREVIEW_WIDTH, clientRect.Width() / 4)
-					  ,max (REVGRAPH_PREVIEW_HEIGHT, clientRect.Height() / 4));
+	CSize preViewSize(max(CDPIAware::Instance().ScaleX(REVGRAPH_PREVIEW_WIDTH), clientRect.Width() / 4),
+					  max(CDPIAware::Instance().ScaleY(REVGRAPH_PREVIEW_HEIGHT), clientRect.Height() / 4));
 
 	// zoom the graph so that it is completely visible in the window
 	CRect graphRect = GetGraphRect();
@@ -103,7 +102,6 @@ void CRevisionGraphWnd::BuildPreview()
 	dc.DeleteDC();
 
 	DoZoom (origZoom, false);
-
 }
 
 void CRevisionGraphWnd::SetScrollbar (int bar, int newPos, int clientMax, int graphMax)
@@ -126,7 +124,6 @@ void CRevisionGraphWnd::SetScrollbar (int bar, int newPos, int clientMax, int gr
 	ScrollInfo.nTrackPos = pos;
 
 	SetScrollInfo(bar, &ScrollInfo);
-
 }
 
 void CRevisionGraphWnd::SetScrollbars (int nVert, int nHorz)
@@ -175,7 +172,7 @@ int CRevisionGraphWnd::GetEncoderClsid(const WCHAR* format, CLSID* pClsid)
 		return -1;  // Failure
 
 	ImageCodecInfo* pImageCodecInfo = (ImageCodecInfo*)(malloc(size));
-	if(pImageCodecInfo == NULL)
+	if (!pImageCodecInfo)
 		return -1;  // Failure
 
 	if (GetImageEncoders(num, size, pImageCodecInfo)==Ok)
@@ -205,7 +202,7 @@ bool CRevisionGraphWnd::FetchRevisionData
 	this->m_logEntries.ClearAll();
 	CString range;
 	if (!m_ToRev.IsEmpty() && !m_FromRev.IsEmpty())
-		range.Format(_T("%s..%s"), (LPCTSTR)g_Git.FixBranchName(m_FromRev), (LPCTSTR)g_Git.FixBranchName(m_ToRev));
+		range.Format(L"%s..%s", (LPCTSTR)g_Git.FixBranchName(m_FromRev), (LPCTSTR)g_Git.FixBranchName(m_ToRev));
 	else if (!m_ToRev.IsEmpty())
 		range = m_ToRev;
 	else if (!m_FromRev.IsEmpty())
@@ -243,7 +240,7 @@ bool CRevisionGraphWnd::FetchRevisionData
 		{
 			if(m_logEntries.m_HashMap.find(rev.m_ParentHash[j]) == m_logEntries.m_HashMap.end())
 			{
-				TRACE(_T("Can't found parent node"));
+				TRACE(L"Can't found parent node");
 				//new parent node as new node
 				node nd;
 				nd = this->m_Graph.newNode();
@@ -255,7 +252,7 @@ bool CRevisionGraphWnd::FetchRevisionData
 
 			}else
 			{
-				TRACE(_T("edge %d - %d\n"),i, m_logEntries.m_HashMap[rev.m_ParentHash[j]]);
+				TRACE(L"edge %d - %d\n",i, m_logEntries.m_HashMap[rev.m_ParentHash[j]]);
 				m_Graph.newEdge(nodes[i], nodes[m_logEntries.m_HashMap[rev.m_ParentHash[j]]]);
 			}
 		}
@@ -291,14 +288,14 @@ bool CRevisionGraphWnd::AnalyzeRevisionData()
 {
 #if 0
 	CSyncPointer<const CFullGraph> fullGraph (m_state.GetFullGraph());
-	if ((fullGraph.get() != NULL) && (fullGraph->GetNodeCount() > 0))
+	if (fullGraph.get() != nullptr && (fullGraph->GetNodeCount() > 0))
 	{
 		// filter graph
 
 		CSyncPointer<CAllRevisionGraphOptions> options (m_state.GetOptions());
 		options->Prepare();
 
-		std::unique_ptr<CVisibleGraph> visibleGraph (new CVisibleGraph());
+		auto visibleGraph = std::make_unique<CVisibleGraph>();
 		CVisibleGraphBuilder builder ( *fullGraph
 									 , *visibleGraph
 									 , options->GetCopyFilterOptions());
@@ -311,7 +308,7 @@ bool CRevisionGraphWnd::AnalyzeRevisionData()
 
 		// layout nodes
 
-		std::unique_ptr<CStandardLayout> newLayout
+		auto newLayout = std::make_unique<CStandardLayout>
 			( new CStandardLayout ( m_state.GetFullHistory()->GetCache()
 								, visibleGraph.get()
 								, m_state.GetFullHistory()->GetWCInfo()));
@@ -323,14 +320,14 @@ bool CRevisionGraphWnd::AnalyzeRevisionData()
 		m_state.SetAnalysisResult (visibleGraph, newLayout);
 	}
 
-	return m_state.GetNodes().get() != NULL;
+	return m_state.GetNodes().get() != nullptr;
 #endif
 	return true;
 }
 
 bool CRevisionGraphWnd::IsUpdateJobRunning() const
 {
-	return (updateJob.get() != NULL) && !updateJob->IsDone();
+	return (updateJob.get() != nullptr) && !updateJob->IsDone();
 }
 
 bool CRevisionGraphWnd::GetShowOverview() const
@@ -352,7 +349,6 @@ void CRevisionGraphWnd::GetSelected
 	, GitRev& rev
 	, GitRev& peg)
 {
-
 	CString repoRoot = m_state.GetRepositoryRoot();
 
 	// get path and revision
@@ -380,13 +376,12 @@ void CRevisionGraphWnd::GetSelected
 		if (head && !peg.IsValid())
 			peg = node->GetRevision();
 	}
-
 }
 #endif
 
 CString	CRevisionGraphWnd::GetFriendRefName(ogdf::node v)
 {
-	if(v == NULL)
+	if (!v)
 		return CString();
 	CGitHash hash = this->m_logEntries[v->index()];
 	if(this->m_HashMap.find(hash) == m_HashMap.end())
@@ -397,12 +392,11 @@ CString	CRevisionGraphWnd::GetFriendRefName(ogdf::node v)
 		return hash.ToString();
 	else
 		return m_HashMap[hash][0];
-
 }
 
-STRING_VECTOR CRevisionGraphWnd::GetFriendRefNames(ogdf::node v, CGit::REF_TYPE *refTypes, int refTypeCount)
+STRING_VECTOR CRevisionGraphWnd::GetFriendRefNames(ogdf::node v, const CString* exclude, CGit::REF_TYPE* onlyRefType)
 {
-	if (v == NULL)
+	if (!v)
 		return STRING_VECTOR();
 	CGitHash hash = m_logEntries[v->index()];
 	if (m_HashMap.find(hash) == m_HashMap.end())
@@ -419,14 +413,12 @@ STRING_VECTOR CRevisionGraphWnd::GetFriendRefNames(ogdf::node v, CGit::REF_TYPE 
 		{
 			CGit::REF_TYPE refType;
 			CString shortName = CGit::GetShortName(all[i], &refType);
-			if (refTypes == NULL)
+			if (exclude && *exclude == shortName)
+				continue;
+			if (!onlyRefType)
+				list.push_back(all[i]);
+			else if (*onlyRefType == refType)
 				list.push_back(shortName);
-			else
-			{
-				for (int j = 0; j < refTypeCount; ++j)
-					if (refTypes[j] == refType)
-						list.push_back(shortName);
-			}
 		}
 		return list;
 	}
@@ -434,32 +426,33 @@ STRING_VECTOR CRevisionGraphWnd::GetFriendRefNames(ogdf::node v, CGit::REF_TYPE 
 
 void CRevisionGraphWnd::CompareRevs(const CString& revTo)
 {
-	ASSERT(m_SelectedEntry1 != NULL);
-	ASSERT(!revTo.IsEmpty() || m_SelectedEntry2 != NULL);
+	ASSERT(m_SelectedEntry1);
+	ASSERT(!revTo.IsEmpty() || m_SelectedEntry2);
 
-//	bool alternativeTool = !!(GetAsyncKeyState(VK_SHIFT) & 0x8000);
+	bool alternativeTool = !!(GetAsyncKeyState(VK_SHIFT) & 0x8000);
 
 	CString sCmd;
 
-	sCmd.Format(_T("/command:showcompare %s /revision1:%s /revision2:%s"),
-			this->m_sPath.IsEmpty() ?  _T("") : (LPCTSTR)(_T("/path:\"") + this->m_sPath + _T("\"")),
+	sCmd.Format(L"/command:showcompare %s /revision1:%s /revision2:%s",
+			this->m_sPath.IsEmpty() ? L"" : (LPCTSTR)(L"/path:\"" + this->m_sPath + L'"'),
 			(LPCTSTR)GetFriendRefName(m_SelectedEntry1),
 			!revTo.IsEmpty() ? (LPCTSTR)revTo : (LPCTSTR)GetFriendRefName(m_SelectedEntry2));
 
-	CAppUtils::RunTortoiseGitProc(sCmd);
+	if (alternativeTool)
+		sCmd += L" /alternative";
 
+	CAppUtils::RunTortoiseGitProc(sCmd);
 }
 
 void CRevisionGraphWnd::UnifiedDiffRevs(bool bHead)
 {
-	ASSERT(m_SelectedEntry1 != NULL);
-	ASSERT(bHead || m_SelectedEntry2 != NULL);
+	ASSERT(m_SelectedEntry1);
+	ASSERT(bHead || m_SelectedEntry2);
 
 	bool alternativeTool = !!(GetAsyncKeyState(VK_SHIFT) & 0x8000);
 	CAppUtils::StartShowUnifiedDiff(m_hWnd, CString(), GetFriendRefName(m_SelectedEntry1), CString(),
-		bHead? _T("HEAD"):GetFriendRefName(m_SelectedEntry2),
+		bHead ? L"HEAD" : GetFriendRefName(m_SelectedEntry2),
 		alternativeTool);
-
 }
 
 void CRevisionGraphWnd::DoZoom (float fZoomFactor, bool updateScrollbars)
@@ -473,12 +466,12 @@ void CRevisionGraphWnd::DoZoom (float fZoomFactor, bool updateScrollbars)
 
 	for (int i = 0; i < MAXFONTS; ++i)
 	{
-		if (m_apFonts[i] != NULL)
+		if (m_apFonts[i])
 		{
 			m_apFonts[i]->DeleteObject();
 			delete m_apFonts[i];
 		}
-		m_apFonts[i] = NULL;
+		m_apFonts[i] = nullptr;
 	}
 
 	if (updateScrollbars)

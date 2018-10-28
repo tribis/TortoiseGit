@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2014 - TortoiseGit
+// Copyright (C) 2014, 2016-2017 - TortoiseGit
 // Copyright (C) 2011 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -39,13 +39,14 @@ public:
 	CString		m_sBugtraqRegex2;
 
 protected:
-	virtual void DoDataExchange(CDataExchange* pDX); // DDX/DDV support
-	virtual BOOL OnInitDialog();
+	virtual void DoDataExchange(CDataExchange* pDX) override; // DDX/DDV support
+	virtual BOOL OnInitDialog() override;
 
 	DECLARE_MESSAGE_MAP()
 
 	afx_msg void OnEnChangeBugtraqlogregex1();
 	afx_msg void OnEnChangeBugtraqlogregex2();
+	afx_msg void OnSysColorChange();
 
 private:
 	void		UpdateLogControl();

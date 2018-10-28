@@ -1,5 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
+// Copyright (C) 2013, 2016 - TortoiseGit
 // Copyright (C) 2003-2006 - Stefan Kueng
 
 // This program is free software; you can redistribute it and/or
@@ -30,7 +31,7 @@ class CInputDlg : public CResizableStandAloneDialog
 	DECLARE_DYNAMIC(CInputDlg)
 
 public:
-	CInputDlg(CWnd* pParent = NULL);
+	CInputDlg(CWnd* pParent = nullptr);
 	virtual ~CInputDlg();
 
 	enum { IDD = IDD_INPUTDLG };
@@ -38,12 +39,13 @@ public:
 protected:
 	CFont			m_logFont;
 
-	virtual void DoDataExchange(CDataExchange* pDX);
-	virtual BOOL OnInitDialog();
-	virtual BOOL PreTranslateMessage(MSG* pMsg);
-	virtual void OnOK();
+	virtual void DoDataExchange(CDataExchange* pDX) override;
+	virtual BOOL OnInitDialog() override;
+	virtual BOOL PreTranslateMessage(MSG* pMsg) override;
+	virtual void OnOK() override;
 
 	afx_msg void OnEnChangeLogmessage();
+	afx_msg void OnSysColorChange();
 	DECLARE_MESSAGE_MAP()
 public:
 	CString				m_sInputText;

@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2009-2013, 2015 - TortoiseGit
+// Copyright (C) 2009-2013, 2015-2018 - TortoiseGit
 // Copyright (C) 2007-2008 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -19,20 +19,20 @@
 //
 #include "stdafx.h"
 #include "ImportPatchCommand.h"
-
-#include "MessageBox.h"
 #include "ImportPatchDlg.h"
+#include "TGitPath.h"
 #include "Git.h"
 #include "AppUtils.h"
 
 bool ImportPatchCommand::Execute()
 {
 	CImportPatchDlg dlg;
-//	dlg.m_bIsTag=TRUE;
+	theApp.m_pMainWnd = &dlg;
+
 	CString cmd;
 	CString output;
 
-	CString droppath = parser.GetVal(_T("droptarget"));
+	CString droppath = parser.GetVal(L"droptarget");
 	if (!droppath.IsEmpty())
 	{
 		if (CTGitPath(droppath).IsAdminDir())
@@ -42,13 +42,13 @@ bool ImportPatchCommand::Execute()
 		{
 			CString err;
 			err.Format(IDS_ERR_NOT_REPOSITORY, (LPCTSTR)g_Git.m_CurrentDir);
-			CMessageBox::Show(nullptr, err, _T("TortoiseGit"), MB_OK | MB_ICONERROR);
+			MessageBox(GetExplorerHWND(), err, L"TortoiseGit", MB_OK | MB_ICONERROR);
 			return FALSE;
 		}
 	}
 	else if (!orgPathList.IsEmpty() && !orgPathList[0].HasAdminDir())
 	{
-		CString str=CAppUtils::ChooseRepository(NULL);
+		CString str = CAppUtils::ChooseRepository(GetExplorerHWND(), nullptr);
 		if(str.IsEmpty())
 			return FALSE;
 
@@ -59,7 +59,7 @@ bool ImportPatchCommand::Execute()
 		{
 			CString err;
 			err.Format(IDS_ERR_NOT_REPOSITORY, (LPCTSTR)str);
-			CMessageBox::Show(NULL,err,_T("TortoiseGit"),MB_OK|MB_ICONERROR);
+			MessageBox(GetExplorerHWND(), err, L"TortoiseGit", MB_OK | MB_ICONERROR);
 			return FALSE;
 		}
 		g_Git.m_CurrentDir=str;
@@ -68,15 +68,11 @@ bool ImportPatchCommand::Execute()
 	for(int i = 0 ; i < this->orgPathList.GetCount(); ++i)
 	{
 		if(!orgPathList[i].IsDirectory())
-		{
 			dlg.m_PathList.AddPath(orgPathList[i]);
-		}
 	}
 
 	if(dlg.DoModal()==IDOK)
-	{
 		return TRUE;
-	}
 
 	return FALSE;
 }

@@ -28,9 +28,11 @@
 #define NO_NSEC
 #define USE_WIN32_MMAP
 #define UNRELIABLE_FSTAT
+#define OBJECT_CREATION_MODE 1
 #define NO_REGEX
 #define NO_CURL
 #define NO_PTHREADS
 #define NO_MBSUPPORT
 #define GAWK
 #define NO_POSIX_GOODIES
+#define PAGER_ENV "LESS=FRX LV=-c"

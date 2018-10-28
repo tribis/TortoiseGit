@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2016 - TortoiseGit
+// Copyright (C) 2008-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -21,6 +21,7 @@
 
 #include "stdafx.h"
 #include "TortoiseProc.h"
+#include "Git.h"
 #include "CloneDlg.h"
 #include "BrowseFolder.h"
 #include "MessageBox.h"
@@ -29,37 +30,34 @@
 
 IMPLEMENT_DYNCREATE(CCloneDlg, CHorizontalResizableStandAloneDialog)
 
-CCloneDlg::CCloneDlg(CWnd* pParent /*=NULL*/)
-	: CHorizontalResizableStandAloneDialog(CCloneDlg::IDD, pParent)
+CCloneDlg::CCloneDlg(CWnd* pParent /*=nullptr*/)
+: CHorizontalResizableStandAloneDialog(CCloneDlg::IDD, pParent)
+, m_bRecursive(BST_UNCHECKED)
+, m_bBare(BST_UNCHECKED)
+, m_bBranch(BST_UNCHECKED)
+, m_bOrigin(BST_UNCHECKED)
+, m_bNoCheckout(BST_UNCHECKED)
+, m_bSVN(BST_UNCHECKED)
+, m_bSVNTrunk(BST_UNCHECKED)
+, m_bSVNTags(BST_UNCHECKED)
+, m_bSVNBranch(BST_UNCHECKED)
+, m_bSVNFrom(BST_UNCHECKED)
+, m_bSVNUserName(BST_UNCHECKED)
+, m_bExactPath(FALSE)
+, m_strSVNTrunk(L"trunk")
+, m_strSVNTags(L"tags")
+, m_strSVNBranchs(L"branches")
+, m_nDepth(1)
+, m_bDepth(BST_UNCHECKED)
+, m_bSaving(false)
+, m_nSVNFrom(0)
+, m_bUseLFS(FALSE)
+, m_regBrowseUrl(L"Software\\TortoiseGit\\TortoiseProc\\CloneBrowse", 0)
+, m_regCloneDir(L"Software\\TortoiseGit\\TortoiseProc\\CloneDir")
+, m_regCloneRecursive(L"Software\\TortoiseGit\\TortoiseProc\\CloneRecursive", FALSE)
+, m_regUseSSHKey(L"Software\\TortoiseGit\\TortoiseProc\\CloneUseSSHKey", TRUE)
 {
-	m_bRecursive = FALSE;
-	m_bBare = FALSE;
-	m_bBranch = FALSE;
-	m_bOrigin = FALSE;
-	m_bNoCheckout = FALSE;
-	m_bSVN = FALSE;
-	m_bSVNTrunk = FALSE;
-	m_bSVNTags = FALSE;
-	m_bSVNBranch = FALSE;
-	m_bSVNFrom = FALSE;
-	m_bSVNUserName = FALSE;
-	m_bExactPath = FALSE;
-
-	m_strSVNTrunk = _T("trunk");
-	m_strSVNTags = _T("tags");
-	m_strSVNBranchs = _T("branches");
-
-	m_regBrowseUrl = CRegDWORD(_T("Software\\TortoiseGit\\TortoiseProc\\CloneBrowse"),0);
-	m_regCloneDir = CRegString(_T("Software\\TortoiseGit\\TortoiseProc\\CloneDir"));
-	m_regCloneRecursive = CRegDWORD(_T("Software\\TortoiseGit\\TortoiseProc\\CloneRecursive"), FALSE);
-	m_regUseSSHKey = CRegDWORD(_T("Software\\TortoiseGit\\TortoiseProc\\CloneUseSSHKey"), TRUE);
-	m_nSVNFrom = 0;
-
 	m_bAutoloadPuttyKeyFile = m_regUseSSHKey && CAppUtils::IsSSHPutty();
-
-	m_nDepth = 1;
-	m_bDepth = false;
-	m_bSaving = false;
 }
 
 CCloneDlg::~CCloneDlg()
@@ -97,12 +95,25 @@ void CCloneDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Check(pDX, IDC_CHECK_ORIGIN, m_bOrigin);
 	DDX_Text(pDX, IDC_EDIT_ORIGIN, m_strOrigin);
 	DDX_Check(pDX,IDC_CHECK_NOCHECKOUT, m_bNoCheckout);
+	DDX_Check(pDX, IDC_CHECK_LFS, m_bUseLFS);
 }
 
 BOOL CCloneDlg::OnInitDialog()
 {
 	CHorizontalResizableStandAloneDialog::OnInitDialog();
 	CAppUtils::MarkWindowAsUnpinnable(m_hWnd);
+
+	AdjustControlSize(IDC_CHECK_DEPTH);
+	AdjustControlSize(IDC_CHECK_RECURSIVE);
+	AdjustControlSize(IDC_CHECK_BARE);
+	AdjustControlSize(IDC_PUTTYKEY_AUTOLOAD);
+	AdjustControlSize(IDC_CHECK_SVN);
+	AdjustControlSize(IDC_CHECK_SVN_TRUNK);
+	AdjustControlSize(IDC_CHECK_SVN_TAG);
+	AdjustControlSize(IDC_CHECK_SVN_BRANCH);
+	AdjustControlSize(IDC_CHECK_SVN_FROM);
+	AdjustControlSize(IDC_CHECK_USERNAME);
+	AdjustControlSize(IDC_CHECK_LFS);
 
 	AddAnchor(IDC_URLCOMBO, TOP_LEFT, TOP_RIGHT);
 	AddAnchor(IDC_CLONE_BROWSE_URL, TOP_RIGHT);
@@ -118,21 +129,11 @@ BOOL CCloneDlg::OnInitDialog()
 	AddAnchor(IDC_CLONE_GROUP_SVN,TOP_LEFT,TOP_RIGHT);
 	AddAnchor(IDHELP, BOTTOM_RIGHT);
 
-	AdjustControlSize(IDC_CHECK_DEPTH);
-	AdjustControlSize(IDC_CHECK_RECURSIVE);
-	AdjustControlSize(IDC_CHECK_BARE);
-	AdjustControlSize(IDC_PUTTYKEY_AUTOLOAD);
-	AdjustControlSize(IDC_CHECK_SVN);
-	AdjustControlSize(IDC_CHECK_SVN_TRUNK);
-	AdjustControlSize(IDC_CHECK_SVN_TAG);
-	AdjustControlSize(IDC_CHECK_SVN_BRANCH);
-	AdjustControlSize(IDC_CHECK_SVN_FROM);
-	AdjustControlSize(IDC_CHECK_USERNAME);
-
 	CString tt;
 	tt.LoadString(IDS_CLONE_DEPTH_TT);
 	m_tooltips.AddTool(IDC_EDIT_DEPTH,tt);
 	m_tooltips.AddTool(IDC_CHECK_DEPTH,tt);
+	m_tooltips.AddTool(IDC_CHECK_LFS, IDS_PROC_USELFS_TT);
 
 	this->AddOthersToAnchor();
 
@@ -147,7 +148,7 @@ BOOL CCloneDlg::OnInitDialog()
 	if (m_Directory.IsEmpty())
 	{
 		TCHAR szPath[MAX_PATH] = {0};
-		if (SUCCEEDED(SHGetFolderPath(NULL, CSIDL_PERSONAL | CSIDL_FLAG_CREATE, NULL, SHGFP_TYPE_CURRENT, szPath)))
+		if (SUCCEEDED(SHGetFolderPath(nullptr, CSIDL_PERSONAL | CSIDL_FLAG_CREATE, nullptr, SHGFP_TYPE_CURRENT, szPath)))
 			m_Directory = szPath;
 	}
 	m_bRecursive = m_regCloneRecursive;
@@ -155,10 +156,10 @@ BOOL CCloneDlg::OnInitDialog()
 
 	m_URLCombo.SetCaseSensitive(TRUE);
 	m_URLCombo.SetURLHistory(TRUE);
-	m_URLCombo.LoadHistory(_T("Software\\TortoiseGit\\History\\repoURLS"), _T("url"));
+	m_URLCombo.LoadHistory(L"Software\\TortoiseGit\\History\\repoURLS", L"url");
 	if(m_URL.IsEmpty())
 	{
-		CString str = CAppUtils::GetClipboardLink(_T("git clone "));
+		CString str = CAppUtils::GetClipboardLink(L"git clone ");
 		str.Trim();
 		if(str.IsEmpty())
 			m_URLCombo.SetCurSel(0);
@@ -177,14 +178,14 @@ BOOL CCloneDlg::OnInitDialog()
 	m_BrowseUrl.SetCurrentEntry(m_regBrowseUrl);
 
 	m_PuttyKeyCombo.SetPathHistory(TRUE);
-	m_PuttyKeyCombo.LoadHistory(_T("Software\\TortoiseGit\\History\\puttykey"), _T("key"));
+	m_PuttyKeyCombo.LoadHistory(L"Software\\TortoiseGit\\History\\puttykey", L"key");
 	m_PuttyKeyCombo.SetCurSel(0);
 
 	this->GetDlgItem(IDC_PUTTYKEY_AUTOLOAD)->EnableWindow( CAppUtils::IsSSHPutty() );
 	this->GetDlgItem(IDC_PUTTYKEYFILE)->EnableWindow(m_bAutoloadPuttyKeyFile);
 	this->GetDlgItem(IDC_PUTTYKEYFILE_BROWSE)->EnableWindow(m_bAutoloadPuttyKeyFile);
 
-	EnableSaveRestore(_T("CloneDlg"));
+	EnableSaveRestore(L"CloneDlg");
 
 	OnBnClickedCheckSvn();
 	OnBnClickedCheckDepth();
@@ -251,7 +252,6 @@ void CCloneDlg::OnOK()
 	this->m_PuttyKeyCombo.GetWindowText(m_strPuttyKeyFile);
 	CResizableDialog::OnOK();
 	m_bSaving = false;
-
 }
 
 void CCloneDlg::OnCancel()
@@ -278,8 +278,8 @@ void CCloneDlg::OnBnClickedCloneBrowseUrl()
 			CMessageBox::Show(GetSafeHwnd(), IDS_PROC_CLONE_URLDIREMPTY, IDS_APPNAME, MB_ICONEXCLAMATION);
 			return;
 		}
-		if (CAppUtils::ExploreTo(GetSafeHwnd(), str) && (INT_PTR)ShellExecute(nullptr, _T("open"), str, nullptr, nullptr, SW_SHOW) <= 32)
-			MessageBox(CFormatMessageWrapper(), _T("TortoiseGit"), MB_ICONERROR);
+		if (CAppUtils::ExploreTo(GetSafeHwnd(), str) && (INT_PTR)ShellExecute(nullptr, L"open", str, nullptr, nullptr, SW_SHOW) <= 32)
+			MessageBox(CFormatMessageWrapper(), L"TortoiseGit", MB_ICONERROR);
 		return;
 	}
 
@@ -292,12 +292,12 @@ void CCloneDlg::OnBnClickedCloneBrowseUrl()
 
 void CCloneDlg::OnBnClickedCloneDirBrowse()
 {
+	UpdateData(TRUE);
 	CBrowseFolder browseFolder;
 	browseFolder.m_style = BIF_EDITBOX | BIF_NEWDIALOGSTYLE | BIF_RETURNFSANCESTORS | BIF_RETURNONLYFSDIRS;
 	CString strCloneDirectory = this->m_Directory;
 	if (browseFolder.Show(GetSafeHwnd(), strCloneDirectory) == CBrowseFolder::OK)
 	{
-		UpdateData(TRUE);
 		m_Directory = strCloneDirectory;
 		UpdateData(FALSE);
 	}
@@ -305,17 +305,15 @@ void CCloneDlg::OnBnClickedCloneDirBrowse()
 
 void CCloneDlg::OnBnClickedPuttykeyfileBrowse()
 {
-	CFileDialog dlg(TRUE,NULL,
-					NULL,
-					OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT,
-					CString(MAKEINTRESOURCE(IDS_PUTTYKEYFILEFILTER)));
+	UpdateData();
+	CString filename;
+	m_PuttyKeyCombo.GetWindowText(filename);
+	if (!PathFileExists(filename))
+		filename.Empty();
+	if (!CAppUtils::FileOpenSave(filename, nullptr, 0, IDS_PUTTYKEYFILEFILTER, true, GetSafeHwnd()))
+		return;
 
-	this->UpdateData();
-	if(dlg.DoModal()==IDOK)
-	{
-		this->m_PuttyKeyCombo.SetWindowText( dlg.GetPathName() );
-	}
-
+	m_PuttyKeyCombo.SetWindowText(filename);
 }
 
 void CCloneDlg::OnBnClickedPuttykeyAutoload()
@@ -347,17 +345,17 @@ void CCloneDlg::OnCbnEditchangeUrlcombo()
 	CString old;
 	old=m_ModuleName;
 
-	url.Replace(_T('\\'),_T('/'));
+	url.Replace(L'\\', L'/');
 
 	// add compatibility for Google Code git urls
 	url.TrimRight(L"/");
 
-	int start=url.ReverseFind(_T('/'));
+	int start = url.ReverseFind(L'/');
 	if(start<0)
 	{
-		start = url.ReverseFind(_T(':'));
+		start = url.ReverseFind(L':');
 		if(start <0)
-			start = url.ReverseFind(_T('@'));
+			start = url.ReverseFind(L'@');
 
 		if(start<0)
 			start = 0;
@@ -368,14 +366,14 @@ void CCloneDlg::OnCbnEditchangeUrlcombo()
 	temp=temp.MakeLower();
 
 	// we've to check whether the URL ends with .git (instead of using the first .git)
-	int end = temp.Right(4) == _T(".git") ? (temp.GetLength() - 4) : temp.GetLength();
+	int end = CStringUtils::EndsWith(temp, L".git") ? (temp.GetLength() - 4) : temp.GetLength();
 
 	//CString modulename;
 	m_ModuleName=url.Mid(start+1,end);
 
-	start = m_Directory.ReverseFind(_T('\\'));
+	start = m_Directory.ReverseFind(L'\\');
 	if(start <0 )
-		start = m_Directory.ReverseFind(_T('/'));
+		start = m_Directory.ReverseFind(L'/');
 	if(start <0 )
 		start =0;
 
@@ -384,7 +382,7 @@ void CCloneDlg::OnCbnEditchangeUrlcombo()
 		m_Directory=m_Directory.Left(dirstart);
 
 	m_Directory.TrimRight(L"\\/");
-	m_Directory += _T('\\');
+	m_Directory += L'\\';
 	m_Directory += m_ModuleName;
 
 	// check if URL starts with http://, https:// or git:// in those cases loading putty keys is only
@@ -393,7 +391,6 @@ void CCloneDlg::OnCbnEditchangeUrlcombo()
 		m_bAutoloadPuttyKeyFile = false;
 	else
 		m_bAutoloadPuttyKeyFile = m_regUseSSHKey && CAppUtils::IsSSHPutty();
-
 
 	this->UpdateData(FALSE);
 }
@@ -408,19 +405,16 @@ void CCloneDlg::OnBnClickedCheckSvn()
 		m_URLCombo.GetWindowText(str);
 
 		str.TrimRight(L"\\/");
-		if(str.GetLength()>=5 && (str.Right(5).MakeLower() == _T("trunk") ))
-		{
+		if (CStringUtils::EndsWithI(str, L"trunk"))
 			this->m_bSVNBranch=this->m_bSVNTags=this->m_bSVNTrunk = FALSE;
-		}
 		else
-		{
 			this->m_bSVNBranch=this->m_bSVNTags=this->m_bSVNTrunk = TRUE;
-		}
 		m_bDepth = false;
 		m_bBare = false;
 		m_bRecursive = false;
 		m_bBranch = FALSE;
 		m_bNoCheckout = FALSE;
+		m_bUseLFS = FALSE;
 		this->UpdateData(FALSE);
 		OnBnClickedCheckDepth();
 	}
@@ -430,6 +424,7 @@ void CCloneDlg::OnBnClickedCheckSvn()
 	this->GetDlgItem(IDC_CHECK_BRANCH)->EnableWindow(!m_bSVN);
 	this->GetDlgItem(IDC_EDIT_BRANCH)->EnableWindow(!m_bSVN);
 	this->GetDlgItem(IDC_CHECK_NOCHECKOUT)->EnableWindow(!m_bSVN);
+	this->GetDlgItem(IDC_CHECK_LFS)->EnableWindow(!m_bSVN);
 	OnBnClickedCheckSvnTrunk();
 	OnBnClickedCheckSvnTag();
 	OnBnClickedCheckSvnBranch();
@@ -485,15 +480,12 @@ void CCloneDlg::OnBnClickedCheckBare()
 	{
 		m_bRecursive = FALSE;
 		m_bNoCheckout = FALSE;
-		GetDlgItem(IDC_CHECK_RECURSIVE)->EnableWindow(FALSE);
-		GetDlgItem(IDC_CHECK_NOCHECKOUT)->EnableWindow(FALSE);
 		UpdateData(FALSE);
 	}
-	else
-	{
-		GetDlgItem(IDC_CHECK_RECURSIVE)->EnableWindow(TRUE);
-		GetDlgItem(IDC_CHECK_NOCHECKOUT)->EnableWindow(TRUE);
-	}
+	GetDlgItem(IDC_CHECK_RECURSIVE)->EnableWindow(!m_bBare);
+	GetDlgItem(IDC_CHECK_NOCHECKOUT)->EnableWindow(!m_bBare);
+	GetDlgItem(IDC_CHECK_ORIGIN)->EnableWindow(!m_bBare);
+	GetDlgItem(IDC_EDIT_ORIGIN)->EnableWindow(!m_bBare);
 }
 void CCloneDlg::OnBnClickedCheckDepth()
 {
@@ -511,6 +503,7 @@ void CCloneDlg::OnBnClickedCheckOrigin()
 {
 	UpdateData(TRUE);
 	this->GetDlgItem(IDC_EDIT_ORIGIN)->EnableWindow(this->m_bOrigin);
+	GetDlgItem(IDC_CHECK_BARE)->EnableWindow(!m_bOrigin);
 }
 
 void CCloneDlg::OnBnClickedCheckUsername()

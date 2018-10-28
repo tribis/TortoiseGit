@@ -39,7 +39,7 @@ CTempFiles& CTempFiles::Instance()
 
 CTGitPath CTempFiles::ConstructTempPath(const CTGitPath& path)
 {
-	DWORD len = ::GetTempPath(0, NULL);
+	DWORD len = ::GetTempPath(0, nullptr);
 	auto temppath = std::make_unique<TCHAR[]>(len + 1);
 	auto tempF = std::make_unique<TCHAR[]>(len + 50);
 	::GetTempPath (len+1, temppath.get());
@@ -47,7 +47,7 @@ CTGitPath CTempFiles::ConstructTempPath(const CTGitPath& path)
 	CString possibletempfile;
 	if (path.IsEmpty())
 	{
-		::GetTempFileName (temppath.get(), _T("tsm"), 0, tempF.get());
+		::GetTempFileName(temppath.get(), L"tsm", 0, tempF.get());
 		tempfile = CTGitPath (tempF.get());
 	}
 	else
@@ -69,7 +69,7 @@ CTGitPath CTempFiles::ConstructTempPath(const CTGitPath& path)
 			// that's longer than MAX_PATH (in that case, we can't really do much to avoid longer paths)
 			do
 			{
-				possibletempfile.Format(_T("%s%s.tsm%3.3x.tmp%s"), temppath, (LPCTSTR)filename, i, (LPCTSTR)path.GetFileExtension());
+				possibletempfile.Format(L"%s%s.tsm%3.3x.tmp%s", temppath.get(), (LPCTSTR)filename, i, (LPCTSTR)path.GetFileExtension());
 				tempfile.SetFromWin(possibletempfile);
 				filename = filename.Left(filename.GetLength()-1);
 			} while (   (filename.GetLength() > 4)
@@ -97,7 +97,7 @@ CTGitPath CTempFiles::CreateTempPath (bool bRemoveAtEnd, const CTGitPath& path, 
 		if (directory)
 		{
 			DeleteFile(tempfile.GetWinPath());
-			if (CreateDirectory (tempfile.GetWinPath(), NULL) == FALSE)
+			if (CreateDirectory(tempfile.GetWinPath(), nullptr) == FALSE)
 			{
 				if (GetLastError() != ERROR_ALREADY_EXISTS)
 					return CTGitPath();
@@ -107,7 +107,7 @@ CTGitPath CTempFiles::CreateTempPath (bool bRemoveAtEnd, const CTGitPath& path, 
 		}
 		else
 		{
-			CAutoFile hFile = CreateFile(tempfile.GetWinPath(), GENERIC_READ, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY, NULL);
+			CAutoFile hFile = CreateFile(tempfile.GetWinPath(), GENERIC_READ, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY, nullptr);
 			if (!hFile)
 			{
 				if (GetLastError() != ERROR_ALREADY_EXISTS)
@@ -152,7 +152,7 @@ CTGitPath CTempFiles::GetTempDirPath(bool bRemoveAtEnd, const CTGitPath& path /*
 
 void CTempFiles::DeleteOldTempFiles(LPCTSTR wildCard)
 {
-	DWORD len = ::GetTempPath(0, NULL);
+	DWORD len = ::GetTempPath(0, nullptr);
 	auto path = std::make_unique<TCHAR[]>(len + 100);
 	len = ::GetTempPath (len+100, path.get());
 	if (len == 0)

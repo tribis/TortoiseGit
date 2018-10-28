@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2009-2013, 2015 - TortoiseGit
+// Copyright (C) 2009-2013, 2015-2018 - TortoiseGit
 // Copyright (C) 2003-2008 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -21,13 +21,14 @@
 #include "TortoiseProc.h"
 #include "MessageBox.h"
 #include "ResolveDlg.h"
+#include "PathUtils.h"
 #include "AppUtils.h"
 #include "Git.h"
 
 #define REFRESHTIMER   100
 
 IMPLEMENT_DYNAMIC(CResolveDlg, CResizableStandAloneDialog)
-CResolveDlg::CResolveDlg(CWnd* pParent /*=NULL*/)
+CResolveDlg::CResolveDlg(CWnd* pParent /*=nullptr*/)
 	: CResizableStandAloneDialog(CResolveDlg::IDD, pParent)
 	, m_bThreadRunning(FALSE)
 	, m_bCancelled(false)
@@ -58,7 +59,7 @@ BOOL CResolveDlg::OnInitDialog()
 	CResizableStandAloneDialog::OnInitDialog();
 	CAppUtils::MarkWindowAsUnpinnable(m_hWnd);
 
-	m_resolveListCtrl.Init(GITSLC_COLEXT, _T("ResolveDlg"), GITSLC_POPALL ^ (GITSLC_POPIGNORE | GITSLC_POPADD | GITSLC_POPCOMMIT | GITSLC_POPEXPORT | GITSLC_POPRESTORE | GITSLC_POPSAVEAS | GITSLC_PREPAREDIFF));
+	m_resolveListCtrl.Init(GITSLC_COLEXT, L"ResolveDlg", GITSLC_POPALL ^ (GITSLC_POPIGNORE | GITSLC_POPADD | GITSLC_POPCOMMIT | GITSLC_POPEXPORT | GITSLC_POPRESTORE | GITSLC_POPSAVEAS | GITSLC_POPPREPAREDIFF));
 	m_resolveListCtrl.SetConfirmButton((CButton*)GetDlgItem(IDOK));
 	m_resolveListCtrl.SetSelectButton(&m_SelectAll);
 	m_resolveListCtrl.SetCancelBool(&m_bCancelled);
@@ -77,13 +78,13 @@ BOOL CResolveDlg::OnInitDialog()
 	AddAnchor(IDCANCEL, BOTTOM_RIGHT);
 	AddAnchor(IDHELP, BOTTOM_RIGHT);
 	AddAnchor(IDC_STATIC_REMINDER, BOTTOM_RIGHT);
-	if (hWndExplorer)
-		CenterWindow(CWnd::FromHandle(hWndExplorer));
-	EnableSaveRestore(_T("ResolveDlg"));
+	if (GetExplorerHWND())
+		CenterWindow(CWnd::FromHandle(GetExplorerHWND()));
+	EnableSaveRestore(L"ResolveDlg");
 
 	// first start a thread to obtain the file list with the status without
 	// blocking the dialog
-	if(AfxBeginThread(ResolveThreadEntry, this) == NULL)
+	if (!AfxBeginThread(ResolveThreadEntry, this))
 	{
 		CMessageBox::Show(this->m_hWnd, IDS_ERR_THREADSTARTFAILED, IDS_APPNAME, MB_OK | MB_ICONERROR);
 	}
@@ -129,7 +130,7 @@ void CResolveDlg::OnBnClickedSelectall()
 
 UINT CResolveDlg::ResolveThreadEntry(LPVOID pVoid)
 {
-	return ((CResolveDlg*)pVoid)->ResolveThread();
+	return reinterpret_cast<CResolveDlg*>(pVoid)->ResolveThread();
 }
 UINT CResolveDlg::ResolveThread()
 {
@@ -139,11 +140,10 @@ UINT CResolveDlg::ResolveThread()
 
 	m_bCancelled = false;
 
+	m_resolveListCtrl.StoreScrollPos();
 	m_resolveListCtrl.Clear();
 	if (!m_resolveListCtrl.GetStatus(&m_pathList))
-	{
 		m_resolveListCtrl.SetEmptyString(m_resolveListCtrl.GetLastErrorMessage());
-	}
 	m_resolveListCtrl.Show(GITSLC_SHOWCONFLICTED|GITSLC_SHOWINEXTERNALS, GITSLC_SHOWCONFLICTED);
 
 	InterlockedExchange(&m_bThreadRunning, FALSE);
@@ -161,9 +161,7 @@ BOOL CResolveDlg::PreTranslateMessage(MSG* pMsg)
 				if (GetAsyncKeyState(VK_CONTROL)&0x8000)
 				{
 					if ( GetDlgItem(IDOK)->IsWindowEnabled() )
-					{
 						PostMessage(WM_COMMAND, IDOK);
-					}
 					return TRUE;
 				}
 			}
@@ -172,10 +170,8 @@ BOOL CResolveDlg::PreTranslateMessage(MSG* pMsg)
 			{
 				if (!m_bThreadRunning)
 				{
-					if(AfxBeginThread(ResolveThreadEntry, this) == NULL)
-					{
+					if (!AfxBeginThread(ResolveThreadEntry, this))
 						CMessageBox::Show(this->m_hWnd, IDS_ERR_THREADSTARTFAILED, IDS_APPNAME, MB_OK | MB_ICONERROR);
-					}
 					else
 						InterlockedExchange(&m_bThreadRunning, TRUE);
 				}
@@ -189,10 +185,8 @@ BOOL CResolveDlg::PreTranslateMessage(MSG* pMsg)
 
 LRESULT CResolveDlg::OnSVNStatusListCtrlNeedsRefresh(WPARAM, LPARAM)
 {
-	if(AfxBeginThread(ResolveThreadEntry, this) == NULL)
-	{
+	if (!AfxBeginThread(ResolveThreadEntry, this))
 		CMessageBox::Show(this->m_hWnd, IDS_ERR_THREADSTARTFAILED, IDS_APPNAME, MB_OK | MB_ICONERROR);
-	}
 	return 0;
 }
 
@@ -212,6 +206,11 @@ LRESULT CResolveDlg::OnFileDropped(WPARAM, LPARAM lParam)
 	// restart the timer.
 	CTGitPath path;
 	path.SetFromWin((LPCTSTR)lParam);
+
+	// check whether the dropped file belongs to the very same repository
+	CString projectDir;
+	if (!path.HasAdminDir(&projectDir) || !CPathUtils::ArePathStringsEqual(g_Git.m_CurrentDir, projectDir))
+		return 0;
 
 	if (!m_resolveListCtrl.HasPath(path))
 	{
@@ -242,10 +241,11 @@ LRESULT CResolveDlg::OnFileDropped(WPARAM, LPARAM lParam)
 			}
 		}
 	}
+	m_resolveListCtrl.ResetChecked(path);
 
 	// Always start the timer, since the status of an existing item might have changed
-	SetTimer(REFRESHTIMER, 200, NULL);
-	CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": Item %s dropped, timer started\n"), path.GetWinPath());
+	SetTimer(REFRESHTIMER, 200, nullptr);
+	CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) L": Item %s dropped, timer started\n", path.GetWinPath());
 	return 0;
 }
 
@@ -256,7 +256,7 @@ void CResolveDlg::OnTimer(UINT_PTR nIDEvent)
 	case REFRESHTIMER:
 		if (m_bThreadRunning)
 		{
-			SetTimer(REFRESHTIMER, 200, NULL);
+			SetTimer(REFRESHTIMER, 200, nullptr);
 			CTraceToOutputDebugString::Instance()(__FUNCTION__ ": Wait some more before refreshing\n");
 		}
 		else

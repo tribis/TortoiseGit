@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2014 - TortoiseGit
+// Copyright (C) 2014, 2016-2017 - TortoiseGit
 // Copyright (C) 2008,2010,2014-2015 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -21,21 +21,23 @@
 #include "SetBugTraqAdv.h"
 #include "BrowseFolder.h"
 #include "BugTraqAssociations.h"
-#include "..\IBugTraqProvider\IBugTraqProvider_h.h"
+#include "../IBugTraqProvider/IBugTraqProvider_h.h"
 
 IMPLEMENT_DYNAMIC(CSetBugTraqAdv, CResizableStandAloneDialog)
 
-CSetBugTraqAdv::CSetBugTraqAdv(CWnd* pParent /*= NULL*/)
+CSetBugTraqAdv::CSetBugTraqAdv(CWnd* pParent /*= nullptr*/)
 	: CResizableStandAloneDialog(CSetBugTraqAdv::IDD, pParent)
 	, m_provider_clsid(GUID_NULL)
+	, m_bEnabled(true)
 {
 }
 
-CSetBugTraqAdv::CSetBugTraqAdv(const CBugTraqAssociation &assoc, CWnd* pParent /*= NULL*/)
+CSetBugTraqAdv::CSetBugTraqAdv(const CBugTraqAssociation& assoc, CWnd* pParent /*= nullptr*/)
 	: CResizableStandAloneDialog(CSetBugTraqAdv::IDD, pParent)
 	, m_sPath(assoc.GetPath().GetWinPathString())
 	, m_provider_clsid(assoc.GetProviderClass())
 	, m_sParameters(assoc.GetParameters())
+	, m_bEnabled(assoc.IsEnabled())
 {
 }
 
@@ -49,6 +51,7 @@ void CSetBugTraqAdv::DoDataExchange(CDataExchange* pDX)
 	DDX_Text(pDX, IDC_BUGTRAQPATH, m_sPath);
 	DDX_Control(pDX, IDC_BUGTRAQPROVIDERCOMBO, m_cProviderCombo);
 	DDX_Text(pDX, IDC_BUGTRAQPARAMETERS, m_sParameters);
+	DDX_Check(pDX, IDC_ENABLE, m_bEnabled);
 }
 
 BEGIN_MESSAGE_MAP(CSetBugTraqAdv, CResizableStandAloneDialog)
@@ -94,6 +97,9 @@ BOOL CSetBugTraqAdv::OnInitDialog()
 	UpdateData(FALSE);
 	CheckHasOptions();
 
+	AdjustControlSize(IDC_ENABLE);
+
+	AddAnchor(IDC_ENABLE, TOP_LEFT);
 	AddAnchor(IDC_BUGTRAQWCPATHLABEL, TOP_LEFT, TOP_RIGHT);
 	AddAnchor(IDC_BUGTRAQPATH, TOP_LEFT, TOP_RIGHT);
 	AddAnchor(IDC_BUGTRAQBROWSE, TOP_RIGHT);
@@ -105,7 +111,7 @@ BOOL CSetBugTraqAdv::OnInitDialog()
 	AddAnchor(IDOK, BOTTOM_RIGHT);
 	AddAnchor(IDCANCEL, BOTTOM_RIGHT);
 	AddAnchor(IDHELP, BOTTOM_RIGHT);
-	EnableSaveRestore(_T("SetBugTraqAdvDlg"));
+	EnableSaveRestore(L"SetBugTraqAdvDlg");
 	return TRUE;
 }
 
@@ -120,6 +126,12 @@ void CSetBugTraqAdv::OnDestroy()
 void CSetBugTraqAdv::OnOK()
 {
 	UpdateData();
+
+	if (m_sPath.IsEmpty() || !PathIsDirectory(m_sPath) || PathIsRelative(m_sPath))
+	{
+		ShowEditBalloon(IDC_BUGTRAQPATH, (LPCTSTR)CFormatMessageWrapper(ERROR_PATH_NOT_FOUND), CString(MAKEINTRESOURCE(IDS_ERR_ERROR)), TTI_ERROR);
+		return;
+	}
 
 	m_provider_clsid = GUID_NULL;
 
@@ -167,7 +179,7 @@ void CSetBugTraqAdv::OnBnClickedBugTraqbrowse()
 
 CBugTraqAssociation CSetBugTraqAdv::GetAssociation() const
 {
-	return CBugTraqAssociation(m_sPath, m_provider_clsid, CBugTraqAssociations::LookupProviderName(m_provider_clsid), m_sParameters);
+	return CBugTraqAssociation(m_sPath, m_provider_clsid, CBugTraqAssociations::LookupProviderName(m_provider_clsid), m_sParameters, m_bEnabled == BST_CHECKED);
 }
 
 void CSetBugTraqAdv::CheckHasOptions()

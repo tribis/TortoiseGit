@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2009,2014 - TortoiseGit
+// Copyright (C) 2009, 2014, 2016-2017 - TortoiseGit
 // Copyright (C) 2008,2013 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -33,15 +33,17 @@ class CBugTraqAssociation
 	CTGitPath m_path;
 	CBugTraqProvider m_provider;
 	CString m_parameters;
+	bool m_enabled;
 
 public:
 	CBugTraqAssociation()
+		: m_enabled(true)
 	{
 		 m_provider.clsid = GUID_NULL;
 	}
 
-	CBugTraqAssociation(LPCTSTR szWorkingCopy, const CLSID &provider_clsid, LPCTSTR szProviderName, LPCTSTR szParameters)
-		: m_path(szWorkingCopy), m_parameters(szParameters)
+	CBugTraqAssociation(LPCTSTR szWorkingCopy, const CLSID &provider_clsid, LPCTSTR szProviderName, LPCTSTR szParameters, bool enabled)
+		: m_path(szWorkingCopy), m_parameters(szParameters), m_enabled(enabled)
 	{
 		m_provider.clsid = provider_clsid;
 		m_provider.name = szProviderName;
@@ -52,6 +54,8 @@ public:
 	CLSID GetProviderClass() const { return m_provider.clsid; }
 	CString GetProviderClassAsString() const;
 	CString GetParameters() const { return m_parameters; }
+	bool IsEnabled() const { return m_enabled; }
+	bool SetEnabled(bool enabled) { if (m_enabled == enabled) { return false; } m_enabled = enabled; return true; }
 };
 
 class CBugTraqAssociations
@@ -67,7 +71,7 @@ public:
 	void Save() const;
 
 	void Add(const CBugTraqAssociation &assoc);
-	void RemoveByPath(const CTGitPath &path);
+	void Remove(CBugTraqAssociation* assoc);
 
 	bool FindProvider(const CString &path, CBugTraqAssociation *assoc);
 

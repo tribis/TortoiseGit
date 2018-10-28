@@ -1,7 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
 // Copyright (C) 2003-2010, 2012 - TortoiseSVN
-// Copyright (C) 2008-2012,2014 - TortoiseGit
+// Copyright (C) 2008-2012, 2014, 2016-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -22,15 +22,14 @@
 #include "Guids.h"
 #include "ShellExtClassFactory.h"
 #include "ShellObjects.h"
-#include "gitindex.h"
 
 volatile LONG		g_cRefThisDll = 0;				///< reference count of this DLL.
-HINSTANCE			g_hmodThisDll = NULL;			///< handle to this DLL itself.
+HINSTANCE			g_hmodThisDll = nullptr;		///< handle to this DLL itself.
 ShellCache			g_ShellCache;					///< caching of registry entries, ...
 DWORD				g_langid;
 ULONGLONG			g_langTimeout = 0;
-HINSTANCE			g_hResInst = NULL;
-stdstring			g_filepath;
+HINSTANCE			g_hResInst = nullptr;
+std::wstring		g_filepath;
 git_wc_status_kind	g_filestatus = git_wc_status_none;	///< holds the corresponding status to the file/dir above
 bool				g_readonlyoverlay = false;
 bool				g_lockedoverlay = false;
@@ -46,10 +45,9 @@ bool				g_ignoredovlloaded = false;
 bool				g_unversionedovlloaded = false;
 CComCriticalSection	g_csGlobalCOMGuard;
 
-LPCTSTR				g_MenuIDString = _T("TortoiseGit");
+LPCTSTR				g_MenuIDString = L"TortoiseGit";
 
 ShellObjects		g_shellObjects;
-CGitIndexFileMap	g_IndexFileMap;
 
 #pragma comment(linker, "\"/manifestdependency:type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 
@@ -63,21 +61,15 @@ DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID /* lpReserved */)
 
 	bool bInShellTest = false;
 	TCHAR buf[MAX_PATH + 1] = {0};		// MAX_PATH ok, the test really is for debugging anyway.
-	DWORD pathLength = GetModuleFileName(NULL, buf, MAX_PATH);
+	DWORD pathLength = GetModuleFileName(nullptr, buf, _countof(buf) - 1);
 	if(pathLength >= 14)
 	{
-		if (pathLength >= 24 && _tcsicmp(&buf[pathLength - 24], _T("\\TortoiseGitExplorer.exe")) == 0)
-		{
+		if (pathLength >= 24 && _wcsicmp(&buf[pathLength - 24], L"\\TortoiseGitExplorer.exe") == 0)
 			bInShellTest = true;
-		}
-		if ((_tcsicmp(&buf[pathLength-14], _T("\\ShellTest.exe"))) == 0)
-		{
+		if ((_wcsicmp(&buf[pathLength-14], L"\\ShellTest.exe")) == 0)
 			bInShellTest = true;
-		}
-		if ((_tcsicmp(&buf[pathLength-13], _T("\\verclsid.exe"))) == 0)
-		{
+		if ((_wcsicmp(&buf[pathLength-13], L"\\verclsid.exe")) == 0)
 			bInShellTest = true;
-		}
 	}
 
 	if (!::IsDebuggerPresent() && !bInShellTest)
@@ -93,10 +85,8 @@ DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID /* lpReserved */)
 	// behavior and even may create dependency loops in the dll load order.
 	if (dwReason == DLL_PROCESS_ATTACH)
 	{
-		if (g_hmodThisDll == NULL)
-		{
+		if (!g_hmodThisDll)
 			g_csGlobalCOMGuard.Init();
-		}
 
 		// Extension DLL one-time initialization
 		g_hmodThisDll = hInstance;
@@ -123,9 +113,9 @@ STDAPI DllCanUnloadNow(void)
 
 STDAPI DllGetClassObject(REFCLSID rclsid, REFIID riid, LPVOID *ppvOut)
 {
-	if (ppvOut == 0)
+	if (!ppvOut)
 		return E_POINTER;
-	*ppvOut = NULL;
+	*ppvOut = nullptr;
 
 	FileState state = FileStateInvalid;
 	if (IsEqualIID(rclsid, CLSID_Tortoisegit_UPTODATE))
@@ -154,10 +144,9 @@ STDAPI DllGetClassObject(REFCLSID rclsid, REFIID riid, LPVOID *ppvOut)
 	if (state != FileStateInvalid)
 	{
 		CShellExtClassFactory *pcf = new (std::nothrow) CShellExtClassFactory(state);
-		if (pcf == NULL)
+		if (!pcf)
 			return E_OUTOFMEMORY;
 		// refcount currently set to 0
-		git_libgit2_init();
 		const HRESULT hr = pcf->QueryInterface(riid, ppvOut);
 		if(FAILED(hr))
 			delete pcf;
@@ -165,5 +154,4 @@ STDAPI DllGetClassObject(REFCLSID rclsid, REFIID riid, LPVOID *ppvOut)
 	}
 
 	return CLASS_E_CLASSNOTAVAILABLE;
-
 }

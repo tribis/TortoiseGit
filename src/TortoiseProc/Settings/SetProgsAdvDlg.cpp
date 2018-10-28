@@ -1,5 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
+// Copyright (C) 2016 - TortoiseGit
 // Copyright (C) 2003-2011 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -23,10 +24,10 @@
 #include "AppUtils.h"
 
 IMPLEMENT_DYNAMIC(CSetProgsAdvDlg, CResizableStandAloneDialog)
-CSetProgsAdvDlg::CSetProgsAdvDlg(const CString& type, CWnd* pParent /*=NULL*/)
+CSetProgsAdvDlg::CSetProgsAdvDlg(const CString& type, CWnd* pParent /*=nullptr*/)
 	: CResizableStandAloneDialog(CSetProgsAdvDlg::IDD, pParent)
 	, m_sType(type)
-	, m_regToolKey(_T("Software\\TortoiseGit\\") + type + _T("Tools"))
+	, m_regToolKey(L"Software\\TortoiseGit\\" + type + L"Tools")
 	, m_ToolsValid(false)
 {
 }
@@ -44,10 +45,10 @@ void CSetProgsAdvDlg::LoadData()
 		CStringList values;
 		if (m_regToolKey.getValues(values))
 		{
-			for (POSITION pos = values.GetHeadPosition(); pos != NULL; )
+			for (POSITION pos = values.GetHeadPosition(); pos; )
 			{
 				CString ext = values.GetNext(pos);
-				m_Tools[ext] = CRegString(m_regToolKey.m_path + _T("\\") + ext);
+				m_Tools[ext] = CRegString(m_regToolKey.m_path + L'\\' + ext);
 			}
 		}
 
@@ -63,12 +64,12 @@ int CSetProgsAdvDlg::SaveData()
 		CStringList values;
 		if (m_regToolKey.getValues(values))
 		{
-			for (POSITION pos = values.GetHeadPosition(); pos != NULL; )
+			for (POSITION pos = values.GetHeadPosition(); pos; )
 			{
 				CString ext = values.GetNext(pos);
 				if (m_Tools.find(ext) == m_Tools.end())
 				{
-					CRegString to_remove(m_regToolKey.m_path + _T("\\") + ext);
+					CRegString to_remove(m_regToolKey.m_path + L'\\' + ext);
 					to_remove.removeValue();
 				}
 			}
@@ -79,7 +80,7 @@ int CSetProgsAdvDlg::SaveData()
 		{
 			CString ext = it->first;
 			CString new_value = it->second;
-			CRegString reg_value(m_regToolKey.m_path + _T("\\") + ext);
+			CRegString reg_value(m_regToolKey.m_path + L'\\' + ext);
 			if (reg_value != new_value)
 				reg_value = new_value;
 		}
@@ -130,14 +131,14 @@ BOOL CSetProgsAdvDlg::OnInitDialog()
 {
 	CResizableStandAloneDialog::OnInitDialog();
 
-	m_ToolListCtrl.SetExtendedStyle(LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER);
+	m_ToolListCtrl.SetExtendedStyle((CRegDWORD(L"Software\\TortoiseGit\\FullRowSelect", TRUE) ? LVS_EX_FULLROWSELECT : 0) | LVS_EX_DOUBLEBUFFER);
 
 	m_ToolListCtrl.DeleteAllItems();
 	int c = m_ToolListCtrl.GetHeaderCtrl()->GetItemCount() - 1;
 	while (c>=0)
 		m_ToolListCtrl.DeleteColumn(c--);
 
-	SetWindowTheme(m_ToolListCtrl.GetSafeHwnd(), L"Explorer", NULL);
+	SetWindowTheme(m_ToolListCtrl.GetSafeHwnd(), L"Explorer", nullptr);
 
 	CString temp;
 	temp.LoadString(IDS_PROGS_EXTCOL);
@@ -150,12 +151,10 @@ BOOL CSetProgsAdvDlg::OnInitDialog()
 	int maxcol = m_ToolListCtrl.GetHeaderCtrl()->GetItemCount() - 1;
 	int col;
 	for (col = mincol; col <= maxcol; col++)
-	{
 		m_ToolListCtrl.SetColumnWidth(col,LVSCW_AUTOSIZE_USEHEADER);
-	}
 	m_ToolListCtrl.SetRedraw(TRUE);
 
-	temp.LoadString(m_sType == _T("Diff") ? IDS_DLGTITLE_ADV_DIFF : IDS_DLGTITLE_ADV_MERGE);
+	temp.LoadString(m_sType == L"Diff" ? IDS_DLGTITLE_ADV_DIFF : IDS_DLGTITLE_ADV_MERGE);
 	SetWindowText(temp);
 
 	LoadData();
@@ -179,9 +178,7 @@ int CSetProgsAdvDlg::AddExtension(const CString& ext, const CString& tool)
 	// Note: list control automatically sorts entries
 	int index = m_ToolListCtrl.InsertItem(0, ext);
 	if (index >= 0)
-	{
 		m_ToolListCtrl.SetItemText(index, 1, tool);
-	}
 	return index;
 }
 

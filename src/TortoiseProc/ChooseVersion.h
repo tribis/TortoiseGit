@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2014, 2016 - TortoiseGit
+// Copyright (C) 2008-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -22,8 +22,9 @@
 #include "BrowseRefsDlg.h"
 #include "MessageBox.h"
 #include "registry.h"
+#include "StringUtils.h"
 
-static UINT WM_GUIUPDATES = RegisterWindowMessage(_T("TORTOISEGIT_CHOOSEVERSION_GUIUPDATES"));
+static UINT WM_GUIUPDATES = RegisterWindowMessage(L"TORTOISEGIT_CHOOSEVERSION_GUIUPDATES");
 
 class CChooseVersion
 {
@@ -35,7 +36,7 @@ private:
 	CWinThread*			m_pLoadingThread;
 	static UINT LoadingThreadEntry(LPVOID pVoid)
 	{
-		return ((CChooseVersion*)pVoid)->LoadingThread();
+		return reinterpret_cast<CChooseVersion*>(pVoid)->LoadingThread();
 	};
 	volatile LONG 		m_bLoadingThreadRunning;
 
@@ -47,6 +48,7 @@ protected:
 	CButton			m_RadioTag;
 	CString			m_pendingRefName;
 	bool			m_bNotFullName;
+	bool			m_bSkipCurrentBranch;
 
 	//Notification when version changed. Can be implemented in derived classes.
 	virtual void OnVersionChanged(){}
@@ -91,9 +93,10 @@ protected:
 		dlg.SetParams(CTGitPath(), CTGitPath(), revision, revision, 0);
 		// tell the dialog to use mode for selecting revisions
 		dlg.SetSelect(true);
+		dlg.ShowWorkingTreeChanges(false);
 		// only one revision must be selected however
 		dlg.SingleSelection(true);
-		if ( dlg.DoModal() == IDOK )
+		if (dlg.DoModal() == IDOK && !dlg.GetSelectedHash().empty())
 		{
 			m_ChooseVersioinVersion.SetWindowText(dlg.GetSelectedHash().at(0).ToString());
 			OnVersionChanged();
@@ -106,7 +109,7 @@ protected:
 		switch (radio)
 		{
 		case IDC_RADIO_HEAD:
-			this->m_VersionName=_T("HEAD");
+			this->m_VersionName = L"HEAD";
 			break;
 		case IDC_RADIO_BRANCH:
 			this->m_VersionName=m_ChooseVersioinBranch.GetString();
@@ -156,25 +159,25 @@ protected:
 				refName = fullRefName;
 		}
 
-		if(wcsncmp(refName,L"refs/",5)==0)
+		if (CStringUtils::StartsWith(refName, L"refs/"))
 			refName = refName.Mid(5);
-		if(wcsncmp(refName,L"heads/",6)==0)
+		if (CStringUtils::StartsWith(refName, L"heads/"))
 		{
 			refName = refName.Mid(6);
 			SetDefaultChoose(IDC_RADIO_BRANCH);
 			m_ChooseVersioinBranch.SetCurSel(
 				m_ChooseVersioinBranch.FindStringExact(-1, refName));
 		}
-		else if(wcsncmp(refName,L"remotes/",8)==0)
+		else if (CStringUtils::StartsWith(refName, L"remotes/"))
 		{
 			SetDefaultChoose(IDC_RADIO_BRANCH);
 			m_ChooseVersioinBranch.SetCurSel(
 				m_ChooseVersioinBranch.FindStringExact(-1, refName));
 		}
-		else if(wcsncmp(refName,L"tags/",5)==0)
+		else if (CStringUtils::StartsWith(refName, L"tags/"))
 		{
 			refName = refName.Mid(5);
-			refName.Replace(_T("^{}"), _T(""));
+			refName.Replace(L"^{}", L"");
 			SetDefaultChoose(IDC_RADIO_TAGS);
 			m_ChooseVersioinTags.SetCurSel(
 				m_ChooseVersioinTags.FindStringExact(-1, refName));
@@ -192,7 +195,7 @@ protected:
 		STRING_VECTOR list;
 
 		int current = -1;
-		g_Git.GetBranchList(list, &current, CRegDWORD(L"Software\\TortoiseGit\\BranchesIncludeFetchHead", TRUE) ? CGit::BRANCH_ALL_F : CGit::BRANCH_ALL);
+		g_Git.GetBranchList(list, &current, CRegDWORD(L"Software\\TortoiseGit\\BranchesIncludeFetchHead", TRUE) ? CGit::BRANCH_ALL_F : CGit::BRANCH_ALL, m_bSkipCurrentBranch);
 		m_ChooseVersioinBranch.SetList(list);
 		m_ChooseVersioinBranch.SetCurSel(current);
 
@@ -241,10 +244,10 @@ protected:
 
 		InterlockedExchange(&m_bLoadingThreadRunning, TRUE);
 
-		if ( (m_pLoadingThread=AfxBeginThread(LoadingThreadEntry, this)) ==NULL)
+		if ((m_pLoadingThread = AfxBeginThread(LoadingThreadEntry, this)) == nullptr)
 		{
 			InterlockedExchange(&m_bLoadingThreadRunning, FALSE);
-			CMessageBox::Show(NULL, IDS_ERR_THREADSTARTFAILED, IDS_APPNAME, MB_OK | MB_ICONERROR);
+			CMessageBox::Show(nullptr, IDS_ERR_THREADSTARTFAILED, IDS_APPNAME, MB_OK | MB_ICONERROR);
 		}
 	}
 	void WaitForFinishLoading()
@@ -266,10 +269,10 @@ public:
 	, m_pLoadingThread(nullptr)
 	, m_bLoadingThreadRunning(FALSE)
 	, m_bNotFullName(true)
+	, m_bSkipCurrentBranch(false)
 	{
 		m_pWin=win;
 	};
-
 };
 
 #define CHOOSE_VERSION_DDX \

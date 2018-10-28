@@ -1,7 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
 // Copyright (C) 2003-2011, 2015 - TortoiseSVN
-// Copyright (C) 2012-2013, 2015 - TortoiseGit
+// Copyright (C) 2012-2013, 2015-2018 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -21,7 +21,6 @@
 #include "TortoiseProc.h"
 #include "MyMemDC.h"
 #include "RevisionGraphDlg.h"
-#include "MessageBox.h"
 #include "Git.h"
 #include "TempFile.h"
 #include "UnicodeUtils.h"
@@ -34,6 +33,7 @@
 //#include "ShowTreeStripes.h"
 #include "registry.h"
 #include "UnicodeUtils.h"
+#include "DPIAware.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -43,6 +43,13 @@ static char THIS_FILE[] = __FILE__;
 
 using namespace Gdiplus;
 using namespace ogdf;
+
+Color GetColorFromSysColor(int nIndex)
+{
+	Color color;
+	color.SetFromCOLORREF(GetSysColor(nIndex));
+	return color;
+}
 
 /************************************************************************/
 /* Graphing functions													*/
@@ -54,22 +61,20 @@ CFont* CRevisionGraphWnd::GetFont(BOOL bItalic /*= FALSE*/, BOOL bBold /*= FALSE
 		nIndex |= 1;
 	if (bItalic)
 		nIndex |= 2;
-	if (m_apFonts[nIndex] == NULL)
+	if (!m_apFonts[nIndex])
 	{
 		m_apFonts[nIndex] = new CFont;
 		m_lfBaseFont.lfWeight = bBold ? FW_BOLD : FW_NORMAL;
 		m_lfBaseFont.lfItalic = (BYTE) bItalic;
 		m_lfBaseFont.lfStrikeOut = (BYTE) FALSE;
-		CDC * pDC = GetDC();
-		m_lfBaseFont.lfHeight = -MulDiv(m_nFontSize, GetDeviceCaps(pDC->m_hDC, LOGPIXELSY), 72);
-		ReleaseDC(pDC);
+		m_lfBaseFont.lfHeight = -CDPIAware::Instance().PointsToPixelsY(m_nFontSize);
 		// use the empty font name, so GDI takes the first font which matches
 		// the specs. Maybe this will help render chinese/japanese chars correctly.
-		_tcsncpy_s(m_lfBaseFont.lfFaceName, _T("MS Shell Dlg 2"), _countof(m_lfBaseFont.lfFaceName) - 1);
+		wcsncpy_s(m_lfBaseFont.lfFaceName, L"MS Shell Dlg 2", _countof(m_lfBaseFont.lfFaceName) - 1);
 		if (!m_apFonts[nIndex]->CreateFontIndirect(&m_lfBaseFont))
 		{
 			delete m_apFonts[nIndex];
-			m_apFonts[nIndex] = NULL;
+			m_apFonts[nIndex] = nullptr;
 			return CWnd::GetFont();
 		}
 	}
@@ -83,7 +88,6 @@ BOOL CRevisionGraphWnd::OnEraseBkgnd(CDC* /*pDC*/)
 
 void CRevisionGraphWnd::OnPaint()
 {
-
 	CPaintDC dc(this); // device context for painting
 	CRect rect = GetClientRect();
 
@@ -91,7 +95,7 @@ void CRevisionGraphWnd::OnPaint()
 	{
 		CString fetch = CString(MAKEINTRESOURCE(IDS_PROC_LOADING));
 		dc.FillSolidRect(rect, ::GetSysColor(COLOR_APPWORKSPACE));
-		dc.ExtTextOut(20,20,ETO_CLIPPED,NULL,fetch,NULL);
+		dc.ExtTextOut(20, 20, ETO_CLIPPED, nullptr, fetch, nullptr);
 		CWnd::OnPaint();
 		return;
 
@@ -100,14 +104,13 @@ void CRevisionGraphWnd::OnPaint()
 		CString sNoGraphText;
 		sNoGraphText.LoadString(IDS_REVGRAPH_ERR_NOGRAPH);
 		dc.FillSolidRect(rect, RGB(255,255,255));
-		dc.ExtTextOut(20,20,ETO_CLIPPED,NULL,sNoGraphText,NULL);
+		dc.ExtTextOut(20, 20, ETO_CLIPPED, nullptr, sNoGraphText, nullptr);
 		return;
 	}
 
 	GraphicsDevice dev;
 	dev.pDC = &dc;
 	DrawGraph(dev, rect, GetScrollPos(SB_VERT), GetScrollPos(SB_HORZ), false);
-
 }
 
 void CRevisionGraphWnd::ClearVisibleGlyphs (const CRect& /*rect*/)
@@ -149,7 +152,6 @@ void CRevisionGraphWnd::CutawayPoints (const RectF& rect, float cutLen, TCutRect
 
 void CRevisionGraphWnd::DrawRoundedRect (GraphicsDevice& graphics, const Color& penColor, int penWidth, const Pen* pen, const Color& fillColor, const Brush* brush, const RectF& rect, int mask)
 {
-
 	enum {POINT_COUNT = 8};
 
 	float radius = CORNER_SIZE * m_fZoomFactor;
@@ -165,9 +167,7 @@ void CRevisionGraphWnd::DrawRoundedRect (GraphicsDevice& graphics, const Color& 
 			path.AddArc (points[0].X, points[1].Y, radius, radius, 180, 90);
 			path.AddArc (points[2].X, points[2].Y, radius, radius, 270, 90);
 		}else
-		{
 			path.AddLine(points[0].X, points[1].Y, points[3].X, points[2].Y);
-		}
 
 		if(mask & ROUND_DOWN)
 		{
@@ -182,18 +182,13 @@ void CRevisionGraphWnd::DrawRoundedRect (GraphicsDevice& graphics, const Color& 
 		points[0].Y -= radius / 2;
 		path.AddLine (points[7], points[0]);
 
-		if (brush != NULL)
-		{
+		if (brush)
 			graphics.graphics->FillPath (brush, &path);
-		}
-		if (pen != NULL)
+		if (pen)
 			graphics.graphics->DrawPath (pen, &path);
 	}
 	else if (graphics.pSVG)
-	{
 		graphics.pSVG->RoundedRectangle((int)rect.X, (int)rect.Y, (int)rect.Width, (int)rect.Height, penColor, penWidth, fillColor, (int)radius, mask);
-	}
-
 }
 
 void CRevisionGraphWnd::DrawOctangle (GraphicsDevice& graphics, const Color& penColor, int penWidth, const Pen* pen, const Color& fillColor, const Brush* brush, const RectF& rect)
@@ -217,9 +212,9 @@ void CRevisionGraphWnd::DrawOctangle (GraphicsDevice& graphics, const Color& pen
 
 	if (graphics.graphics)
 	{
-		if (brush != NULL)
+		if (brush)
 			graphics.graphics->FillPolygon (brush, points, POINT_COUNT);
-		if (pen != NULL)
+		if (pen)
 			graphics.graphics->DrawPolygon (pen, points, POINT_COUNT);
 	}
 	else if (graphics.pSVG)
@@ -237,9 +232,9 @@ void CRevisionGraphWnd::DrawShape (GraphicsDevice& graphics, const Color& penCol
 	case TSVNRectangle:
 		if (graphics.graphics)
 		{
-			if (brush != NULL)
+			if (brush)
 				graphics.graphics->FillRectangle (brush, rect);
-			if (pen != NULL)
+			if (pen)
 				graphics.graphics->DrawRectangle (pen, rect);
 		}
 		else if (graphics.pSVG)
@@ -256,9 +251,9 @@ void CRevisionGraphWnd::DrawShape (GraphicsDevice& graphics, const Color& penCol
 	case TSVNEllipse:
 		if (graphics.graphics)
 		{
-			if (brush != NULL)
+			if (brush)
 				graphics.graphics->FillEllipse (brush, rect);
-			if (pen != NULL)
+			if (pen)
 				graphics.graphics->DrawEllipse(pen, rect);
 		}
 		else if (graphics.pSVG)
@@ -382,7 +377,7 @@ isionGraphWnd::GetBranchCover
 			? node.node->GetPrevious()
 			: node.node->GetNext();
 
-		nodeIndex = nextNode == NULL ? NO_INDEX : nextNode->GetIndex();
+		nodeIndex = !nextNode ? NO_INDEX : nextNode->GetIndex();
 	}
 
 	// expand it just a little to make it look nicer
@@ -438,7 +433,6 @@ void CRevisionGraphWnd::DrawShadows (GraphicsDevice& graphics, const CRect& logR
 			break;
 		}
 	}
-
 }
 #endif
 
@@ -501,7 +495,7 @@ void CRevisionGraphWnd::DrawGlyph
 		graphics.graphics->DrawImage ( glyphs
 			, target
 			, x, 0.0f, GLYPH_BITMAP_SIZE, GLYPH_BITMAP_SIZE
-			, UnitPixel, NULL, NULL, NULL);
+			, UnitPixel, nullptr, nullptr, nullptr);
 	}
 	else if (graphics.pSVG)
 	{
@@ -578,7 +572,6 @@ void CRevisionGraphWnd::DrawGlyphs
 		visibleGlyphs->push_back
 			(CRevisionGraphState::SVisibleGlyph (state2, leftTop2, node));
 	}
-
 }
 #endif
 
@@ -635,7 +628,6 @@ void CRevisionGraphWnd::DrawGlyphs
 				, CGraphNodeStates::COLLAPSED_BELOW
 				, CGraphNodeStates::SPLIT_BELOW
 				, (allowed & CGraphNodeStates::COLLAPSED_BELOW) != 0);
-
 }
 #endif
 
@@ -695,7 +687,7 @@ void CRevisionGraphWnd::IndicateGlyphDirection
 	{
 		for ( const CVisibleGraphNode::CCopyTarget* branch
 				= node.node->GetFirstCopyTarget()
-			; branch != NULL
+			; branch
 			; branch = branch->next())
 		{
 			RectF branchCover
@@ -737,7 +729,7 @@ void CRevisionGraphWnd::DrawMarker
 {
 	REAL width = 4*this->m_fZoomFactor<1? 1: 4*this->m_fZoomFactor;
 	Pen pen(penColor,width);
-	DrawRoundedRect(graphics, penColor, (int)width, &pen, Color(0,0,0), NULL, noderect);
+	DrawRoundedRect(graphics, penColor, (int)width, &pen, Color(0,0,0), nullptr, noderect);
 	if (num == 1)
 	{
 		// Roman number 1
@@ -745,7 +737,18 @@ void CRevisionGraphWnd::DrawMarker
 		REAL y1 = max(1, 25 * this->m_fZoomFactor);
 		REAL y2 = max(1, 5 * this->m_fZoomFactor);
 		if(graphics.graphics)
+		{
 			graphics.graphics->DrawLine(&pen, noderect.X + x, noderect.Y - y1, noderect.X + x, noderect.Y - y2);
+			if (m_SelectedEntry2)
+			{
+				CString base(L'(');
+				base.AppendFormat(IDS_PROC_DIFF_BASE);
+				base += L')';
+				SolidBrush blackbrush(penColor);
+				Gdiplus::Font font(CAppUtils::GetLogFontName(), (REAL)m_nFontSize, FontStyleRegular);
+				graphics.graphics->DrawString(base, base.GetLength(), &font, Gdiplus::PointF(noderect.X + x + width, noderect.Y - y1), &blackbrush);
+			}
+		}
 	}
 	else if (num == 2)
 	{
@@ -842,7 +845,6 @@ PointF CRevisionGraphWnd::cutPoint(node v,double lw,PointF ps, PointF pt)
 
 			if(xmin <= x && x <= xmax)
 				return PointF((REAL)x, (REAL)ymin);
-
 		}
 	}
 
@@ -862,17 +864,14 @@ PointF CRevisionGraphWnd::cutPoint(node v,double lw,PointF ps, PointF pt)
 
 			if(ymin <= y && y <= ymax)
 				return PointF((REAL)xmin, (REAL)y);
-
 		}
 	}
 
 	return pt;
-
 }
 
 void CRevisionGraphWnd::DrawConnections (GraphicsDevice& graphics, const CRect& /*logRect*/, const CSize& offset)
 {
-
 	CArray<PointF> points;
 	CArray<CPoint> pts;
 
@@ -880,7 +879,7 @@ void CRevisionGraphWnd::DrawConnections (GraphicsDevice& graphics, const CRect& 
 		graphics.graphics->SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
 
 	float penwidth = 2*m_fZoomFactor<1? 1:2*m_fZoomFactor;
-	Gdiplus::Pen pen(Color(0,0,0),penwidth);
+	Gdiplus::Pen pen(GetColorFromSysColor(COLOR_WINDOWTEXT), penwidth);
 
 	// iterate over all visible lines
 	edge e;
@@ -924,20 +923,13 @@ void CRevisionGraphWnd::DrawConnections (GraphicsDevice& graphics, const CRect& 
 		}
 
 		if (graphics.graphics)
-		{
 			graphics.graphics->DrawLines(&pen, points.GetData(), (INT)points.GetCount());
-
-		}
 		else if (graphics.pSVG)
-		{
-			Color color;
-			color.SetFromCOLORREF(GetSysColor(COLOR_WINDOWTEXT));
 			graphics.pSVG->Polyline(points.GetData(), (int)points.GetCount(), Color(0,0,0), (int)penwidth);
-		}
 		else if (graphics.pGraphviz)
 		{
-			CString hash1 = _T("g") + m_logEntries[e->target()->index()].ToString().Left(g_Git.GetShortHASHLength());
-			CString hash2 = _T("g") + m_logEntries[e->source()->index()].ToString().Left(g_Git.GetShortHASHLength());
+			CString hash1 = L'g' + m_logEntries[e->target()->index()].ToString().Left(g_Git.GetShortHASHLength());
+			CString hash2 = L'g' + m_logEntries[e->source()->index()].ToString().Left(g_Git.GetShortHASHLength());
 			graphics.pGraphviz->DrawEdge(hash1, hash2);
 		}
 
@@ -979,16 +971,11 @@ void CRevisionGraphWnd::DrawConnections (GraphicsDevice& graphics, const CRect& 
 		path.AddLines(arrows, 5);
 		path.SetFillMode(FillModeAlternate);
 		if(graphics.graphics)
-		{
 			graphics.graphics->DrawPath(&pen, &path);
-		}else if(graphics.pSVG)
-		{
+		else if(graphics.pSVG)
 			graphics.pSVG->DrawPath(arrows, 5, Color(0,0,0), (int)penwidth, Color(0,0,0));
-		}
 	}
 }
-
-
 
 void CRevisionGraphWnd::DrawTexts (GraphicsDevice& graphics, const CRect& /*logRect*/, const CSize& offset)
 {
@@ -1001,13 +988,12 @@ void CRevisionGraphWnd::DrawTexts (GraphicsDevice& graphics, const CRect& /*logR
 	if (graphics.pDC)
 		graphics.pDC->SetTextAlign (TA_CENTER | TA_TOP);
 
-
-	CString fontname = CRegString(_T("Software\\TortoiseGit\\LogFontName"), _T("Courier New"));
+	CString fontname = CAppUtils::GetLogFontName();
 
 	Gdiplus::Font font(fontname, (REAL)m_nFontSize, FontStyleRegular);
 	SolidBrush blackbrush((ARGB)Color::Black);
 
-	DWORD revGraphUseLocalForCur = CRegDWORD(_T("Software\\TortoiseGit\\TortoiseProc\\Graph\\RevGraphUseLocalForCur"));
+	DWORD revGraphUseLocalForCur = CRegDWORD(L"Software\\TortoiseGit\\TortoiseProc\\Graph\\RevGraphUseLocalForCur");
 
 	node v;
 	forall_nodes(v,m_Graph)
@@ -1020,9 +1006,9 @@ void CRevisionGraphWnd::DrawTexts (GraphicsDevice& graphics, const CRect& /*logR
 
 		// draw the revision text
 		CGitHash hash = this->m_logEntries[v->index()];
-		double hight = noderect.Height / (m_HashMap[hash].size()?m_HashMap[hash].size():1);
+		double hight = noderect.Height / (!m_HashMap[hash].empty() ? m_HashMap[hash].size() : 1);
 
-		if(m_HashMap.find(hash) == m_HashMap.end() || m_HashMap[hash].size() == 0)
+		if (m_HashMap.find(hash) == m_HashMap.end() || m_HashMap[hash].empty())
 		{
 			Color background;
 			background.SetFromCOLORREF (GetSysColor(COLOR_WINDOW));
@@ -1049,13 +1035,13 @@ void CRevisionGraphWnd::DrawTexts (GraphicsDevice& graphics, const CRect& /*logR
 			if (graphics.pGraphviz)
 			{
 				CString shortHash = hash.ToString().Left(g_Git.GetShortHASHLength());
-				graphics.pGraphviz->DrawNode(_T("g") + shortHash, shortHash, fontname, m_nFontSize, background, brightColor, (int)noderect.Height);
+				graphics.pGraphviz->DrawNode(L'g' + shortHash, shortHash, fontname, m_nFontSize, background, brightColor, (int)noderect.Height);
 			}
 		}else
 		{
 			if (graphics.pGraphviz)
 			{
-				CString id = _T("g") + hash.ToString().Left(g_Git.GetShortHASHLength());
+				CString id = L'g' + hash.ToString().Left(g_Git.GetShortHASHLength());
 				graphics.pGraphviz->BeginDrawTableNode(id, fontname, m_nFontSize, (int)noderect.Height);
 			}
 
@@ -1070,7 +1056,7 @@ void CRevisionGraphWnd::DrawTexts (GraphicsDevice& graphics, const CRect& /*logR
 				rect.Width = (REAL)noderect.Width;
 				rect.Height = (REAL)hight;
 
-				COLORREF colRef = RGB(224, 224, 224);
+				COLORREF colRef = m_Colors.GetColor(CColors::OtherRef);
 
 				CGit::REF_TYPE refType;
 				shortname = CGit::GetShortName(str, &refType);
@@ -1098,6 +1084,9 @@ void CRevisionGraphWnd::DrawTexts (GraphicsDevice& graphics, const CRect& /*logR
 				case CGit::REF_TYPE::BISECT_BAD:
 					colRef = m_Colors.GetColor(CColors::BisectBad);
 					break;
+				case CGit::REF_TYPE::BISECT_SKIP:
+					colRef = m_Colors.GetColor(CColors::BisectSkip);
+					break;
 				case CGit::REF_TYPE::NOTES:
 					colRef = m_Colors.GetColor(CColors::NoteNode);
 					break;
@@ -1114,7 +1103,6 @@ void CRevisionGraphWnd::DrawTexts (GraphicsDevice& graphics, const CRect& /*logR
 
 				if (graphics.graphics)
 				{
-
 					//graphics.graphics->FillRectangle(&SolidBrush(Gdiplus::Color(GetRValue(colRef), GetGValue(colRef), GetBValue(colRef))),
 					//		rect);
 
@@ -1124,35 +1112,26 @@ void CRevisionGraphWnd::DrawTexts (GraphicsDevice& graphics, const CRect& /*logR
 										(REAL)(noderect.Y + this->GetTopBottomMargin()*m_fZoomFactor+ hight*i)),
 						&blackbrush);
 
-					//graphics.graphics->DrawString(shortname.GetBuffer(), shortname.GetLength(), ::new Gdiplus::Font(graphics.pDC->m_hDC), PointF(noderect.X, noderect.Y + hight *i),NULL, NULL);
+					//graphics.graphics->DrawString(shortname.GetBuffer(), shortname.GetLength(), ::new Gdiplus::Font(graphics.pDC->m_hDC), PointF(noderect.X, noderect.Y + hight * i), nullptr, nullptr);
 
 				}
 				else if (graphics.pSVG)
-				{
-
 					graphics.pSVG->Text((int)(noderect.X + this->GetLeftRightMargin() * m_fZoomFactor), 
 										(int)(noderect.Y + this->GetTopBottomMargin() * m_fZoomFactor + hight * i + m_nFontSize),
 										CUnicodeUtils::GetUTF8(fontname), m_nFontSize,
 										false, false, (ARGB)Color::Black, CUnicodeUtils::GetUTF8(shortname));
-
-				}				
 				else if (graphics.pGraphviz)
-				{
 					graphics.pGraphviz->DrawTableNode(shortname, color);
-				}
 			}
 			
 			if (graphics.pGraphviz)
-			{
 				graphics.pGraphviz->EndDrawTableNode();
-			}
 		}
 		if ((m_SelectedEntry1 == v))
-			DrawMarker(graphics, noderect, mpLeft, 0, Color(0,0, 255), 1);
+			DrawMarker(graphics, noderect, mpLeft, 0, GetColorFromSysColor(COLOR_HIGHLIGHT), 1);
 
 		if ((m_SelectedEntry2 == v))
 			DrawMarker(graphics, noderect, mpLeft, 0, Color(136,0, 21), 2);
-
 	}
 }
 
@@ -1160,7 +1139,6 @@ void CRevisionGraphWnd::DrawTexts (GraphicsDevice& graphics, const CRect& /*logR
 #if 0
 void CRevisionGraphWnd::DrawCurrentNodeGlyphs (GraphicsDevice& graphics, Image* glyphs, const CSize& offset)
 {
-
 	CSyncPointer<const ILayoutNodeList> nodeList (m_state.GetNodes());
 	bool upsideDown
 		= m_state.GetOptions()->GetOption<CUpsideDownLayout>()->IsActive();
@@ -1196,13 +1174,12 @@ void CRevisionGraphWnd::DrawCurrentNodeGlyphs (GraphicsDevice& graphics, Image* 
 		IndicateGlyphDirection (graphics, nodeList.get(), node, noderect, m_hoverGlyphs, upsideDown, offset);
 		DrawGlyphs (graphics, glyphs, node.node, noderect, flags, m_hoverGlyphs, upsideDown);
 	}
-
 }
 #endif
 
 void CRevisionGraphWnd::DrawGraph(GraphicsDevice& graphics, const CRect& rect, int nVScrollPos, int nHScrollPos, bool bDirectDraw)
 {
-	CMemDC* memDC = NULL;
+	CMemDC* memDC = nullptr;
 	if (graphics.pDC)
 	{
 		if (!bDirectDraw)
@@ -1246,7 +1223,7 @@ void CRevisionGraphWnd::DrawGraph(GraphicsDevice& graphics, const CRect& rect, i
 	//if (m_fZoomFactor > SHADOW_ZOOM_THRESHOLD)
 	//	DrawShadows (graphics, logRect, offset);
 
-	Bitmap glyphs (AfxGetInstanceHandle(), MAKEINTRESOURCE(IDR_REVGRAPHGLYPHS));
+	Bitmap glyphs (AfxGetResourceHandle(), MAKEINTRESOURCE(IDR_REVGRAPHGLYPHS));
 
 	DrawTexts (graphics, logRect, offset);
 	DrawConnections (graphics, logRect, offset);
@@ -1272,7 +1249,6 @@ void CRevisionGraphWnd::DrawGraph(GraphicsDevice& graphics, const CRect& rect, i
 		graphics.pDC->DrawEdge(&m_OverviewRect, EDGE_BUMP, BF_RECT);
 		// now draw a rectangle where the current view is located in the overview
 
-		CRect viewRect = GetViewRect();
 		LONG width = (long)(rect.Width() * m_previewZoom / m_fZoomFactor);
 		LONG height = (long)(rect.Height() * m_previewZoom / m_fZoomFactor);
 		LONG xpos = (long)(nHScrollPos * m_previewZoom / m_fZoomFactor);
@@ -1304,7 +1280,7 @@ void CRevisionGraphWnd::DrawGraph(GraphicsDevice& graphics, const CRect& rect, i
 void CRevisionGraphWnd::SetNodeRect(GraphicsDevice& graphics, ogdf::node *pnode, CGitHash rev, int mode )
 {
 	//multi - line mode. One RefName is one new line
-	CString fontname = CRegString(_T("Software\\TortoiseGit\\LogFontName"), _T("Courier New"));
+	CString fontname = CAppUtils::GetLogFontName();
 	if(mode == 0)
 	{
 		if(this->m_HashMap.find(rev) == m_HashMap.end())
@@ -1318,7 +1294,6 @@ void CRevisionGraphWnd::SetNodeRect(GraphicsDevice& graphics, ogdf::node *pnode,
 				graphics.graphics->MeasureString(shorthash, shorthash.GetLength(),
 										&font,
 										Gdiplus::PointF(0,0), &rect);
-
 			}
 			m_GraphAttr.width(*pnode) = this->GetLeftRightMargin()*2 + rect.Width;
 			m_GraphAttr.height(*pnode) = this->GetTopBottomMargin()*2 + rect.Height;
@@ -1332,7 +1307,7 @@ void CRevisionGraphWnd::SetNodeRect(GraphicsDevice& graphics, ogdf::node *pnode,
 			{
 				RectF rect;
 				CString shortref = m_HashMap[rev][i];
-				shortref = CGit::GetShortName(shortref,NULL);
+				shortref = CGit::GetShortName(shortref, nullptr);
 				if(graphics.pDC)
 				{
 					Gdiplus::Font font(fontname, (REAL)m_nFontSize, FontStyleRegular);
@@ -1349,6 +1324,5 @@ void CRevisionGraphWnd::SetNodeRect(GraphicsDevice& graphics, ogdf::node *pnode,
 			m_GraphAttr.width(*pnode) = this->GetLeftRightMargin()*2 + xmax;
 			m_GraphAttr.height(*pnode) = (this->GetTopBottomMargin()*2 + ymax) * lines;
 		}
-
 	}
 }

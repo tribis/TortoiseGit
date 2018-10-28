@@ -26,16 +26,16 @@ class CIgnoreDlg : public CStateStandAloneDialog
 	DECLARE_DYNAMIC(CIgnoreDlg)
 
 public:
-	CIgnoreDlg(CWnd* pParent = NULL);   // standard constructor
+	CIgnoreDlg(CWnd* pParent = nullptr);   // standard constructor
 	virtual ~CIgnoreDlg();
 
 // Dialog Data
 	enum { IDD = IDD_IGNORE };
 
 protected:
-	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
-	virtual BOOL OnInitDialog();
-	virtual void OnOK();
+	virtual void DoDataExchange(CDataExchange* pDX) override;    // DDX/DDV support
+	virtual BOOL OnInitDialog() override;
+	virtual void OnOK() override;
 
 	DECLARE_MESSAGE_MAP()
 

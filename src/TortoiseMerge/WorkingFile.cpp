@@ -1,5 +1,6 @@
 // TortoiseGitMerge - a Diff/Patch program
 
+// Copyright (C) 2017 - TortoiseGit
 // Copyright (C) 2006-2007, 2011-2014 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -72,7 +73,7 @@ void CWorkingFile::SetReflectedName(const CString& newReflectedName)
 // Make an empty file with this name
 void CWorkingFile::CreateEmptyFile()
 {
-	CAutoFile hFile = CreateFile(m_sFilename, GENERIC_WRITE, NULL, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+	CAutoFile hFile = CreateFile(m_sFilename, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
 }
 
 // Move the details of the specified file to the current one, and then mark the specified file
@@ -88,7 +89,7 @@ void CWorkingFile::TransferDetailsFrom(CWorkingFile& rightHandFile)
 	m_attribs = rightHandFile.m_attribs;
 }
 
-CString CWorkingFile::GetWindowName() const
+CString CWorkingFile::GetWindowName(UINT type) const
 {
 	CString sErrMsg;
 	// TortoiseMerge allows non-existing files to be used in a merge
@@ -102,13 +103,20 @@ CString CWorkingFile::GetWindowName() const
 	{
 		// We don't have a proper name - use the filename part of the path
 		// return the filename part of the path.
-		return CPathUtils::GetFileNameFromPath(m_sFilename) + _T(" ") + sErrMsg;
+		CString ret;
+		if (type)
+		{
+			ret.LoadString(type);
+			ret += L" - ";
+		}
+		ret += CPathUtils::GetFileNameFromPath(m_sFilename) + L' ' + sErrMsg;
+		return ret;
 	}
 	else if (sErrMsg.IsEmpty())
 	{
 		return m_sDescriptiveName;
 	}
-	return m_sDescriptiveName + _T(" ") + sErrMsg;
+	return m_sDescriptiveName + L' ' + sErrMsg;
 }
 
 bool CWorkingFile::Exists() const

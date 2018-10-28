@@ -53,6 +53,7 @@ protected:
 	afx_msg void OnModified();
 	afx_msg void OnModifiedWithReload();
 	afx_msg void OnBnClickedWhitespace();
+	afx_msg void OnMeasureItem(int nIDCtl, LPMEASUREITEMSTRUCT lpMeasureItemStruct);
 
 	DECLARE_MESSAGE_MAP()
 
@@ -89,8 +90,6 @@ protected:
 	CRegDWORD		m_regMaxInline;
 	BOOL			m_bUseRibbons;
 	CRegDWORD		m_regUseRibbons;
-	BOOL			m_bUseTaskDialog;
-	CRegDWORD		m_regUseTaskDialog;
 
 	CRegDWORD		m_regFontSize;
 	DWORD			m_dwFontSize;

@@ -1,7 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2012 - TortoiseGit
-// Copyright (C) 2011 - TortoiseSVN
+// Copyright (C) 2012, 2017 - TortoiseGit
+// Copyright (C) 2011, 2016 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -25,8 +25,8 @@
 
 IMPLEMENT_DYNAMIC(CRegexEdit, CEdit)
 CRegexEdit::CRegexEdit()
+: m_bValid(true)
 {
-	m_bValid = true;
 }
 
 CRegexEdit::~CRegexEdit()
@@ -46,9 +46,9 @@ HBRUSH CRegexEdit::CtlColor(CDC* pDC, UINT /*nCtlColor*/)
 	{
 		CString sRegex;
 		GetWindowText(sRegex);
-		const std::tr1::wregex regMatch(sRegex, std::tr1::regex_constants::icase | std::tr1::regex_constants::ECMAScript);
+		const std::wregex regMatch(sRegex, std::regex_constants::icase | std::regex_constants::ECMAScript);
 	}
-	catch (std::exception)
+	catch (std::exception&)
 	{
 		m_bValid = false;
 	}
@@ -56,12 +56,17 @@ HBRUSH CRegexEdit::CtlColor(CDC* pDC, UINT /*nCtlColor*/)
 	if (!m_bValid)
 	{
 		pDC->SetBkColor(GetSysColor(COLOR_3DFACE) - RGB(0,20,20));
-		if (m_invalidBkgnd.GetSafeHandle() == NULL)
+		if (!m_invalidBkgnd.GetSafeHandle())
 			m_invalidBkgnd.CreateSolidBrush(GetSysColor(COLOR_3DFACE) - RGB(0,20,20));
 		return (HBRUSH)m_invalidBkgnd.GetSafeHandle();
 	}
 	else if (!oldState)
 		this->Invalidate();
 
-	return NULL;
+	return nullptr;
+}
+
+ULONG CRegexEdit::GetGestureStatus(CPoint /*ptTouch*/)
+{
+	return 0;
 }

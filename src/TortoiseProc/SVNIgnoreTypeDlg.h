@@ -27,16 +27,16 @@ class CSVNIgnoreTypeDlg : public CStandAloneDialog
 	DECLARE_DYNAMIC(CSVNIgnoreTypeDlg)
 
 public:
-	CSVNIgnoreTypeDlg(CWnd* pParent = NULL);   // standard constructor
+	CSVNIgnoreTypeDlg(CWnd* pParent = nullptr);   // standard constructor
 	virtual ~CSVNIgnoreTypeDlg();
 
 // Dialog Data
 	enum { IDD = IDD_SVNIGNORE };
 
 protected:
-	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
+	virtual void DoDataExchange(CDataExchange* pDX) override;    // DDX/DDV support
 
-	virtual BOOL OnInitDialog();
+	virtual BOOL OnInitDialog() override;
 
 	DECLARE_MESSAGE_MAP()
 

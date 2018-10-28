@@ -40,27 +40,28 @@
   <PropertyGroup Label="UserMacros" />
   <ItemDefinitionGroup>
     <ClCompile>
-      <AdditionalIncludeDirectories>$(ProjectDir);..\Resources;$InputDir;..\..\ext\ResizableLib;..\Git;..\Utils;..\..\ext\hunspell;..\..\ext\scintilla\include;..\Utils\TreePropSheet;..\Utils\MiscUI;..\TortoiseShell;..\..\ext\gitdll;..\..\ext\libgit2\include;..\..\ext\zlib;..\..\ext\OGDF;..\AsyncFramework;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);..\Resources;$InputDir;..\..\ext\ResizableLib;..\Git;..\Utils;..\..\ext\hunspell;..\..\ext\scintilla\include;..\Utils\TreePropSheet;..\Utils\MiscUI;..\TortoiseShell;..\..\ext\gitdll;..\..\ext\libgit2\include;..\..\ext\zlib;..\..\ext\OGDF;..\AsyncFramework;..\TortoiseMerge;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>HUNSPELL_STATIC;THESAURUS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <ExceptionHandling>Async</ExceptionHandling>
+      <ExceptionHandling>SyncCThrow</ExceptionHandling>
     </ClCompile>
     <ResourceCompile>
       <AdditionalIncludeDirectories>$(IntDir);..\TortoiseShell;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <Link>
-      <AdditionalDependencies>Crypt32.lib;Winmm.lib;gdiplus.lib;shfolder.lib;shell32.lib;comctl32.lib;ws2_32.lib;rpcrt4.lib;shlwapi.lib;wininet.lib;version.lib;Dnsapi.lib;UxTheme.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Winmm.lib;gdiplus.lib;shfolder.lib;comctl32.lib;ws2_32.lib;shlwapi.lib;wininet.lib;UxTheme.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\Git\Git.cpp" />
     <ClCompile Include="..\Git\GitAdminDir.cpp" />
-    <ClCompile Include="..\Git\GitIndex.cpp" />
+    <ClCompile Include="..\Git\GitDataObject.cpp" />
     <ClCompile Include="..\Git\GitRev.cpp" />
     <ClCompile Include="..\Git\GitRevLoglist.cpp" />
     <ClCompile Include="..\Git\GitRevRefBrowser.cpp" />
-    <ClCompile Include="..\Git\GitStatus.cpp" />
     <ClCompile Include="..\Git\MassiveGitTaskBase.cpp" />
     <ClCompile Include="..\Git\TGitPath.cpp" />
+    <ClCompile Include="..\TortoiseMerge\FileTextLines.cpp" />
+    <ClCompile Include="..\TortoiseShell\ShellCache.cpp" />
     <ClCompile Include="..\Utils\ACEdit.cpp" />
     <ClCompile Include="..\Utils\ACListWnd.cpp" />
     <ClCompile Include="..\Utils\BugTraqAssociations.cpp" />
@@ -70,21 +71,21 @@
     <ClCompile Include="..\Utils\DebugOutput.cpp" />
     <ClCompile Include="..\Utils\DirFileEnum.cpp" />
     <ClCompile Include="..\Utils\DragDropImpl.cpp" />
-    <ClCompile Include="..\Utils\DropFiles.cpp" />
     <ClCompile Include="..\Utils\Graphviz.cpp" />
     <ClCompile Include="..\Utils\Hooks.cpp" />
     <ClCompile Include="..\Utils\HwSMTP.cpp" />
     <ClCompile Include="..\Utils\JumpListHelpers.cpp" />
     <ClCompile Include="..\Utils\LangDll.cpp" />
+    <ClCompile Include="..\Utils\LoadIconEx.cpp" />
     <ClCompile Include="..\Utils\MailMsg.cpp" />
+    <ClCompile Include="..\Utils\MiscUI\AnimationManager.cpp" />
     <ClCompile Include="..\Utils\MiscUI\BrowseFolder.cpp" />
     <ClCompile Include="..\Utils\MiscUI\BufferDC.cpp" />
     <ClCompile Include="..\Utils\MiscUI\DIB.cpp" />
+    <ClCompile Include="..\Utils\MiscUI\FileDlgEventHandler.cpp" />
     <ClCompile Include="..\Utils\MiscUI\FileDropEdit.cpp" />
     <ClCompile Include="..\Utils\MiscUI\FilterEdit.cpp" />
-    <ClCompile Include="..\Utils\MiscUI\HintListCtrl.cpp" />
     <ClCompile Include="..\Utils\MiscUI\HistoryCombo.cpp" />
-    <ClCompile Include="..\Utils\MiscUI\HTMLFormatter.cpp" />
     <ClCompile Include="..\Utils\MiscUI\HyperLink.cpp" />
     <ClCompile Include="..\Utils\MiscUI\IconBitmapUtils.cpp" />
     <ClCompile Include="..\Utils\MiscUI\IconMenu.cpp" />
@@ -114,13 +115,25 @@
     <ClCompile Include="..\Utils\TreePropSheet\PropPageFrameDefault.cpp" />
     <ClCompile Include="..\Utils\TreePropSheet\TreePropSheet.cpp" />
     <ClCompile Include="..\Utils\UnicodeUtils.cpp" />
+    <ClCompile Include="..\Utils\WindowsCredentialsStore.cpp" />
     <ClCompile Include="AddRemoteDlg.cpp" />
     <ClCompile Include="..\TGitCache\CacheInterface.cpp" />
     <ClCompile Include="AutoTextTestDlg.cpp" />
     <ClCompile Include="BugtraqRegexTestDlg.cpp" />
     <ClCompile Include="CheckCertificateDlg.cpp" />
+    <ClCompile Include="ColumnManager.cpp" />
+    <ClCompile Include="Commands\CommitIsOnRefsCommand.cpp" />
     <ClCompile Include="Commands\DaemonCommand.cpp" />
+    <ClCompile Include="CommitIsOnRefsDlg.cpp" />
     <ClCompile Include="FindBar.cpp" />
+    <ClCompile Include="FirstStartWizard.cpp" />
+    <ClCompile Include="FirstStartWizardAuthentication.cpp" />
+    <ClCompile Include="FirstStartWizardBasePage.cpp" />
+    <ClCompile Include="FirstStartWizardGit.cpp" />
+    <ClCompile Include="FirstStartWizardLanguage.cpp" />
+    <ClCompile Include="FirstStartWizardStart.cpp" />
+    <ClCompile Include="FirstStartWizardUser.cpp" />
+    <ClCompile Include="GitTagCompareList.cpp" />
     <ClCompile Include="GravatarPictureBox.cpp" />
     <ClCompile Include="MergeAbortDlg.cpp" />
     <ClCompile Include="GitRefCompareList.cpp" />
@@ -266,6 +279,7 @@
     <ClCompile Include="SyncDlg.cpp" />
     <ClCompile Include="CheckForUpdatesDlg.cpp" />
     <ClCompile Include="Commands\UpdateCheckCommand.cpp" />
+    <ClCompile Include="SyncTabCtrl.cpp" />
     <ClCompile Include="UpdateCrypto.cpp" />
     <ClCompile Include="UpdateDownloader.cpp" />
     <ClCompile Include="UpdateListCtrl.cpp" />
@@ -303,13 +317,14 @@
     </ClCompile>
     <ClCompile Include="TortoiseProc.cpp" />
     <ClCompile Include="UserPassword.cpp" />
+    <ClCompile Include="VersioncheckParser.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Git\Git.h" />
     <ClInclude Include="..\Git\GitAdminDir.h" />
+    <ClInclude Include="..\Git\GitDataObject.h" />
     <ClInclude Include="..\Git\GitForWindows.h" />
     <ClInclude Include="..\Git\GitHash.h" />
-    <ClInclude Include="..\Git\gitindex.h" />
     <ClInclude Include="..\Git\GitRev.h" />
     <ClInclude Include="..\Git\GitRevLoglist.h" />
     <ClInclude Include="..\Git\GitRevRefBrowser.h" />
@@ -318,6 +333,8 @@
     <ClInclude Include="..\Git\MassiveGitTaskBase.h" />
     <ClInclude Include="..\Git\TGitPath.h" />
     <ClInclude Include="..\Resources\LoglistCommonResource.h" />
+    <ClInclude Include="..\TortoiseMerge\FileTextLines.h" />
+    <ClInclude Include="..\TortoiseShell\ShellCache.h" />
     <ClInclude Include="..\Utils\ACEdit.h" />
     <ClInclude Include="..\Utils\ACListWnd.h" />
     <ClInclude Include="..\Utils\BugTraqAssociations.h" />
@@ -325,10 +342,10 @@
     <ClInclude Include="..\Utils\CmdLineParser.h" />
     <ClInclude Include="..\Utils\COMError.h" />
     <ClInclude Include="..\Utils\CommonAppUtils.h" />
+    <ClInclude Include="..\Utils\CreateProcessHelper.h" />
     <ClInclude Include="..\Utils\DebugOutput.h" />
     <ClInclude Include="..\Utils\DirFileEnum.h" />
     <ClInclude Include="..\Utils\DragDropImpl.h" />
-    <ClInclude Include="..\Utils\DropFiles.h" />
     <ClInclude Include="..\Utils\Graphviz.h" />
     <ClInclude Include="..\Utils\Hooks.h" />
     <ClInclude Include="..\Utils\HwSMTP.h" />
@@ -336,16 +353,22 @@
     <ClInclude Include="..\Utils\JumpListHelpers.h" />
     <ClInclude Include="..\Utils\LangDll.h" />
     <ClInclude Include="..\Utils\Libraries.h" />
+    <ClInclude Include="..\Utils\LoadIconEx.h" />
+    <ClInclude Include="..\Utils\LruCache.h" />
     <ClInclude Include="..\Utils\MailMsg.h" />
+    <ClInclude Include="..\Utils\MiscUI\AnimationManager.h" />
     <ClInclude Include="..\Utils\MiscUI\BrowseFolder.h" />
     <ClInclude Include="..\Utils\MiscUI\BufferDC.h" />
+    <ClInclude Include="..\Utils\MiscUI\CommonDialogFunctions.h" />
     <ClInclude Include="..\Utils\MiscUI\ControlsBridge.h" />
     <ClInclude Include="..\Utils\MiscUI\DIB.h" />
+    <ClInclude Include="..\Utils\MiscUI\FileDlgEventHandler.h" />
     <ClInclude Include="..\Utils\MiscUI\FileDropEdit.h" />
     <ClInclude Include="..\Utils\MiscUI\FilterEdit.h" />
-    <ClInclude Include="..\Utils\MiscUI\HintListCtrl.h" />
+    <ClInclude Include="..\Utils\MiscUI\GestureEnabledControl.h" />
+    <ClInclude Include="..\Utils\MiscUI\HighColorTab.hpp" />
+    <ClInclude Include="..\Utils\MiscUI\HintCtrl.h" />
     <ClInclude Include="..\Utils\MiscUI\HistoryCombo.h" />
-    <ClInclude Include="..\Utils\MiscUI\HTMLFormatter.h" />
     <ClInclude Include="..\Utils\MiscUI\HyperLink.h" />
     <ClInclude Include="..\Utils\MiscUI\IconBitmapUtils.h" />
     <ClInclude Include="..\Utils\MiscUI\IconMenu.h" />
@@ -377,15 +400,29 @@
     <ClInclude Include="..\Utils\TreePropSheet\PropPageFrameDefault.h" />
     <ClInclude Include="..\Utils\TreePropSheet\TreePropSheet.h" />
     <ClInclude Include="..\Utils\UnicodeUtils.h" />
-    <ClInclude Include="..\Utils\Win7.h" />
+    <ClInclude Include="..\Utils\WindowsCredentialsStore.h" />
     <ClInclude Include="AddRemoteDlg.h" />
     <ClInclude Include="AutoTextTestDlg.h" />
     <ClInclude Include="BstrSafeVector.h" />
     <ClInclude Include="BugtraqRegexTestDlg.h" />
     <ClInclude Include="CheckCertificateDlg.h" />
+    <ClInclude Include="ColumnManager.h" />
     <ClInclude Include="Commands\AutoTextTestCommand.h" />
+    <ClInclude Include="Commands\CommitIsOnRefsCommand.h" />
     <ClInclude Include="Commands\DaemonCommand.h" />
+    <ClInclude Include="Commands\HelpCommand.h" />
+    <ClInclude Include="Commands\RTFMCommand.h" />
+    <ClInclude Include="CommitIsOnRefsDlg.h" />
+    <ClInclude Include="ConfigureGitExe.h" />
     <ClInclude Include="FindBar.h" />
+    <ClInclude Include="FirstStartWizard.h" />
+    <ClInclude Include="FirstStartWizardAuthentication.h" />
+    <ClInclude Include="FirstStartWizardBasePage.h" />
+    <ClInclude Include="FirstStartWizardGit.h" />
+    <ClInclude Include="FirstStartWizardLanguage.h" />
+    <ClInclude Include="FirstStartWizardStart.h" />
+    <ClInclude Include="FirstStartWizardUser.h" />
+    <ClInclude Include="GitTagCompareList.h" />
     <ClInclude Include="GravatarPictureBox.h" />
     <ClInclude Include="MergeAbortDlg.h" />
     <ClInclude Include="GitRefCompareList.h" />
@@ -397,6 +434,7 @@
     <ClInclude Include="ProgressCommands\ResolveProgressCommand.h" />
     <ClInclude Include="ProgressCommands\RevertProgressCommand.h" />
     <ClInclude Include="ProgressCommands\SendMailProgressCommand.h" />
+    <ClInclude Include="ResizableColumnsListCtrl.h" />
     <ClInclude Include="SendMail.h" />
     <ClInclude Include="FindDlg.h" />
     <ClInclude Include="GitProgressList.h" />
@@ -531,6 +569,7 @@
     <ClInclude Include="SyncDlg.h" />
     <ClInclude Include="CheckForUpdatesDlg.h" />
     <ClInclude Include="Commands\UpdateCheckCommand.h" />
+    <ClInclude Include="SyncTabCtrl.h" />
     <ClInclude Include="UpdateCrypto.h" />
     <ClInclude Include="UpdateDownloader.h" />
     <ClInclude Include="UpdateListCtrl.h" />
@@ -564,6 +603,7 @@
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="TortoiseProc.h" />
     <ClInclude Include="UserPassword.h" />
+    <ClInclude Include="VersioncheckParser.h" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="..\Resources\actionadded.ico" />
@@ -574,8 +614,6 @@
     <Image Include="..\Resources\actionreplaced.ico" />
     <Image Include="..\Resources\AddBackground.ico" />
     <Image Include="..\Resources\bugtraq.ico" />
-    <Image Include="..\Resources\cache.ico" />
-    <Image Include="..\Resources\CacheList.ico" />
     <Image Include="..\Resources\cancel-normal.ico" />
     <Image Include="..\Resources\cancel-pressed.ico" />
     <Image Include="..\Resources\certcheck.ico" />
@@ -585,18 +623,14 @@
     <Image Include="..\Resources\code.ico" />
     <Image Include="..\Resources\CommitBackground.ico" />
     <Image Include="..\Resources\copy.ico" />
-    <Image Include="..\Resources\CopyBackground.ico" />
-    <Image Include="..\Resources\DelunversionedBackground.ico" />
     <Image Include="..\Resources\dialogs.ico" />
     <Image Include="..\Resources\Drives.ico" />
     <Image Include="..\Resources\executableovl.ico" />
     <Image Include="..\Resources\explorer.ico" />
-    <Image Include="..\Resources\ExportBackground.ico" />
     <Image Include="..\Resources\externalovl.ico" />
     <Image Include="..\Resources\file.ico" />
     <Image Include="..\Resources\filteredit.ico" />
     <Image Include="..\Resources\general.ico" />
-    <Image Include="..\Resources\git.bmp" />
     <Image Include="..\Resources\gitconfig.ico" />
     <Image Include="..\Resources\gitcredential.ico" />
     <Image Include="..\Resources\gitremote.ico" />
@@ -607,7 +641,6 @@
     <Image Include="..\Resources\graph-pie.ico" />
     <Image Include="..\Resources\hook.ico" />
     <Image Include="..\Resources\iconset.ico" />
-    <Image Include="..\Resources\ImportBackground.ico" />
     <Image Include="..\Resources\ImportPatchesBackground.ico" />
     <Image Include="..\Resources\jumpdown.ico" />
     <Image Include="..\Resources\jumpup.ico" />
@@ -619,7 +652,6 @@
     <Image Include="..\Resources\lookandfeel.ico" />
     <Image Include="..\Resources\menuabout.ico" />
     <Image Include="..\Resources\menuadd.ico" />
-    <Image Include="..\Resources\menublame.ico" />
     <Image Include="..\Resources\menucheckout.ico" />
     <Image Include="..\Resources\menucleanup.ico" />
     <Image Include="..\Resources\menucommit.ico" />
@@ -628,16 +660,13 @@
     <Image Include="..\Resources\menucopy.ico" />
     <Image Include="..\Resources\menucreaterepos.ico" />
     <Image Include="..\Resources\menudelete.ico" />
-    <Image Include="..\Resources\menudelunversioned.ico" />
     <Image Include="..\Resources\menudiff.ico" />
     <Image Include="..\Resources\menuexport.ico" />
     <Image Include="..\Resources\menuhelp.ico" />
     <Image Include="..\Resources\menuignore.ico" />
-    <Image Include="..\Resources\menuimport.ico" />
     <Image Include="..\Resources\menulog.ico" />
     <Image Include="..\Resources\menumerge.ico" />
     <Image Include="..\Resources\menupatch.ico" />
-    <Image Include="..\Resources\menuproperties.ico" />
     <Image Include="..\Resources\menurelocate.ico" />
     <Image Include="..\Resources\menurename.ico" />
     <Image Include="..\Resources\menuresolve.ico" />
@@ -646,28 +675,20 @@
     <Image Include="..\Resources\menushowchanged.ico" />
     <Image Include="..\Resources\menuswitch.ico" />
     <Image Include="..\Resources\menuupdate.ico" />
-    <Image Include="..\Resources\MergeBackground.ico" />
     <Image Include="..\Resources\misc.ico" />
-    <Image Include="..\Resources\newfolder.ico" />
+    <Image Include="..\Resources\notepad.ico" />
     <Image Include="..\Resources\open.ico" />
     <Image Include="..\Resources\Overlays.ico" />
     <Image Include="..\Resources\proxy.ico" />
     <Image Include="..\Resources\pull1.ico" />
     <Image Include="..\Resources\refresh.ico" />
     <Image Include="..\Resources\reftype.bmp" />
-    <Image Include="..\Resources\RenameBackground.ico" />
     <Image Include="..\Resources\RepoBrowserBackground.ico" />
+    <Image Include="..\Resources\reset.ico" />
     <Image Include="..\Resources\ResolveBackground.ico" />
     <Image Include="..\Resources\restore.ico" />
     <Image Include="..\Resources\restoreovl.ico" />
     <Image Include="..\Resources\RevertBackground.ico" />
-    <Image Include="..\Resources\revgraph_added.ico" />
-    <Image Include="..\Resources\revgraph_addedplus.ico" />
-    <Image Include="..\Resources\revgraph_deleted.ico" />
-    <Image Include="..\Resources\revgraph_lastcommit.ico" />
-    <Image Include="..\Resources\revgraph_renamed.ico" />
-    <Image Include="..\Resources\revgraph_replaced.ico" />
-    <Image Include="..\Resources\revgraph_tag.ico" />
     <Image Include="..\Resources\revgraphbar.bmp" />
     <Image Include="..\Resources\revgraphglyphs.bmp" />
     <Image Include="..\Resources\save.ico" />
@@ -677,13 +698,12 @@
     <Image Include="..\Resources\snippet.ico" />
     <Image Include="..\Resources\spell.ico" />
     <Image Include="..\Resources\UpdateBackground.ico" />
-    <Image Include="..\Resources\ssh.ico" />
     <Image Include="..\Resources\switch.ico" />
     <Image Include="..\Resources\SwitchBackground.ico" />
     <Image Include="..\Resources\symlinkovl.ico" />
     <Image Include="..\Resources\Toolbar.bmp" />
     <Image Include="..\Resources\Tortoise.ico" />
-    <Image Include="..\Resources\TortoiseBlame.ico" />
+    <Image Include="..\Resources\TortoiseGitBlame.ico" />
     <Image Include="..\Resources\tortoisegit_logoflipped.bmp" />
     <Image Include="..\Resources\TortoiseMerge.ico" />
     <Image Include="..\Resources\TortoiseSmall.ico" />
@@ -691,21 +711,14 @@
     <Image Include="..\Resources\tsvnmenufolder.ico" />
     <Image Include="..\Resources\tsvnmenulink.ico" />
     <Image Include="..\Resources\tsvnmenumultiple.ico" />
-    <Image Include="..\Resources\ttf_glyph.bmp" />
-    <Image Include="..\Resources\up.ico" />
-    <Image Include="..\Resources\update1.ico" />
     <Image Include="..\Resources\warning-general.ico" />
     <Image Include="..\TortoiseUDiff\TortoiseUDiff.ico" />
     <Image Include="..\Resources\library-win10.ico" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\Resources\bin167.avi" />
-    <None Include="..\Resources\bin168.avi" />
-    <None Include="..\Resources\cleananim.avi" />
     <None Include="..\Resources\download.avi" />
     <None Include="..\Resources\pan.cur" />
     <None Include="..\Resources\pandown.cur" />
-    <None Include="..\Resources\search.avi" />
     <None Include="..\Resources\TortoiseLoglistCommon.rc2" />
   </ItemGroup>
   <ItemGroup>

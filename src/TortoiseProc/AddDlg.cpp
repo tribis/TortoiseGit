@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2018 - TortoiseGit
 // Copyright (C) 2003-2008 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -21,13 +21,14 @@
 #include "TortoiseProc.h"
 #include "MessageBox.h"
 #include "AddDlg.h"
+#include "PathUtils.h"
 #include "Git.h"
 #include "AppUtils.h"
 
 #define REFRESHTIMER   100
 
 IMPLEMENT_DYNAMIC(CAddDlg, CResizableStandAloneDialog)
-CAddDlg::CAddDlg(CWnd* pParent /*=NULL*/)
+CAddDlg::CAddDlg(CWnd* pParent /*=nullptr*/)
 	: CResizableStandAloneDialog(CAddDlg::IDD, pParent)
 	, m_bThreadRunning(FALSE)
 	, m_bCancelled(false)
@@ -62,7 +63,7 @@ BOOL CAddDlg::OnInitDialog()
 	CAppUtils::MarkWindowAsUnpinnable(m_hWnd);
 
 	// initialize the svn status list control
-	m_addListCtrl.Init(GITSLC_COLEXT, _T("AddDlg"), GITSLC_POPALL ^ (GITSLC_POPADD | GITSLC_POPCOMMIT | GITSLC_POPCHANGELISTS | GITSLC_PREPAREDIFF), true, true, GITSLC_COLEXT | GITSLC_COLMODIFICATIONDATE | GITSLC_COLSIZE); // adding and committing is useless in the add dialog
+	m_addListCtrl.Init(GITSLC_COLEXT, L"AddDlg", GITSLC_POPALL ^ (GITSLC_POPADD | GITSLC_POPCOMMIT | GITSLC_POPCHANGELISTS | GITSLC_POPPREPAREDIFF), true, true, GITSLC_COLEXT | GITSLC_COLMODIFICATIONDATE | GITSLC_COLSIZE); // adding and committing is useless in the add dialog
 	m_addListCtrl.SetIgnoreRemoveOnly();	// when ignoring, don't add the parent folder since we're in the add dialog
 	m_addListCtrl.SetSelectButton(&m_SelectAll);
 	m_addListCtrl.SetConfirmButton((CButton*)GetDlgItem(IDOK));
@@ -85,16 +86,14 @@ BOOL CAddDlg::OnInitDialog()
 	AddAnchor(IDCANCEL, BOTTOM_RIGHT);
 	AddAnchor(IDHELP, BOTTOM_RIGHT);
 
-	if (hWndExplorer)
-		CenterWindow(CWnd::FromHandle(hWndExplorer));
-	EnableSaveRestore(_T("AddDlg"));
+	if (GetExplorerHWND())
+		CenterWindow(CWnd::FromHandle(GetExplorerHWND()));
+	EnableSaveRestore(L"AddDlg");
 
 	//first start a thread to obtain the file list with the status without
 	//blocking the dialog
-	if(AfxBeginThread(AddThreadEntry, this) == NULL)
-	{
+	if (!AfxBeginThread(AddThreadEntry, this))
 		CMessageBox::Show(this->m_hWnd, IDS_ERR_THREADSTARTFAILED, IDS_APPNAME, MB_OK | MB_ICONERROR);
-	}
 	InterlockedExchange(&m_bThreadRunning, TRUE);
 
 	return TRUE;
@@ -137,7 +136,7 @@ void CAddDlg::OnBnClickedSelectall()
 
 UINT CAddDlg::AddThreadEntry(LPVOID pVoid)
 {
-	return ((CAddDlg*)pVoid)->AddThread();
+	return reinterpret_cast<CAddDlg*>(pVoid)->AddThread();
 }
 
 UINT CAddDlg::AddThread()
@@ -146,15 +145,14 @@ UINT CAddDlg::AddThread()
 	// and show the ones which the user can add (i.e. the unversioned ones)
 	DialogEnableWindow(IDOK, false);
 	m_bCancelled = false;
+	m_addListCtrl.StoreScrollPos();
 	m_addListCtrl.Clear();
 	if (!m_addListCtrl.GetStatus(&m_pathList, false, m_bIncludeIgnored != FALSE, true))
-	{
 		m_addListCtrl.SetEmptyString(m_addListCtrl.GetLastErrorMessage());
-	}
 	unsigned int dwShow = GITSLC_SHOWUNVERSIONED | GITSLC_SHOWDIRECTFILES | GITSLC_SHOWREMOVEDANDPRESENT;
 	if (m_bIncludeIgnored)
 		dwShow |= GITSLC_SHOWIGNORED;
-	m_addListCtrl.Show(dwShow);
+	m_addListCtrl.Show(dwShow, GITSLC_SHOWUNVERSIONED);
 
 	InterlockedExchange(&m_bThreadRunning, FALSE);
 	return 0;
@@ -171,9 +169,7 @@ BOOL CAddDlg::PreTranslateMessage(MSG* pMsg)
 				if (GetAsyncKeyState(VK_CONTROL)&0x8000)
 				{
 					if ( GetDlgItem(IDOK)->IsWindowEnabled() )
-					{
 						PostMessage(WM_COMMAND, IDOK);
-					}
 					return TRUE;
 				}
 			}
@@ -191,10 +187,8 @@ BOOL CAddDlg::PreTranslateMessage(MSG* pMsg)
 
 LRESULT CAddDlg::OnSVNStatusListCtrlNeedsRefresh(WPARAM, LPARAM)
 {
-	if(AfxBeginThread(AddThreadEntry, this) == NULL)
-	{
+	if (!AfxBeginThread(AddThreadEntry, this))
 		CMessageBox::Show(this->m_hWnd, IDS_ERR_THREADSTARTFAILED, IDS_APPNAME, MB_OK | MB_ICONERROR);
-	}
 	return 0;
 }
 
@@ -214,6 +208,11 @@ LRESULT CAddDlg::OnFileDropped(WPARAM, LPARAM lParam)
 	// restart the timer.
 	CTGitPath path;
 	path.SetFromWin((LPCTSTR)lParam);
+
+	// check whether the dropped file belongs to the very same repository
+	CString projectDir;
+	if (!path.HasAdminDir(&projectDir) || !CPathUtils::ArePathStringsEqual(g_Git.m_CurrentDir, projectDir))
+		return 0;
 
 	if (!m_addListCtrl.HasPath(path))
 	{
@@ -244,10 +243,11 @@ LRESULT CAddDlg::OnFileDropped(WPARAM, LPARAM lParam)
 			}
 		}
 	}
+	m_addListCtrl.ResetChecked(path);
 
 	// Always start the timer, since the status of an existing item might have changed
-	SetTimer(REFRESHTIMER, 200, NULL);
-	CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": Item %s dropped, timer started\n"), path.GetWinPath());
+	SetTimer(REFRESHTIMER, 200, nullptr);
+	CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) L": Item %s dropped, timer started\n", path.GetWinPath());
 	return 0;
 }
 
@@ -255,10 +255,8 @@ void CAddDlg::Refresh()
 {
 	if (!m_bThreadRunning)
 	{
-		if(AfxBeginThread(AddThreadEntry, this) == NULL)
-		{
+		if (!AfxBeginThread(AddThreadEntry, this))
 			CMessageBox::Show(this->m_hWnd, IDS_ERR_THREADSTARTFAILED, IDS_APPNAME, MB_OK | MB_ICONERROR);
-		}
 		else
 			InterlockedExchange(&m_bThreadRunning, TRUE);
 	}
@@ -271,7 +269,7 @@ void CAddDlg::OnTimer(UINT_PTR nIDEvent)
 	case REFRESHTIMER:
 		if (m_bThreadRunning)
 		{
-			SetTimer(REFRESHTIMER, 200, NULL);
+			SetTimer(REFRESHTIMER, 200, nullptr);
 			CTraceToOutputDebugString::Instance()(__FUNCTION__ ": Wait some more before refreshing\n");
 		}
 		else

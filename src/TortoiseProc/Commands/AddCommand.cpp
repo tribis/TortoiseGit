@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2013 - TortoiseGit
+// Copyright (C) 2008-2013, 2016, 2018 - TortoiseGit
 // Copyright (C) 2007-2008 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -28,7 +28,7 @@
 bool AddCommand::Execute()
 {
 	bool bRet = false;
-	if (parser.HasKey(_T("noui")))
+	if (parser.HasKey(L"noui"))
 	{
 #if 0
 		SVN svn;
@@ -40,18 +40,20 @@ bool AddCommand::Execute()
 	}
 	else
 	{
-#if 0
 		if (pathList.AreAllPathsFiles())
 		{
-			SVN svn;
-			ProjectProperties props;
-			props.ReadPropsPathList(pathList);
-			bRet = !!svn.Add(pathList, &props, svn_depth_empty, FALSE, FALSE, TRUE);
-			CShellUpdater::Instance().AddPathsForUpdate(pathList);
+			CGitProgressDlg progDlg;
+			theApp.m_pMainWnd = &progDlg;
+			AddProgressCommand addCommand;
+			progDlg.SetCommand(&addCommand);
+			addCommand.SetPathList(pathList);
+			progDlg.SetItemCount(pathList.GetCount());
+			progDlg.DoModal();
+
+			bRet = !progDlg.DidErrorsOccur();
 		}
 		else
 		{
-#endif
 			CAddDlg dlg;
 			dlg.m_pathList = pathList;
 			if (dlg.DoModal() == IDOK)
@@ -69,7 +71,7 @@ bool AddCommand::Execute()
 				bRet = !progDlg.DidErrorsOccur();
 
 			}
-	//	}
+		}
 	}
 	CShellUpdater::Instance().Flush();
 	return bRet;

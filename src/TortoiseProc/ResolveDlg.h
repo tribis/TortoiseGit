@@ -30,21 +30,21 @@ class CResolveDlg : public CResizableStandAloneDialog
 	DECLARE_DYNAMIC(CResolveDlg)
 
 public:
-	CResolveDlg(CWnd* pParent = NULL);   // standard constructor
+	CResolveDlg(CWnd* pParent = nullptr);   // standard constructor
 	virtual ~CResolveDlg();
 
 // Dialog Data
 	enum { IDD = IDD_RESOLVE };
 
 protected:
-	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
+	virtual void DoDataExchange(CDataExchange* pDX) override;    // DDX/DDV support
 	afx_msg void OnBnClickedSelectall();
 	afx_msg LRESULT OnFileDropped(WPARAM, LPARAM lParam);
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
-	virtual BOOL PreTranslateMessage(MSG* pMsg);
-	virtual BOOL OnInitDialog();
-	virtual void OnOK();
-	virtual void OnCancel();
+	virtual BOOL PreTranslateMessage(MSG* pMsg) override;
+	virtual BOOL OnInitDialog() override;
+	virtual void OnOK() override;
+	virtual void OnCancel() override;
 
 private:
 	static UINT ResolveThreadEntry(LPVOID pVoid);

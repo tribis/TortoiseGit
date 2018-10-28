@@ -30,7 +30,7 @@ class CSimplePrompt : public CDialog
 	DECLARE_DYNAMIC(CSimplePrompt)
 
 public:
-	CSimplePrompt(CWnd* pParent = NULL);
+	CSimplePrompt(CWnd* pParent = nullptr);
 	virtual ~CSimplePrompt();
 
 	enum { IDD = IDD_SIMPLEPROMPT };
@@ -46,5 +46,4 @@ public:
 	CString		m_sRealm;
 	BOOL		m_bSaveAuthentication;
 	HWND		m_hParentWnd;
-
 };

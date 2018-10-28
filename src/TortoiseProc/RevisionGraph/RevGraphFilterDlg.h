@@ -1,7 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
 // Copyright (C) 2003-2006 - Stefan Kueng
-// Copyright (C) 2012, 2014-2015 - TortoiseGit
+// Copyright (C) 2012, 2014-2016 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -29,7 +29,7 @@ class CRevGraphFilterDlg : public CDialog
 	DECLARE_DYNAMIC(CRevGraphFilterDlg)
 
 public:
-	CRevGraphFilterDlg(CWnd* pParent = NULL);   // standard constructor
+	CRevGraphFilterDlg(CWnd* pParent = nullptr);   // standard constructor
 	virtual ~CRevGraphFilterDlg();
 
 	void	GetRevisionRange (CString& minrev, CString& maxrev);
@@ -42,12 +42,12 @@ public:
 	BOOL m_bLocalBranches;
 
 protected:
-	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV support
+	virtual void DoDataExchange(CDataExchange* pDX) override;	// DDX/DDV support
 	afx_msg void OnBnClickedResetfilter();
 	afx_msg void OnBnClickedCurrentBranch();
 	afx_msg void OnBnClickedLocalBranches();
-	virtual BOOL OnInitDialog();
-	virtual void OnOK();
+	virtual BOOL OnInitDialog() override;
+	virtual void OnOK() override;
 
 	DECLARE_MESSAGE_MAP()
 	CString	m_sFromRev;

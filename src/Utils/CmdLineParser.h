@@ -1,6 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2003-2007, 2009, 2013 - TortoiseSVN 
+// Copyright (C) 2016 - TortoiseGit
+// Copyright (C) 2003-2007, 2009, 2013 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -19,19 +20,9 @@
 #pragma once
 #include <map>
 #include <string>
+#include "tstring.h"
 
 using std::map;
-
-#pragma warning (push,1)
-typedef std::wstring wide_string;
-#ifndef stdstring
-#ifdef UNICODE
-#	define stdstring wide_string
-#else
-#	define stdstring std::string
-#endif
-#endif
-#pragma warning (pop)
 
 /**
  * \ingroup Utils
@@ -64,15 +55,18 @@ typedef std::wstring wide_string;
 class CCmdLineParser
 {
 public:
-	typedef map<stdstring, stdstring> CValsMap;
+	typedef map<std::wstring, std::wstring> CValsMap;
 	typedef CValsMap::const_iterator ITERPOS;
 public:
 	/**
 	 * Creates a CCmdLineParser object and parses the parameters in.
 	 * \param sCmdLine the command line
 	 */
-	CCmdLineParser(LPCTSTR sCmdLine = NULL);
-	virtual ~CCmdLineParser();
+	CCmdLineParser(LPCTSTR sCmdLine = nullptr);
+
+	CCmdLineParser(const CCmdLineParser&) = default;
+	CCmdLineParser& operator=(const CCmdLineParser&) = default;
+	CCmdLineParser& operator=(CCmdLineParser&& other);
 
 	/**
 	 * returns the command line string this object was created on.
@@ -95,7 +89,7 @@ public:
 	 * \param sValue returns the value
 	 * \return the next position
 	 */
-	ITERPOS getNext(ITERPOS& pos, stdstring& sKey, stdstring& sValue) const;
+	ITERPOS getNext(ITERPOS& pos, std::wstring& sKey, std::wstring& sValue) const;
 
 	/**
 	 * Checks if the position is the last or if there are more key/value pairs in the command line.
@@ -119,7 +113,7 @@ public:
 	BOOL HasVal(LPCTSTR sKey) const;
 
 	/**
-	 * Reads the value for a key. If the key has no value then NULL is returned.
+	 * Reads the value for a key. If the key has no value then nullptr is returned.
 	 * \param sKey the key to get the value from
 	 * \return the value string of the key
 	 */
@@ -140,7 +134,7 @@ private:
 	CValsMap::const_iterator findKey(LPCTSTR sKey) const;
 	const CValsMap& getVals() const { return m_valueMap; }
 private:
-	stdstring 	m_sCmdLine;
+	std::wstring	m_sCmdLine;
 	CValsMap	m_valueMap;
 
 	static const TCHAR m_sDelims[];

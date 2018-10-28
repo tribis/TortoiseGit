@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2012, 2015 - TortoiseGit
+// Copyright (C) 2008-2012, 2015-2017 - TortoiseGit
 // Copyright (C) 2003-2008 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -23,8 +23,8 @@
 class GitAdminDir
 {
 private:
-	GitAdminDir(void);
-	~GitAdminDir(void);
+	GitAdminDir() = delete;
+
 public:
 	/// Returns true if the path points to or below an admin directory
 	static bool IsAdminDirPath(const CString& path);
@@ -38,13 +38,13 @@ public:
 	/// associated, i.e. if the path is in a working copy.
 	static bool HasAdminDir(const CString& path);
 	static bool HasAdminDir(const CString& path, CString* ProjectTopDir);
-	static bool HasAdminDir(const CString& path, bool bDir, CString* ProjectTopDir = nullptr);
+	// IsAdminDirPath is only touched/set to true if and only if we the path is an AdminDirPath
+	static bool HasAdminDir(const CString& path, bool bDir, CString* ProjectTopDir = nullptr, bool* IsAdminDirPath = nullptr);
 	static CString GetSuperProjectRoot(const CString& path);
 
-	static bool GetAdminDirPath(const CString &projectTopDir, CString& adminDir);
+	static bool GetAdminDirPath(const CString& projectTopDir, CString& adminDir, bool* isWorktree = nullptr);
+	static bool GetWorktreeAdminDirPath(const CString& projectTopDir, CString& adminDir);
 	static CString ReadGitLink(const CString& topDir, const CString& dotGitPath);
 
-	static CString GetGitTopDir(const CString& path);
-
-	static CString GetAdminDirName() { return _T(".git"); }
+	static CString GetAdminDirName() { return L".git"; }
 };

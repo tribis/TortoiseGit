@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008, 2013-2014 - TortoiseGit
+// Copyright (C) 2008, 2013-2014, 2016 - TortoiseGit
 // Copyright (C) 2007 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -22,9 +22,9 @@
 #include "PathUtils.h"
 
 CLogFile::CLogFile(const CString& repo)
+	: m_maxlines(CRegStdDWORD(L"Software\\TortoiseGit\\MaxLinesInLogfile", 4000))
+	, m_sRepo(repo)
 {
-	m_maxlines = CRegStdDWORD(_T("Software\\TortoiseGit\\MaxLinesInLogfile"), 4000);
-	m_sRepo = repo;
 }
 
 CLogFile::~CLogFile(void)
@@ -35,7 +35,7 @@ bool CLogFile::Open()
 {
 	if (m_maxlines == 0)
 		return false;
-	CTGitPath logfile = CTGitPath(CPathUtils::GetLocalAppDataDirectory() + _T("logfile.txt"));
+	CTGitPath logfile = CTGitPath(CPathUtils::GetLocalAppDataDirectory() + L"logfile.txt");
 	return Open(logfile);
 }
 
@@ -65,9 +65,7 @@ bool CLogFile::Open(const CTGitPath& logfile)
 			return false;
 
 		while (file.ReadString(strLine))
-		{
 			m_lines.push_back(strLine);
-		}
 		file.Close();
 	}
 	catch (CFileException* pE)
@@ -93,7 +91,6 @@ bool CLogFile::Close()
 	AdjustSize();
 	try
 	{
-		CString strLine;
 		CStdioFile file;
 
 		int retrycounter = 10;
@@ -110,7 +107,7 @@ bool CLogFile::Close()
 		for (const auto& line : m_lines)
 		{
 			file.WriteString(line);
-			file.WriteString(_T("\n"));
+			file.WriteString(L"\n");
 		}
 		file.Close();
 	}
@@ -130,12 +127,12 @@ bool CLogFile::AddTimeLine()
 	m_lines.push_back(sLine);
 	// now add the time string
 	TCHAR datebuf[4096] = {0};
-	GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, NULL, NULL, datebuf, 4096);
+	GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, nullptr, nullptr, datebuf, 4096);
 	sLine = datebuf;
-	GetTimeFormat(LOCALE_USER_DEFAULT, 0, NULL, NULL, datebuf, 4096);
-	sLine += _T(" - ");
+	GetTimeFormat(LOCALE_USER_DEFAULT, 0, nullptr, nullptr, datebuf, 4096);
+	sLine += L" - ";
 	sLine += datebuf;
-	sLine += _T(" - ");
+	sLine += L" - ";
 	sLine += m_sRepo;
 	m_lines.push_back(sLine);
 	return true;
@@ -146,7 +143,5 @@ void CLogFile::AdjustSize()
 	DWORD maxlines = m_maxlines;
 
 	while (m_lines.size() > maxlines)
-	{
 		m_lines.pop_front();
-	}
 }

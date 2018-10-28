@@ -25,14 +25,12 @@
 
 int strwildcmp(const char *wild, const char *string)
 {
-	const char *cp = NULL;
-	const char *mp = NULL;
+	const char* cp = nullptr;
+	const char* mp = nullptr;
 	while ((*string) && (*wild != '*'))
 	{
 		if ((*wild != *string) && (*wild != '?'))
-		{
 			return 0;
-		}
 		++wild;
 		++string;
 	}
@@ -41,9 +39,7 @@ int strwildcmp(const char *wild, const char *string)
 		if (*wild == '*')
 		{
 			if (!*++wild)
-			{
 				return 1;
-			}
 			mp = wild;
 			cp = string+1;
 		}
@@ -60,22 +56,18 @@ int strwildcmp(const char *wild, const char *string)
 	}
 
 	while (*wild == '*')
-	{
 		++wild;
-	}
 	return !*wild;
 }
 
 int wcswildcmp(const wchar_t *wild, const wchar_t *string)
 {
-	const wchar_t *cp = NULL;
-	const wchar_t *mp = NULL;
+	const wchar_t* cp = nullptr;
+	const wchar_t* mp = nullptr;
 	while ((*string) && (*wild != '*'))
 	{
 		if ((*wild != *string) && (*wild != '?'))
-		{
 			return 0;
-		}
 		++wild;
 		++string;
 	}
@@ -84,9 +76,7 @@ int wcswildcmp(const wchar_t *wild, const wchar_t *string)
 		if (*wild == '*')
 		{
 			if (!*++wild)
-			{
 				return 1;
-			}
 			mp = wild;
 			cp = string+1;
 		}
@@ -103,9 +93,7 @@ int wcswildcmp(const wchar_t *wild, const wchar_t *string)
 	}
 
 	while (*wild == '*')
-	{
 		++wild;
-	}
 	return !*wild;
 }
 
@@ -190,7 +178,7 @@ bool CStringUtils::WriteAsciiStringToClipboard(const CStringW& sClipdata, HWND h
 	if (!pchData)
 		return false;
 
-	_tcscpy_s(pchData, sClipdata.GetLength()+1, (LPCWSTR)sClipdata);
+	wcscpy_s(pchData, sClipdata.GetLength() + 1, (LPCWSTR)sClipdata);
 	GlobalUnlock(hClipboardData);
 	if (!SetClipboardData(CF_UNICODETEXT, hClipboardData))
 		return false;
@@ -202,7 +190,7 @@ bool CStringUtils::WriteAsciiStringToClipboard(const CStringW& sClipdata, HWND h
 
 bool CStringUtils::WriteDiffToClipboard(const CStringA& sClipdata, HWND hOwningWnd)
 {
-	UINT cFormat = RegisterClipboardFormat(_T("TGIT_UNIFIEDDIFF"));
+	UINT cFormat = RegisterClipboardFormat(L"TGIT_UNIFIEDDIFF");
 	if (cFormat == 0)
 		return false;
 	CClipboardHelper clipboardHelper;
@@ -226,7 +214,7 @@ bool CStringUtils::WriteDiffToClipboard(const CStringA& sClipdata, HWND hOwningW
 		return false;
 
 	CString sClipdataW = CUnicodeUtils::GetUnicode(sClipdata);
-	auto hClipboardDataW = CClipboardHelper::GlobalAlloc(sClipdataW.GetLength()*sizeof(wchar_t) + 1);
+	auto hClipboardDataW = CClipboardHelper::GlobalAlloc((sClipdataW.GetLength() + 1) * sizeof(wchar_t));
 	if (!hClipboardDataW)
 		return false;
 
@@ -267,13 +255,12 @@ bool CStringUtils::ReadStringFromTextFile(const CString& path, CString& text)
 	}
 	return true;
 }
-
 #endif // #ifdef _MFC_VER
 
 #if defined(CSTRING_AVAILABLE) || defined(_MFC_VER)
 BOOL CStringUtils::WildCardMatch(const CString& wildcard, const CString& string)
 {
-	return _tcswildcmp(wildcard, string);
+	return wcswildcmp(wildcard, string);
 }
 
 CString CStringUtils::LinesWrap(const CString& longstring, int limit /* = 80 */, bool bCompactPaths /* = true */)
@@ -295,12 +282,12 @@ CString CStringUtils::LinesWrap(const CString& longstring, int limit /* = 80 */,
 			break;
 		lineposold = linepos;
 		if (!retString.IsEmpty())
-			retString += _T("\n");
+			retString += L'\n';
 		retString += WordWrap(temp, limit, bCompactPaths, false, 4);
 	}
 	temp = longstring.Mid(lineposold);
 	if (!temp.IsEmpty())
-		retString += _T("\n");
+		retString += L'\n';
 	retString += WordWrap(temp, limit, bCompactPaths, false, 4);
 	retString.Trim();
 	return retString;
@@ -348,7 +335,7 @@ CString CStringUtils::WordWrap(const CString& longstring, int limit, bool bCompa
 			}
 			else
 				retString += longstring.Mid(nLineStart, nLineEnd-nLineStart);
-			retString += L"\n";
+			retString += L'\n';
 			tabOffset = 0;
 			nLineStart = nLineEnd;
 		}
@@ -441,12 +428,22 @@ int CStringUtils::FastCompareNoCase (const CStringW& lhs, const CStringW& rhs)
 	return 0;
 }
 
+bool CStringUtils::IsPlainReadableASCII(const CString& text)
+{
+	for (int i = 0; i < text.GetLength(); ++i)
+	{
+		if (text[i] < 32 || text[i] >= 127)
+			return false;
+	}
+	return true;
+}
+
 static void cleanup_space(CString& string)
 {
 	for (int pos = 0; pos < string.GetLength(); ++pos)
 	{
 		if (_istspace(string[pos])) {
-			string.SetAt(pos ,_T(' '));
+			string.SetAt(pos, L' ');
 			int cnt;
 			for (cnt = 0; _istspace(string[pos + cnt + 1]); ++cnt);
 			string.Delete(pos + 1, cnt);
@@ -457,7 +454,7 @@ static void cleanup_space(CString& string)
 static void get_sane_name(CString* out, const CString* name, const CString& email)
 {
 	const CString* src = name;
-	if (name->GetLength() < 3 || 60 < name->GetLength() || _tcschr(*name, _T('@')) || _tcschr(*name, _T('<')) || _tcschr(*name, _T('>')))
+	if (name->GetLength() < 3 || 60 < name->GetLength() || wcschr(*name, L'@') || wcschr(*name, L'<') || wcschr(*name, L'>'))
 		src = &email;
 	else if (name == out)
 		return;
@@ -468,10 +465,10 @@ static void parse_bogus_from(const CString& mailaddress, CString& parsedAddress,
 {
 	/* John Doe <johndoe> */
 
-	int bra = mailaddress.Find(L"<");
+	int bra = mailaddress.Find(L'<');
 	if (bra < 0)
 		return;
-	int ket = mailaddress.Find(L">");
+	int ket = mailaddress.Find(L'>');
 	if (ket < 0)
 		return;
 
@@ -486,8 +483,50 @@ static void parse_bogus_from(const CString& mailaddress, CString& parsedAddress,
 
 void CStringUtils::ParseEmailAddress(CString mailaddress, CString& parsedAddress, CString* parsedName)
 {
+	if (parsedName)
+		parsedName->Empty();
+
+	mailaddress = mailaddress.Trim();
+	if (mailaddress.IsEmpty())
+	{
+		parsedAddress.Empty();
+		return;
+	}
+
+	if (mailaddress.Left(1) == L'"')
+	{
+		mailaddress = mailaddress.TrimLeft();
+		bool escaped = false;
+		bool opened = true;
+		for (int i = 1; i < mailaddress.GetLength(); ++i)
+		{
+			if (mailaddress[i] == L'"')
+			{
+				if (!escaped)
+				{
+					opened = !opened;
+					if (!opened)
+					{
+						if (parsedName)
+							*parsedName = mailaddress.Mid(1, i - 1);
+						mailaddress = mailaddress.Mid(i);
+						break;
+					}
+				}
+				else
+				{
+					escaped = false;
+					mailaddress.Delete(i - 1);
+					--i;
+				}
+			}
+			else if (mailaddress[i] == L'\\')
+				escaped = !escaped;
+		}
+	}
+
 	auto buf = mailaddress.GetBuffer();
-	auto at = _tcschr(buf, _T('@'));
+	auto at = wcschr(buf, L'@');
 	if (!at)
 	{
 		parse_bogus_from(mailaddress, parsedAddress, parsedName);
@@ -502,15 +541,16 @@ void CStringUtils::ParseEmailAddress(CString mailaddress, CString& parsedAddress
 		auto c = at[-1];
 		if (_istspace(c))
 			break;
-		if (c == _T('<')) {
-			at[-1] = _T(' ');
+		if (c == L'<')
+		{
+			at[-1] = L' ';
 			break;
 		}
 		at--;
 	}
 
 	mailaddress.ReleaseBuffer();
-	size_t el = _tcscspn(at, _T(" \n\t\r\v\f>"));
+	size_t el = wcscspn(at, L" \n\t\r\v\f>");
 	parsedAddress = mailaddress.Mid((int)(at - buf), (int)el);
 	mailaddress.Delete((int)(at - buf), (int)(el + (at[el] ? 1 : 0)));
 
@@ -528,32 +568,84 @@ void CStringUtils::ParseEmailAddress(CString mailaddress, CString& parsedAddress
 	 */
 	cleanup_space(mailaddress);
 	mailaddress.Trim();
-	if (!mailaddress.IsEmpty() && ((mailaddress[0] == _T('(') && mailaddress[mailaddress.GetLength() - 1] == _T(')')) || (mailaddress[0] == _T('"') && mailaddress[mailaddress.GetLength() - 1] == _T('"'))))
+	if (!mailaddress.IsEmpty() && ((mailaddress[0] == L'(' && mailaddress[mailaddress.GetLength() - 1] == L')') || (mailaddress[0] == L'"' && mailaddress[mailaddress.GetLength() - 1] == L'"')))
 		mailaddress = mailaddress.Mid(1, mailaddress.GetLength() - 2);
 
-	if (parsedName)
+	if (parsedName && parsedName->IsEmpty())
 		get_sane_name(parsedName, &mailaddress, parsedAddress);
 }
+
+bool CStringUtils::StartsWith(const wchar_t* heystack, const CString& needle)
+{
+	return wcsncmp(heystack, needle, needle.GetLength()) == 0;
+}
+
+bool CStringUtils::EndsWith(const CString& heystack, const wchar_t* needle)
+{
+	auto lenNeedle = wcslen(needle);
+	auto lenHeystack = (size_t)heystack.GetLength();
+	if (lenNeedle > lenHeystack)
+		return false;
+	return wcsncmp((LPCTSTR)heystack + (lenHeystack - lenNeedle), needle, lenNeedle) == 0;
+}
+
+bool CStringUtils::EndsWith(const CString& heystack, const wchar_t needle)
+{
+	auto lenHeystack = heystack.GetLength();
+	if (!lenHeystack)
+		return false;
+	return *((LPCTSTR)heystack + (lenHeystack - 1)) == needle;
+}
+
+bool CStringUtils::EndsWithI(const CString& heystack, const wchar_t* needle)
+{
+	auto lenNeedle = wcslen(needle);
+	auto lenHeystack = (size_t)heystack.GetLength();
+	if (lenNeedle > lenHeystack)
+		return false;
+	return _wcsnicmp((LPCTSTR)heystack + (lenHeystack - lenNeedle), needle, lenNeedle) == 0;
+}
+
+bool CStringUtils::StartsWithI(const wchar_t* heystack, const CString& needle)
+{
+	return _wcsnicmp(heystack, needle, needle.GetLength()) == 0;
+}
+
+bool CStringUtils::WriteStringToTextFile(LPCTSTR path, LPCTSTR text, bool bUTF8 /* = true */)
+{
+	return WriteStringToTextFile((const std::wstring&)path, (const std::wstring&)text, bUTF8);
+}
+
 #endif // #if defined(CSTRING_AVAILABLE) || defined(_MFC_VER)
+
+bool CStringUtils::StartsWith(const wchar_t* heystack, const wchar_t* needle)
+{
+	return wcsncmp(heystack, needle, wcslen(needle)) == 0;
+}
+
+bool CStringUtils::StartsWith(const char* heystack, const char* needle)
+{
+	return strncmp(heystack, needle, strlen(needle)) == 0;
+}
 
 bool CStringUtils::WriteStringToTextFile(const std::wstring& path, const std::wstring& text, bool bUTF8 /* = true */)
 {
 	DWORD dwWritten = 0;
-	CAutoFile hFile = CreateFile(path.c_str(), GENERIC_WRITE, FILE_SHARE_DELETE, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+	CAutoFile hFile = CreateFile(path.c_str(), GENERIC_WRITE, FILE_SHARE_DELETE, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
 	if (!hFile)
 		return false;
 
 	if (bUTF8)
 	{
 		std::string buf = CUnicodeUtils::StdGetUTF8(text);
-		if (!WriteFile(hFile, buf.c_str(), (DWORD)buf.length(), &dwWritten, NULL))
+		if (!WriteFile(hFile, buf.c_str(), (DWORD)buf.length(), &dwWritten, nullptr))
 		{
 			return false;
 		}
 	}
 	else
 	{
-		if (!WriteFile(hFile, text.c_str(), (DWORD)text.length(), &dwWritten, NULL))
+		if (!WriteFile(hFile, text.c_str(), (DWORD)text.length(), &dwWritten, nullptr))
 		{
 			return false;
 		}
@@ -580,7 +672,7 @@ void CStringUtils::PipesToNulls(TCHAR* buffer, size_t length)
 void CStringUtils::PipesToNulls(TCHAR* buffer)
 {
 	TCHAR* ptr = buffer;
-	while (*ptr != 0)
+	while (*ptr)
 	{
 		PipeToNull(ptr);
 		++ptr;

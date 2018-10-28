@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2013, 2015-2016 - TortoiseGit
+// Copyright (C) 2008-2013, 2015-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -18,8 +18,6 @@
 //
 #pragma once
 
-#include "Git.h"
-#include "TGitPath.h"
 #include "GitRevLoglist.h"
 #include "GitHash.h"
 
@@ -27,7 +25,7 @@
 #define LOG_DATA_MAGIC		0x99BB0FFF
 #define LOG_DATA_ITEM_MAGIC 0x0FCC9ACC
 #define LOG_DATA_FILE_MAGIC 0x19EE9DFF
-#define LOG_INDEX_VERSION   0xF
+#define LOG_INDEX_VERSION	0x11
 
 #pragma pack (1)
 struct SLogCacheIndexHeader
@@ -52,22 +50,20 @@ struct SLogCacheIndexFile
 struct SLogCacheRevFileHeader
 {
 	DWORD m_Magic;
-	DWORD m_Version;
 	DWORD m_Action;
 	DWORD m_Stage;
 	DWORD m_ParentNo;
 	DWORD m_Add;
 	DWORD m_Del;
+	DWORD m_IsSubmodule;
 	DWORD m_FileNameSize;
 	DWORD m_OldFileNameSize;
 	TCHAR m_FileName[1];
 };
-# pragma pack ()
 
 struct SLogCacheRevItemHeader
 {
 	DWORD m_Magic;
-	DWORD m_Version;
 	DWORD m_FileCount;
 };
 
@@ -76,8 +72,9 @@ struct SLogCacheDataFileHeader
 	DWORD m_Magic;
 	DWORD m_Version;
 };
+# pragma pack ()
 
-class CGitHashMap : public std::map<CGitHash, GitRevLoglist>
+class CGitHashMap : public std::unordered_map<CGitHash, GitRevLoglist>
 {
 public:
 	bool IsExist(CGitHash &hash)
@@ -86,8 +83,8 @@ public:
 	}
 };
 
-#define INDEX_FILE_NAME _T("tortoisegit.index")
-#define DATA_FILE_NAME _T("tortoisegit.data")
+#define INDEX_FILE_NAME L"tortoisegit.index"
+#define DATA_FILE_NAME L"tortoisegit.data"
 
 class CLogCache
 {
@@ -109,7 +106,6 @@ protected:
 
 	void CloseDataHandles();
 	void CloseIndexHandles();
-	void Sort();
 
 	BOOL CheckHeader(SLogCacheIndexHeader *header)
 	{
@@ -127,18 +123,12 @@ protected:
 		if (header->m_Magic != LOG_DATA_FILE_MAGIC)
 			return FALSE;
 
-		if (header->m_Version != LOG_INDEX_VERSION)
-			return FALSE;
-
 		return TRUE;
 	}
 
 	BOOL CheckHeader(SLogCacheRevItemHeader *header)
 	{
 		if (header->m_Magic != LOG_DATA_ITEM_MAGIC)
-			return FALSE;
-
-		if (header->m_Version != LOG_INDEX_VERSION)
 			return FALSE;
 
 		return TRUE;

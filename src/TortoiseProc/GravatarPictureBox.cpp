@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2013-2015 - TortoiseGit
+// Copyright (C) 2013-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -33,23 +33,23 @@ static CString CalcMD5(CString text)
 {
 	HCRYPTPROV hProv = 0;
 	if (!CryptAcquireContext(&hProv, nullptr, nullptr, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT))
-		return _T("");
+		return L"";
 	SCOPE_EXIT { CryptReleaseContext(hProv, 0); };
 
 	HCRYPTHASH hHash = 0;
 	if (!CryptCreateHash(hProv, CALG_MD5, 0, 0, &hHash))
-		return _T("");
+		return L"";
 	SCOPE_EXIT { CryptDestroyHash(hHash); };
 
 	CStringA textA = CUnicodeUtils::GetUTF8(text);
 	if (!CryptHashData(hHash, (LPBYTE)(LPCSTR)textA, textA.GetLength(), 0))
-		return _T("");
+		return L"";
 
 	CString hash;
 	BYTE rgbHash[16];
 	DWORD cbHash = _countof(rgbHash);
 	if (!CryptGetHashParam(hHash, HP_HASHVAL, rgbHash, &cbHash, 0))
-		return _T("");
+		return L"";
 
 	for (DWORD i = 0; i < cbHash; i++)
 	{
@@ -93,10 +93,10 @@ void CGravatar::Init()
 		if (m_gravatarThread == nullptr)
 		{
 			m_gravatarExit = new bool(false);
-			m_gravatarThread = AfxBeginThread([] (LPVOID lpVoid) -> UINT { ((CGravatar *)lpVoid)->GravatarThread(); return 0; }, this, THREAD_PRIORITY_BELOW_NORMAL);
+			m_gravatarThread = AfxBeginThread([](LPVOID lpVoid) -> UINT { reinterpret_cast<CGravatar*>(lpVoid)->GravatarThread(); return 0; }, this, THREAD_PRIORITY_BELOW_NORMAL);
 			if (m_gravatarThread == nullptr)
 			{
-				CMessageBox::Show(nullptr, IDS_ERR_THREADSTARTFAILED, IDS_APPNAME, MB_OK | MB_ICONERROR);
+				CMessageBox::Show(GetSafeHwnd(), IDS_ERR_THREADSTARTFAILED, IDS_APPNAME, MB_OK | MB_ICONERROR);
 				delete m_gravatarExit;
 				m_gravatarExit = nullptr;
 				return;
@@ -139,7 +139,7 @@ void CGravatar::GravatarThread()
 {
 	bool *gravatarExit = m_gravatarExit;
 	SCOPE_EXIT { delete gravatarExit; };
-	CString gravatarBaseUrl = CRegString(_T("Software\\TortoiseGit\\GravatarUrl"), _T("http://www.gravatar.com/avatar/%HASH%?d=identicon"));
+	CString gravatarBaseUrl = CRegString(L"Software\\TortoiseGit\\GravatarUrl", L"http://www.gravatar.com/avatar/%HASH%?d=identicon");
 
 	CString hostname;
 	CString baseUrlPath;
@@ -193,7 +193,7 @@ void CGravatar::GravatarThread()
 				continue;
 
 			CString gravatarUrl = baseUrlPath;
-			gravatarUrl.Replace(_T("%HASH%"), md5);
+			gravatarUrl.Replace(L"%HASH%", md5);
 			CString tempFile;
 			GetTempPath(tempFile);
 			tempFile += md5;
@@ -224,7 +224,7 @@ void CGravatar::GravatarThread()
 				CAutoLocker lock(m_gravatarLock);
 				if (m_email == email && !ret)
 				{
-					CAutoFile hFile = CreateFile(tempFile, FILE_READ_ATTRIBUTES | FILE_WRITE_ATTRIBUTES, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+					CAutoFile hFile = CreateFile(tempFile, FILE_READ_ATTRIBUTES | FILE_WRITE_ATTRIBUTES, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
 					FILETIME creationTime = {};
 					GetFileTime(hFile, &creationTime, nullptr, nullptr);
 					uint64_t delta = 7 * 24 * 60 * 60 * 10000000LL;
@@ -247,7 +247,7 @@ void CGravatar::GravatarThread()
 	}
 }
 
-BOOL CGravatar::DownloadToFile(bool *gravatarExit, const HINTERNET hConnectHandle, bool isHttps, const CString& urlpath, const CString& dest)
+int CGravatar::DownloadToFile(bool* gravatarExit, const HINTERNET hConnectHandle, bool isHttps, const CString& urlpath, const CString& dest)
 {
 	HINTERNET hResourceHandle = HttpOpenRequest(hConnectHandle, nullptr, urlpath, nullptr, nullptr, nullptr, INTERNET_FLAG_KEEP_CONNECTION | (isHttps ? INTERNET_FLAG_SECURE : 0), 0);
 	if (!hResourceHandle)
@@ -256,7 +256,7 @@ BOOL CGravatar::DownloadToFile(bool *gravatarExit, const HINTERNET hConnectHandl
 	SCOPE_EXIT { InternetCloseHandle(hResourceHandle); };
 resend:
 	if (*gravatarExit)
-		return INET_E_DOWNLOAD_FAILURE;
+		return (int)INET_E_DOWNLOAD_FAILURE;
 
 	BOOL httpsendrequest = HttpSendRequest(hResourceHandle, nullptr, 0, nullptr, 0);
 
@@ -265,17 +265,17 @@ resend:
 	if (dwError == ERROR_INTERNET_FORCE_RETRY)
 		goto resend;
 	else if (!httpsendrequest || *gravatarExit)
-		return INET_E_DOWNLOAD_FAILURE;
+		return (int)INET_E_DOWNLOAD_FAILURE;
 
 	DWORD statusCode = 0;
 	DWORD length = sizeof(statusCode);
-	if (!HttpQueryInfo(hResourceHandle, HTTP_QUERY_STATUS_CODE | HTTP_QUERY_FLAG_NUMBER, (LPVOID)&statusCode, &length, NULL) || statusCode != 200)
+	if (!HttpQueryInfo(hResourceHandle, HTTP_QUERY_STATUS_CODE | HTTP_QUERY_FLAG_NUMBER, (LPVOID)&statusCode, &length, nullptr) || statusCode != 200)
 	{
 		if (statusCode == 404)
 			return ERROR_FILE_NOT_FOUND;
 		else if (statusCode == 403)
 			return ERROR_ACCESS_DENIED;
-		return INET_E_DOWNLOAD_FAILURE;
+		return (int)INET_E_DOWNLOAD_FAILURE;
 	}
 
 	CFile destinationFile;
@@ -287,12 +287,12 @@ resend:
 	{
 		DWORD size; // size of the data available
 		if (!InternetQueryDataAvailable(hResourceHandle, &size, 0, 0))
-			return INET_E_DOWNLOAD_FAILURE;
+			return (int)INET_E_DOWNLOAD_FAILURE;
 
 		DWORD downloaded; // size of the downloaded data
 		auto buff = std::make_unique<TCHAR[]>(size + 1);
 		if (!InternetReadFile(hResourceHandle, (LPVOID)buff.get(), size, &downloaded))
-			return INET_E_DOWNLOAD_FAILURE;
+			return (int)INET_E_DOWNLOAD_FAILURE;
 
 		if (downloaded == 0)
 			break;
@@ -304,7 +304,7 @@ resend:
 	}
 	destinationFile.Close();
 	if (downloadedSum == 0)
-		return INET_E_DOWNLOAD_FAILURE;
+		return (int)INET_E_DOWNLOAD_FAILURE;
 
 	return 0;
 }

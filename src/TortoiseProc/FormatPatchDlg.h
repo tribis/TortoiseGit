@@ -30,15 +30,15 @@ class CFormatPatchDlg : public CHorizontalResizableStandAloneDialog
 	DECLARE_DYNAMIC(CFormatPatchDlg)
 
 public:
-	CFormatPatchDlg(CWnd* pParent = NULL);   // standard constructor
+	CFormatPatchDlg(CWnd* pParent = nullptr);   // standard constructor
 	virtual ~CFormatPatchDlg();
 
 // Dialog Data
 	enum { IDD = IDD_FORMAT_PATCH };
 
 protected:
-	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
-	virtual BOOL OnInitDialog();
+	virtual void DoDataExchange(CDataExchange* pDX) override;    // DDX/DDV support
+	virtual BOOL OnInitDialog() override;
 
 	afx_msg void OnBnClickedButtonDir();
 	afx_msg void OnBnClickedButtonFrom();
@@ -56,6 +56,7 @@ protected:
 	CEdit		  m_cNum;
 	CRegDWORD	m_regSendMail;
 	CRegDWORD	m_regNoPrefix;
+	CRegString	m_regSince;
 
 	DECLARE_MESSAGE_MAP()
 public:

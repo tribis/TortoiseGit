@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2013,2015 - TortoiseGit
+// Copyright (C) 2008-2013, 2015-2018 - TortoiseGit
 // Copyright (C) 2003-2008,2010 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -30,15 +30,19 @@ public:
 	/**
 	* Launch an external application (usually the diff viewer)
 	*/
-	static bool LaunchApplication(const CString& sCommandLine, UINT idErrMessageFormat, bool bWaitForStartup, CString *cwd = NULL, bool uac = false);
+	static bool LaunchApplication(const CString& sCommandLine, UINT idErrMessageFormat, bool bWaitForStartup, CString* cwd = nullptr, bool uac = false);
 
 	static bool RunTortoiseGitProc(const CString& sCommandLine, bool uac = false, bool includeGroupingUUID = true);
 
 	static bool IsAdminLogin();
 
-	static bool SetListCtrlBackgroundImage(HWND hListCtrl, UINT nID, int width = 128, int height = 128);
+	static bool SetListCtrlBackgroundImage(HWND hListCtrl, UINT nID);
+	static bool SetListCtrlBackgroundImage(HWND hListCtrl, UINT nID, int width, int height);
 
-	static bool FileOpenSave(CString& path, int * filterindex, UINT title, UINT filter, bool bOpen, HWND hwndOwner = nullptr, LPCTSTR defaultExt = nullptr);
+	static bool FileOpenSave(CString& path, int* filterindex, UINT title, UINT filterId, bool bOpen, HWND hwndOwner = nullptr, LPCTSTR defaultExt = nullptr, bool handleAsFile = false);
+
+	// Wrapper for LoadImage(IMAGE_ICON)
+	static HICON LoadIconEx(UINT resourceId, UINT cx, UINT cy);
 
 	/**
 	 * Apply the @a effects or color (depending on @a mask)
@@ -48,7 +52,5 @@ public:
 	static void SetCharFormat(CWnd* window, DWORD mask, DWORD effects, const std::vector<CHARRANGE>& positions);
 	static void SetCharFormat(CWnd* window, DWORD mask, DWORD effects);
 
-protected:
-	CCommonAppUtils(void){};
-	~CCommonAppUtils(void){};
+	CCommonAppUtils() = delete;
 };

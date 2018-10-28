@@ -1,5 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
+// Copyright (C) 2012, 2014-2018 - TortoiseGit
 // Copyright (C) 2003-2008 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -20,12 +21,13 @@
 #include "TortoiseProc.h"
 #include "InputDlg.h"
 #include "registry.h"
+#include "AppUtils.h"
 
 
 IMPLEMENT_DYNAMIC(CInputDlg, CResizableStandAloneDialog)
-CInputDlg::CInputDlg(CWnd* pParent /*=NULL*/)
+CInputDlg::CInputDlg(CWnd* pParent /*=nullptr*/)
 	: CResizableStandAloneDialog(CInputDlg::IDD, pParent)
-	, m_pProjectProperties(NULL)
+	, m_pProjectProperties(nullptr)
 	, m_iCheck(0)
 	, m_bUseLogWidth(true)
 {
@@ -45,6 +47,7 @@ void CInputDlg::DoDataExchange(CDataExchange* pDX)
 
 BEGIN_MESSAGE_MAP(CInputDlg, CResizableStandAloneDialog)
 	ON_EN_CHANGE(IDC_INPUTTEXT, OnEnChangeLogmessage)
+	ON_WM_SYSCOLORCHANGE()
 END_MESSAGE_MAP()
 
 BOOL CInputDlg::OnInitDialog()
@@ -54,25 +57,10 @@ BOOL CInputDlg::OnInitDialog()
 	if (m_pProjectProperties)
 		m_cInput.Init(*m_pProjectProperties);
 	else
-		m_cInput.Init();
+		m_cInput.Init(-1);
 
-	m_cInput.SetFont((CString)CRegString(_T("Software\\TortoiseGit\\LogFontName"), _T("Courier New")), (DWORD)CRegDWORD(_T("Software\\TortoiseGit\\LogFontSize"), 8));
+	m_cInput.SetFont(CAppUtils::GetLogFontName(), CAppUtils::GetLogFontSize());
 
-	if (m_pProjectProperties)
-	{
-		if (m_pProjectProperties->nLogWidthMarker)
-		{
-			m_cInput.Call(SCI_SETWRAPMODE, SC_WRAP_NONE);
-			m_cInput.Call(SCI_SETEDGEMODE, EDGE_LINE);
-			m_cInput.Call(SCI_SETEDGECOLUMN, m_pProjectProperties->nLogWidthMarker);
-		}
-		else
-		{
-			m_cInput.Call(SCI_SETEDGEMODE, EDGE_NONE);
-			m_cInput.Call(SCI_SETWRAPMODE, SC_WRAP_WORD);
-		}
-		//m_cInput.SetText(m_pProjectProperties->sLogTemplate);
-	}
 	if (!m_sInputText.IsEmpty())
 	{
 		m_cInput.SetText(m_sInputText);
@@ -95,17 +83,17 @@ BOOL CInputDlg::OnInitDialog()
 		GetDlgItem(IDC_CHECKBOX)->ShowWindow(SW_HIDE);
 	}
 
+	AdjustControlSize(IDC_CHECKBOX);
+
 	AddAnchor(IDC_HINTTEXT, TOP_LEFT, TOP_RIGHT);
 	AddAnchor(IDC_INPUTTEXT, TOP_LEFT, BOTTOM_RIGHT);
 	AddAnchor(IDC_CHECKBOX, BOTTOM_LEFT, BOTTOM_RIGHT);
 	AddAnchor(IDCANCEL, BOTTOM_RIGHT);
 	AddAnchor(IDOK, BOTTOM_RIGHT);
 
-	AdjustControlSize(IDC_CHECKBOX);
-
-	EnableSaveRestore(_T("InputDlg"));
-	if (hWndExplorer)
-		CenterWindow(CWnd::FromHandle(hWndExplorer));
+	EnableSaveRestore(L"InputDlg");
+	if (GetExplorerHWND())
+		CenterWindow(CWnd::FromHandle(GetExplorerHWND()));
 	GetDlgItem(IDC_INPUTTEXT)->SetFocus();
 	// clear the selection
 	m_cInput.Call(SCI_SETSEL, (WPARAM)-1, (LPARAM)-1);
@@ -130,9 +118,7 @@ BOOL CInputDlg::PreTranslateMessage(MSG* pMsg)
 				if (GetAsyncKeyState(VK_CONTROL)&0x8000)
 				{
 					if ( GetDlgItem(IDOK)->IsWindowEnabled() )
-					{
 						PostMessage(WM_COMMAND, IDOK);
-					}
 				}
 			}
 			break;
@@ -145,12 +131,15 @@ BOOL CInputDlg::PreTranslateMessage(MSG* pMsg)
 void CInputDlg::OnEnChangeLogmessage()
 {
 	CString sTemp = m_cInput.GetText();
-	if ((!m_bUseLogWidth)||((m_pProjectProperties==NULL)||(sTemp.GetLength() >= m_pProjectProperties->nMinLogSize)))
-	{
+	if (!m_bUseLogWidth || !m_pProjectProperties || sTemp.GetLength() >= m_pProjectProperties->nMinLogSize)
 		DialogEnableWindow(IDOK, TRUE);
-	}
 	else
-	{
 		DialogEnableWindow(IDOK, FALSE);
-	}
+}
+
+void CInputDlg::OnSysColorChange()
+{
+	__super::OnSysColorChange();
+	m_cInput.SetColors(true);
+	m_cInput.SetFont(CAppUtils::GetLogFontName(), CAppUtils::GetLogFontSize());
 }

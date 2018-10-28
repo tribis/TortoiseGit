@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2013 - TortoiseGit
+// Copyright (C) 2008-2013, 2016-2018 - TortoiseGit
 // Copyright (C) 2003-2008 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -26,7 +26,8 @@
 
 #include "resource.h"		// main symbols
 
-#include "..\\TortoiseShell\\resource.h"
+#include "../TortoiseShell/resource.h"
+#include "LoglistCommonResource.h"
 
 /**
  * \ingroup TortoiseProc
@@ -48,30 +49,27 @@ public:
 
 // Overrides
 public:
-	virtual BOOL InitInstance();
-	virtual int ExitInstance();
-
-	BOOL CheckMsysGitDir();
+	virtual BOOL InitInstance() override;
+	virtual int ExitInstance() override;
 
 	void CheckUpgrade();
 	void CheckForNewerVersion();
-	void EnableCrashHandler();
 	void InitializeJumpList(const CString& appid);
 	void DoInitializeJumpList(const CString& appid);
 
 	ULONG_PTR m_gdiplusToken;
+
+	HWND GetExplorerHWND() { return ::IsWindow(hWndExplorer) ? hWndExplorer : nullptr; }
+
 // Implementation
-
 private:
-
-
 	DECLARE_MESSAGE_MAP()
-private:
 	bool	retSuccess;
+	HWND	hWndExplorer;
 };
 
 extern CTortoiseProcApp theApp;
 extern CString g_sGroupingUUID;
-extern HWND hWndExplorer;
 extern CString sOrigCWD;
+HWND GetExplorerHWND();
 

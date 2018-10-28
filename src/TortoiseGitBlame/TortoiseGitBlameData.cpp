@@ -1,6 +1,6 @@
 // TortoiseGitBlame - a Viewer for Git Blames
 
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2018 - TortoiseGit
 // Copyright (C) 2003 Don HO <donho@altern.org>
 
 // This program is free software; you can redistribute it and/or
@@ -34,8 +34,8 @@ wchar_t WideCharSwap2(wchar_t nValue)
 // CTortoiseGitBlameData construction/destruction
 
 CTortoiseGitBlameData::CTortoiseGitBlameData()
+	: m_encode(-1)
 {
-	m_encode = -1;
 }
 
 CTortoiseGitBlameData::~CTortoiseGitBlameData()
@@ -79,16 +79,14 @@ int CTortoiseGitBlameData::GetEncode(int *bomoffset)
 	int encoding = 0;
 	BYTE_VECTOR rawAll;
 	for (const auto& rawBytes : m_RawLines)
-	{
-		rawAll.append(&rawBytes[0], rawBytes.size());
-	}
-	encoding = GetEncode(&rawAll[0], (int)rawAll.size(), bomoffset);
+		rawAll.append(rawBytes.data(), rawBytes.size());
+	encoding = GetEncode(rawAll.data(), (int)rawAll.size(), bomoffset);
 	return encoding;
 }
 
 void CTortoiseGitBlameData::ParseBlameOutput(BYTE_VECTOR &data, CGitHashMap & HashToRev, DWORD dateFormat, bool bRelativeTimes)
 {
-	std::map<CGitHash, CString> hashToFilename;
+	std::unordered_map<CGitHash, CString> hashToFilename;
 
 	std::vector<CGitHash>		hashes;
 	std::vector<int>			originalLineNumbers;
@@ -99,13 +97,12 @@ void CTortoiseGitBlameData::ParseBlameOutput(BYTE_VECTOR &data, CGitHashMap & Ha
 
 	CGitHash hash;
 	int originalLineNumber = 0;
-	int finalLineNumber = 0;
 	int numberOfSubsequentLines = 0;
 	CString filename;
 
-	int pos = 0;
+	size_t pos = 0;
 	bool expectHash = true;
-	while (pos >= 0 && (size_t)pos < data.size())
+	while (pos < data.size())
 	{
 		if (data[pos] == 0)
 		{
@@ -113,10 +110,10 @@ void CTortoiseGitBlameData::ParseBlameOutput(BYTE_VECTOR &data, CGitHashMap & Ha
 			continue;
 		}
 
-		int lineBegin = pos;
-		int lineEnd = data.find('\n', lineBegin);
-		if (lineEnd < 0)
-			lineEnd = (int)data.size();
+		size_t lineBegin = pos;
+		size_t lineEnd = data.find('\n', lineBegin);
+		if (lineEnd == BYTE_VECTOR::npos)
+			lineEnd = data.size();
 
 		if (lineEnd > lineBegin)
 		{
@@ -125,39 +122,36 @@ void CTortoiseGitBlameData::ParseBlameOutput(BYTE_VECTOR &data, CGitHashMap & Ha
 				if (expectHash)
 				{
 					expectHash = false;
-					if (lineEnd - lineBegin > 40)
+					if (lineEnd - lineBegin > 2 * GIT_HASH_SIZE)
 					{
 						hash.ConvertFromStrA((char*)&data[lineBegin]);
 
-						int hashEnd = lineBegin + 40;
-						int originalLineNumberBegin = hashEnd + 1;
-						int originalLineNumberEnd = data.find(' ', originalLineNumberBegin);
-						if (originalLineNumberEnd >= 0)
+						size_t hashEnd = lineBegin + 2 * GIT_HASH_SIZE;
+						size_t originalLineNumberBegin = hashEnd + 1;
+						size_t originalLineNumberEnd = data.find(' ', originalLineNumberBegin);
+						if (originalLineNumberEnd != BYTE_VECTOR::npos)
 						{
-							originalLineNumber = atoi(CStringA((LPCSTR)&data[originalLineNumberBegin], originalLineNumberEnd - originalLineNumberBegin));
-							int finalLineNumberBegin = originalLineNumberEnd + 1;
-							int finalLineNumberEnd = (numberOfSubsequentLines == 0) ? data.find(' ', finalLineNumberBegin) : lineEnd;
-							if (finalLineNumberEnd >= 0)
+							originalLineNumber = atoi(CStringA((LPCSTR)&data[originalLineNumberBegin], (int)(originalLineNumberEnd - originalLineNumberBegin)));
+							size_t finalLineNumberBegin = originalLineNumberEnd + 1;
+							size_t finalLineNumberEnd = (numberOfSubsequentLines == 0) ? data.find(' ', finalLineNumberBegin) : lineEnd;
+							if (finalLineNumberEnd != BYTE_VECTOR::npos)
 							{
-								finalLineNumber = atoi(CStringA((LPCSTR)&data[finalLineNumberBegin], finalLineNumberEnd - finalLineNumberBegin));
 								if (numberOfSubsequentLines == 0)
 								{
-									int numberOfSubsequentLinesBegin = finalLineNumberEnd + 1;
-									int numberOfSubsequentLinesEnd = lineEnd;
-									numberOfSubsequentLines = atoi(CStringA((LPCSTR)&data[numberOfSubsequentLinesBegin], numberOfSubsequentLinesEnd - numberOfSubsequentLinesBegin));
+									size_t numberOfSubsequentLinesBegin = finalLineNumberEnd + 1;
+									size_t numberOfSubsequentLinesEnd = lineEnd;
+									numberOfSubsequentLines = atoi(CStringA((LPCSTR)&data[numberOfSubsequentLinesBegin], (int)(numberOfSubsequentLinesEnd - numberOfSubsequentLinesBegin)));
 								}
 							}
 							else
 							{
 								// parse error
-								finalLineNumber = 0;
 								numberOfSubsequentLines = 0;
 							}
 						}
 						else
 						{
 							// parse error
-							finalLineNumber = 0;
 							numberOfSubsequentLines = 0;
 						}
 
@@ -170,21 +164,20 @@ void CTortoiseGitBlameData::ParseBlameOutput(BYTE_VECTOR &data, CGitHashMap & Ha
 					else
 					{
 						// parse error
-						finalLineNumber = 0;
 						numberOfSubsequentLines = 0;
 					}
 				}
 				else
 				{
-					int tokenBegin = lineBegin;
-					int tokenEnd = data.find(' ', tokenBegin);
-					if (tokenEnd >= 0)
+					size_t tokenBegin = lineBegin;
+					size_t tokenEnd = data.find(' ', tokenBegin);
+					if (tokenEnd != BYTE_VECTOR::npos)
 					{
 						if (!strncmp("filename", (const char*)&data[tokenBegin], tokenEnd - tokenBegin))
 						{
-							int filenameBegin = tokenEnd + 1;
-							int filenameEnd = lineEnd;
-							CStringA filenameA = CStringA((LPCSTR)&data[filenameBegin], filenameEnd - filenameBegin);
+							size_t filenameBegin = tokenEnd + 1;
+							size_t filenameEnd = lineEnd;
+							CStringA filenameA = CStringA((LPCSTR)&data[filenameBegin], (int)(filenameEnd - filenameBegin));
 							filename = UnquoteFilename(filenameA);
 							auto r = hashToFilename.emplace(hash, filename);
 							if (!r.second)
@@ -227,7 +220,7 @@ void CTortoiseGitBlameData::ParseBlameOutput(BYTE_VECTOR &data, CGitHashMap & Ha
 		}
 		else
 		{
-			MessageBox(nullptr, err, _T("TortoiseGit"), MB_ICONERROR);
+			MessageBox(nullptr, err, L"TortoiseGit", MB_ICONERROR);
 			authors.emplace_back();
 			dates.emplace_back();
 		}
@@ -255,9 +248,9 @@ int CTortoiseGitBlameData::UpdateEncoding(int encode)
 		for (const auto& rawLine : m_RawLines)
 		{
 			if (!rawLine.empty())
-				all.append(&rawLine[0], rawLine.size());
+				all.append(rawLine.data(), rawLine.size());
 		}
-		encoding = GetEncode(&all[0], (int)all.size(), &bomoffset);
+		encoding = GetEncode(all.data(), (int)all.size(), &bomoffset);
 	}
 
 	if (encoding != m_encode)
@@ -393,7 +386,7 @@ static int FindUtf8Lower(const CStringA& strA, bool allAscii, const CString &fin
 	return strW.MakeLower().Find(findW);
 }
 
-int CTortoiseGitBlameData::FindFirstLineWrapAround(SearchDirection direction, const CString& what, int line, bool bCaseSensitive)
+int CTortoiseGitBlameData::FindFirstLineWrapAround(SearchDirection direction, const CString& what, int line, bool bCaseSensitive, std::function<void()> wraparound)
 {
 	bool allAscii = true;
 	for (int i = 0; i < what.GetLength(); ++i)
@@ -406,13 +399,13 @@ int CTortoiseGitBlameData::FindFirstLineWrapAround(SearchDirection direction, co
 	}
 	CString whatNormalized(what);
 	if (!bCaseSensitive)
-	{
 		whatNormalized.MakeLower();
-	}
 
 	CStringA whatNormalizedUtf8 = CUnicodeUtils::GetUTF8(whatNormalized);
 
-	int numberOfLines = GetNumberOfLines();
+	auto numberOfLines = (int)GetNumberOfLines();
+	if (numberOfLines == 0)
+		return -1;
 	int i = line;
 	if (direction == SearchPrevious)
 	{
@@ -444,13 +437,21 @@ int CTortoiseGitBlameData::FindFirstLineWrapAround(SearchDirection direction, co
 		{
 			++i;
 			if (i >= numberOfLines)
+			{
 				i = 0;
+				if (wraparound)
+					wraparound();
+			}
 		}
 		else if (direction == SearchPrevious)
 		{
 			--i;
 			if (i < 0)
+			{
 				i = numberOfLines - 2;
+				if (wraparound)
+					wraparound();
+			}
 		}
 	} while (i != line);
 

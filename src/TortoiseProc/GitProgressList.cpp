@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2018 - TortoiseGit
 // Copyright (C) 2003-2008 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -20,12 +20,12 @@
 #include "stdafx.h"
 #include "GitProgressList.h"
 #include "TortoiseProc.h"
+#include "Git.h"
 #include "registry.h"
 #include "AppUtils.h"
 #include "StringUtils.h"
 #include "LogFile.h"
 #include "LoglistUtils.h"
-#include "AppUtils.h"
 
 BOOL	CGitProgressList::m_bAscending = FALSE;
 int		CGitProgressList::m_nSortedColumn = -1;
@@ -38,7 +38,7 @@ IMPLEMENT_DYNAMIC(CGitProgressList, CListCtrl)
 
 CGitProgressList::CGitProgressList():CListCtrl()
 	, m_bCancelled(FALSE)
-	, m_pThread(NULL)
+	, m_pThread(nullptr)
 	, m_bErrorsOccurred(false)
 	, m_options(ProgOptNone)
 	, m_bSetTitle(false)
@@ -53,21 +53,20 @@ CGitProgressList::CGitProgressList():CListCtrl()
 	, m_bLastVisible(false)
 	, m_itemCount(-1)
 	, m_itemCountTotal(-1)
+	, m_nBackgroundImageID(0)
+	, m_pInfoCtrl(nullptr)
+	, m_pAnimate(nullptr)
+	, m_pProgControl(nullptr)
+	, m_pProgressLabelCtrl(nullptr)
+	, m_pPostWnd(nullptr)
 {
-	m_pInfoCtrl = nullptr;
-	m_pAnimate = nullptr;
-	m_pProgControl = nullptr;
-	m_pProgressLabelCtrl = nullptr;
-	m_pPostWnd = nullptr;
-	m_columnbuf[0] = 0;
+	m_columnbuf[0] = L'\0';
 }
 
 CGitProgressList::~CGitProgressList()
 {
 	for (size_t i = 0; i < m_arData.size(); ++i)
-	{
 		delete m_arData[i];
-	}
 	delete m_pThread;
 }
 
@@ -184,7 +183,6 @@ CString CGitProgressList::BuildInfoString()
 
 #if 0
 
-	CString temp;
 	int added = 0;
 	int copied = 0;
 	int deleted = 0;
@@ -251,74 +249,74 @@ CString CGitProgressList::BuildInfoString()
 	{
 		temp.LoadString(IDS_SVNACTION_CONFLICTED);
 		infotext += temp;
-		temp.Format(_T(":%d "), conflicted);
+		temp.Format(L":%d ", conflicted);
 		infotext += temp;
 	}
 	if (skipped)
 	{
 		temp.LoadString(IDS_SVNACTION_SKIP);
 		infotext += temp;
-		infotext.AppendFormat(_T(":%d "), skipped);
+		infotext.AppendFormat(L":%d ", skipped);
 	}
 	if (merged)
 	{
 		temp.LoadString(IDS_SVNACTION_MERGED);
 		infotext += temp;
-		infotext.AppendFormat(_T(":%d "), merged);
+		infotext.AppendFormat(L":%d ", merged);
 	}
 	if (added)
 	{
 		temp.LoadString(IDS_SVNACTION_ADD);
 		infotext += temp;
-		infotext.AppendFormat(_T(":%d "), added);
+		infotext.AppendFormat(L":%d ", added);
 	}
 	if (deleted)
 	{
 		temp.LoadString(IDS_SVNACTION_DELETE);
 		infotext += temp;
-		infotext.AppendFormat(_T(":%d "), deleted);
+		infotext.AppendFormat(L":%d ", deleted);
 	}
 	if (modified)
 	{
 		temp.LoadString(IDS_SVNACTION_MODIFIED);
 		infotext += temp;
-		infotext.AppendFormat(_T(":%d "), modified);
+		infotext.AppendFormat(L":%d ", modified);
 	}
 	if (copied)
 	{
 		temp.LoadString(IDS_SVNACTION_COPY);
 		infotext += temp;
-		infotext.AppendFormat(_T(":%d "), copied);
+		infotext.AppendFormat(L":%d ", copied);
 	}
 	if (replaced)
 	{
 		temp.LoadString(IDS_SVNACTION_REPLACED);
 		infotext += temp;
-		infotext.AppendFormat(_T(":%d "), replaced);
+		infotext.AppendFormat(L":%d ", replaced);
 	}
 	if (updated)
 	{
 		temp.LoadString(IDS_SVNACTION_UPDATE);
 		infotext += temp;
-		infotext.AppendFormat(_T(":%d "), updated);
+		infotext.AppendFormat(L":%d ", updated);
 	}
 	if (restored)
 	{
 		temp.LoadString(IDS_SVNACTION_RESTORE);
 		infotext += temp;
-		infotext.AppendFormat(_T(":%d "), restored);
+		infotext.AppendFormat(L":%d ", restored);
 	}
 	if (reverted)
 	{
 		temp.LoadString(IDS_SVNACTION_REVERT);
 		infotext += temp;
-		infotext.AppendFormat(_T(":%d "), reverted);
+		infotext.AppendFormat(L":%d ", reverted);
 	}
 	if (resolved)
 	{
 		temp.LoadString(IDS_SVNACTION_RESOLVE);
 		infotext += temp;
-		infotext.AppendFormat(_T(":%d "), resolved);
+		infotext.AppendFormat(L":%d ", resolved);
 	}
 #endif
 	return infotext;
@@ -330,7 +328,7 @@ void CGitProgressList::ResizeColumns()
 
 	TCHAR textbuf[MAX_PATH] = {0};
 
-	CHeaderCtrl * pHeaderCtrl = (CHeaderCtrl*)(GetDlgItem(0));
+	auto pHeaderCtrl = GetHeaderCtrl();
 	if (pHeaderCtrl)
 	{
 		int maxcol = pHeaderCtrl->GetItemCount()-1;
@@ -370,6 +368,7 @@ void CGitProgressList::ResizeColumns()
 
 bool CGitProgressList::SetBackgroundImage(UINT nID)
 {
+	m_nBackgroundImageID = nID;
 	return CAppUtils::SetListCtrlBackgroundImage(GetSafeHwnd(), nID);
 }
 
@@ -385,23 +384,23 @@ void CGitProgressList::ReportUserCanceled()
 
 void CGitProgressList::ReportError(const CString& sError)
 {
-	if (CRegDWORD(_T("Software\\TortoiseGit\\NoSounds"), FALSE) == FALSE)
-		PlaySound((LPCTSTR)SND_ALIAS_SYSTEMEXCLAMATION, NULL, SND_ALIAS_ID | SND_ASYNC);
+	if (CRegDWORD(L"Software\\TortoiseGit\\NoSounds", FALSE) == FALSE)
+		PlaySound((LPCTSTR)SND_ALIAS_SYSTEMEXCLAMATION, nullptr, SND_ALIAS_ID | SND_ASYNC);
 	ReportString(sError, CString(MAKEINTRESOURCE(IDS_ERR_ERROR)), m_Colors.GetColor(CColors::Conflict));
 	m_bErrorsOccurred = true;
 }
 
 void CGitProgressList::ReportWarning(const CString& sWarning)
 {
-	if (CRegDWORD(_T("Software\\TortoiseGit\\NoSounds"), FALSE) == FALSE)
-		PlaySound((LPCTSTR)SND_ALIAS_SYSTEMDEFAULT, NULL, SND_ALIAS_ID | SND_ASYNC);
+	if (CRegDWORD(L"Software\\TortoiseGit\\NoSounds", FALSE) == FALSE)
+		PlaySound((LPCTSTR)SND_ALIAS_SYSTEMDEFAULT, nullptr, SND_ALIAS_ID | SND_ASYNC);
 	ReportString(sWarning, CString(MAKEINTRESOURCE(IDS_WARN_WARNING)), m_Colors.GetColor(CColors::Conflict));
 }
 
 void CGitProgressList::ReportNotification(const CString& sNotification)
 {
-	if (CRegDWORD(_T("Software\\TortoiseGit\\NoSounds"), FALSE) == FALSE)
-		PlaySound((LPCTSTR)SND_ALIAS_SYSTEMDEFAULT, NULL, SND_ALIAS_ID | SND_ASYNC);
+	if (CRegDWORD(L"Software\\TortoiseGit\\NoSounds", FALSE) == FALSE)
+		PlaySound((LPCTSTR)SND_ALIAS_SYSTEMDEFAULT, nullptr, SND_ALIAS_ID | SND_ASYNC);
 	ReportString(sNotification, CString(MAKEINTRESOURCE(IDS_WARN_NOTE)));
 }
 
@@ -427,12 +426,12 @@ void CGitProgressList::ReportString(CString sMessage, const CString& sMsgKind, C
 			data->sPathColumnText = sMessage.Left(sMessage.Find('\n'));
 		else
 			data->sPathColumnText = sMessage;
-		data->sPathColumnText.Trim(_T("\n\r"));
+		data->sPathColumnText.Trim(L"\n\r");
 		data->color = color;
 		if (sMessage.Find('\n')>=0)
 		{
 			sMessage = sMessage.Mid(sMessage.Find('\n'));
-			sMessage.Trim(_T("\n\r"));
+			sMessage.Trim(L"\n\r");
 		}
 		else
 			sMessage.Empty();
@@ -442,7 +441,7 @@ void CGitProgressList::ReportString(CString sMessage, const CString& sMsgKind, C
 
 UINT CGitProgressList::ProgressThreadEntry(LPVOID pVoid)
 {
-	return ((CGitProgressList*)pVoid)->ProgressThread();
+	return reinterpret_cast<CGitProgressList*>(pVoid)->ProgressThread();
 }
 
 UINT CGitProgressList::ProgressThread()
@@ -459,7 +458,7 @@ UINT CGitProgressList::ProgressThread()
 	if(m_pProgressLabelCtrl)
 	{
 		m_pProgressLabelCtrl->ShowWindow(SW_SHOW);
-		m_pProgressLabelCtrl->SetWindowText(_T(""));
+		m_pProgressLabelCtrl->SetWindowText(L"");
 	}
 
 //	SetAndClearProgressInfo(m_hWnd);
@@ -469,7 +468,7 @@ UINT CGitProgressList::ProgressThread()
 	iFirstResized = 0;
 	bSecondResized = FALSE;
 	m_bFinishedItemAdded = false;
-	DWORD startTime = GetCurrentTime();
+	auto startTime = GetTickCount64();
 
 	if (m_pTaskbarList && m_pPostWnd)
 		m_pTaskbarList->SetProgressState(m_pPostWnd->GetSafeHwnd(), TBPF_INDETERMINATE);
@@ -484,7 +483,7 @@ UINT CGitProgressList::ProgressThread()
 		temp.LoadString(IDS_PROGRS_TITLEFAILED);
 	else
 		temp.LoadString(IDS_PROGRS_TITLEFIN);
-	sWindowTitle = sWindowTitle + _T(" ") + temp;
+	sWindowTitle = sWindowTitle + L' ' + temp;
 	if (m_bSetTitle && m_pPostWnd)
 		::SetWindowText(m_pPostWnd->GetSafeHwnd(), sWindowTitle);
 
@@ -514,13 +513,13 @@ UINT CGitProgressList::ProgressThread()
 
 	ResizeColumns();
 
-	DWORD time = GetCurrentTime() - startTime;
+	auto time = GetTickCount64() - startTime;
 
 	CString sFinalInfo;
 	if (!m_sTotalBytesTransferred.IsEmpty())
 	{
-		temp.Format(IDS_PROGRS_TIME, (time / 1000) / 60, (time / 1000) % 60);
-		sFinalInfo.Format(IDS_PROGRS_FINALINFO, m_sTotalBytesTransferred, (LPCTSTR)temp);
+		temp.FormatMessage(IDS_PROGRS_TIME, (DWORD)(time / 1000) / 60, (DWORD)(time / 1000) % 60);
+		sFinalInfo.FormatMessage(IDS_PROGRS_FINALINFO, (LPCTSTR)m_sTotalBytesTransferred, (LPCTSTR)temp);
 		if (m_pProgressLabelCtrl)
 			m_pProgressLabelCtrl->SetWindowText(sFinalInfo);
 	}
@@ -540,7 +539,7 @@ UINT CGitProgressList::ProgressThread()
 			str.LoadString(IDS_SUCCESS);
 		else
 			str.LoadString(IDS_FAIL);
-		log.Format(_T("%s (%lu ms @ %s)"), (LPCTSTR)str, time, (LPCTSTR)CLoglistUtils::FormatDateAndTime(CTime::GetCurrentTime(), DATE_SHORTDATE, true, false));
+		log.Format(L"%s (%lu ms @ %s)", (LPCTSTR)str, time, (LPCTSTR)CLoglistUtils::FormatDateAndTime(CTime::GetCurrentTime(), DATE_SHORTDATE, true, false));
 
 		// there's no "finished: xxx" line at the end. We add one here to make
 		// sure the user sees that the command is actually finished.
@@ -558,7 +557,7 @@ UINT CGitProgressList::ProgressThread()
 		for (size_t i = 0; i < m_arData.size(); ++i)
 		{
 			NotificationData * data = m_arData[i];
-			temp.Format(_T("%-20s : %s"), (LPCTSTR)data->sActionColumnText, (LPCTSTR)data->sPathColumnText);
+			temp.Format(L"%-20s : %s", (LPCTSTR)data->sActionColumnText, (LPCTSTR)data->sPathColumnText);
 			logfile.AddLine(temp);
 		}
 		if (!sFinalInfo.IsEmpty())
@@ -600,7 +599,7 @@ void CGitProgressList::OnLvnGetdispinfoSvnprogress(NMHDR *pNMHDR, LRESULT *pResu
 						int cWidth = GetColumnWidth(1);
 						cWidth = max(12, cWidth-12);
 						CDC * pDC = GetDC();
-						if (pDC != NULL)
+						if (pDC)
 						{
 							CFont * pFont = pDC->SelectObject(GetFont());
 							PathCompactPath(pDC->GetSafeHdc(), m_columnbuf, cWidth);
@@ -610,7 +609,7 @@ void CGitProgressList::OnLvnGetdispinfoSvnprogress(NMHDR *pNMHDR, LRESULT *pResu
 					}
 					break;
 				default:
-					m_columnbuf[0] = 0;
+					m_columnbuf[0] = L'\0';
 				}
 				pDispInfo->item.pszText = m_columnbuf;
 			}
@@ -648,8 +647,8 @@ void CGitProgressList::OnNMCustomdrawSvnprogress(NMHDR *pNMHDR, LRESULT *pResult
 			return;
 		}
 		const NotificationData * data = m_arData[pLVCD->nmcd.dwItemSpec];
-		ASSERT(data != NULL);
-		if (data == NULL)
+		ASSERT(data);
+		if (!data)
 			return;
 
 		// Store the color back in the NMLVCUSTOMDRAW struct.
@@ -732,8 +731,8 @@ void CGitProgressList::AddNotify(NotificationData* data, CColors::Colors color)
 
 int CGitProgressList::UpdateProgress(const git_transfer_progress* stat)
 {
-	static unsigned int start = 0;
-	unsigned int dt = GetCurrentTime() - start;
+	static ULONGLONG start = 0;
+	auto dt = GetTickCount64() - start;
 	double speed = 0;
 	
 	if (m_bCancelled)
@@ -744,7 +743,7 @@ int CGitProgressList::UpdateProgress(const git_transfer_progress* stat)
 
 	if (dt > 100)
 	{
-		start = GetCurrentTime();
+		start = GetTickCount64();
 		size_t ds = stat->received_bytes - m_TotalBytesTransferred;
 		speed = ds * 1000.0/dt;
 		m_TotalBytesTransferred = stat->received_bytes;
@@ -782,17 +781,17 @@ int CGitProgressList::UpdateProgress(const git_transfer_progress* stat)
 
 	CString str;
 	if(speed < 1024)
-		str.Format(_T("%.0f B/s"), speed);
+		str.Format(L"%.0f B/s", speed);
 	else if(speed < 1024 * 1024)
-		str.Format(_T("%.2f KiB/s"), speed / 1024);
+		str.Format(L"%.2f KiB/s", speed / 1024);
 	else
-		str.Format(_T("%.2f MiB/s"), speed / 1048576.0);
+		str.Format(L"%.2f MiB/s", speed / 1048576.0);
 
-	progText.Format(IDS_SVN_PROGRESS_TOTALANDSPEED, (LPCTSTR)m_sTotalBytesTransferred, (LPCTSTR)str);
+	progText.FormatMessage(IDS_SVN_PROGRESS_TOTALANDSPEED, (LPCTSTR)m_sTotalBytesTransferred, (LPCTSTR)str);
 	if (m_pProgressLabelCtrl)
 		m_pProgressLabelCtrl->SetWindowText(progText);
 
-	SetTimer(TRANSFERTIMER, 2000, NULL);
+	SetTimer(TRANSFERTIMER, 2000, nullptr);
 
 	return 0;
 }
@@ -802,8 +801,8 @@ void CGitProgressList::OnTimer(UINT_PTR nIDEvent)
 	if (nIDEvent == TRANSFERTIMER)
 	{
 		CString progText;
-		CString progSpeed = _T("0 B/s");
-		progText.Format(IDS_SVN_PROGRESS_TOTALANDSPEED, (LPCTSTR)m_sTotalBytesTransferred, (LPCTSTR)progSpeed);
+		CString progSpeed = L"0 B/s";
+		progText.FormatMessage(IDS_SVN_PROGRESS_TOTALANDSPEED, (LPCTSTR)m_sTotalBytesTransferred, (LPCTSTR)progSpeed);
 		if (m_pProgressLabelCtrl)
 			m_pProgressLabelCtrl->SetWindowText(progText);
 
@@ -820,9 +819,7 @@ void CGitProgressList::OnTimer(UINT_PTR nIDEvent)
 void CGitProgressList::Sort()
 {
 	if(m_arData.size() < 2)
-	{
 		return;
-	}
 
 	// We need to sort the blocks which lie between the auxiliary entries
 	// This is so that any aux data stays where it was
@@ -832,14 +829,14 @@ void CGitProgressList::Sort()
 	for(;;)
 	{
 		// Search to the start of the non-aux entry in the next block
-		actionBlockBegin = std::find_if(actionBlockEnd, m_arData.end(), std::not1(std::ptr_fun(&CGitProgressList::NotificationDataIsAux)));
+		actionBlockBegin = std::find_if(actionBlockEnd, m_arData.end(), [](const auto& pData) { return !CGitProgressList::NotificationDataIsAux(pData); });
 		if(actionBlockBegin == m_arData.end())
 		{
 			// There are no more actions
 			break;
 		}
 		// Now search to find the end of the block
-		actionBlockEnd = std::find_if(actionBlockBegin+1, m_arData.end(), std::ptr_fun(&CGitProgressList::NotificationDataIsAux));
+		actionBlockEnd = std::find_if(actionBlockBegin + 1, m_arData.end(), [](const auto& pData) { return CGitProgressList::NotificationDataIsAux(pData); });
 		// Now sort the block
 		std::sort(actionBlockBegin, actionBlockEnd, &CGitProgressList::SortCompare);
 	}
@@ -862,9 +859,7 @@ bool CGitProgressList::SortCompare(const NotificationData * pData1, const Notifi
 
 	// Sort by path if everything else is equal
 	if (result == 0)
-	{
 		result = CTGitPath::Compare(pData1->path, pData2->path);
-	}
 
 	if (!m_bAscending)
 		result = -result;
@@ -915,7 +910,7 @@ void CGitProgressList::OnContextMenu(CWnd* pWnd, CPoint point)
 			if (data)
 			{
 				sLines += data->sPathColumnText;
-				sLines += _T("\r\n");
+				sLines += L"\r\n";
 			}
 		}
 		sLines.TrimRight();
@@ -927,7 +922,7 @@ void CGitProgressList::OnContextMenu(CWnd* pWnd, CPoint point)
 	if (actions.empty())
 		return;
 
-	int cmd = popup.TrackPopupMenu(TPM_RETURNCMD | TPM_LEFTALIGN | TPM_NONOTIFY, point.x, point.y, this, 0);
+	int cmd = popup.TrackPopupMenu(TPM_RETURNCMD | TPM_LEFTALIGN | TPM_NONOTIFY, point.x, point.y, this);
 
 	if (cmd <= 0 || (size_t)cmd > actions.size())
 		return;
@@ -985,10 +980,10 @@ void CGitProgressList::OnSize(UINT nType, int cx, int cy)
 
 void CGitProgressList::Init()
 {
-	SetExtendedStyle (LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER);
+	SetExtendedStyle((CRegDWORD(L"Software\\TortoiseGit\\FullRowSelect", TRUE) ? LVS_EX_FULLROWSELECT : 0) | LVS_EX_DOUBLEBUFFER);
 
 	DeleteAllItems();
-	int c = ((CHeaderCtrl*)(GetDlgItem(0)))->GetItemCount()-1;
+	int c = GetHeaderCtrl()->GetItemCount()-1;
 	while (c>=0)
 		DeleteColumn(c--);
 
@@ -999,10 +994,8 @@ void CGitProgressList::Init()
 	InsertColumn(1, temp);
 
 	m_pThread = AfxBeginThread(ProgressThreadEntry, this, THREAD_PRIORITY_NORMAL,0,CREATE_SUSPENDED);
-	if (m_pThread==NULL)
-	{
+	if (!m_pThread)
 		ReportError(CString(MAKEINTRESOURCE(IDS_ERR_THREADSTARTFAILED)));
-	}
 	else
 	{
 		m_pThread->m_bAutoDelete = FALSE;
@@ -1013,7 +1006,7 @@ void CGitProgressList::Init()
 	// text gets added.
 	ResizeColumns();
 
-	SetTimer(VISIBLETIMER, 300, NULL);
+	SetTimer(VISIBLETIMER, 300, nullptr);
 }
 
 
@@ -1021,7 +1014,7 @@ void CGitProgressList::OnClose()
 {
 	if (m_bCancelled)
 	{
-		TerminateThread(m_pThread->m_hThread, (DWORD)-1);
+		g_Git.KillRelatedThreads(m_pThread);
 		InterlockedExchange(&m_bThreadRunning, FALSE);
 	}
 	else
@@ -1031,7 +1024,6 @@ void CGitProgressList::OnClose()
 	}
 	CListCtrl::OnClose();
 }
-
 
 BOOL CGitProgressList::PreTranslateMessage(MSG* pMsg)
 {
@@ -1044,9 +1036,7 @@ BOOL CGitProgressList::PreTranslateMessage(MSG* pMsg)
 				// Ctrl-A -> select all
 				SetSelectionMark(0);
 				for (int i=0; i<GetItemCount(); ++i)
-				{
 					SetItemState(i, LVIS_SELECTED, LVIS_SELECTED);
-				}
 			}
 		}
 		if ((pMsg->wParam == 'C')||(pMsg->wParam == VK_INSERT))
@@ -1059,7 +1049,7 @@ BOOL CGitProgressList::PreTranslateMessage(MSG* pMsg)
 					//Ctrl-C -> copy to clipboard
 					CString sClipdata;
 					POSITION pos = GetFirstSelectedItemPosition();
-					if (pos != NULL)
+					if (pos)
 					{
 						while (pos)
 						{
@@ -1067,10 +1057,7 @@ BOOL CGitProgressList::PreTranslateMessage(MSG* pMsg)
 							CString sAction = GetItemText(nItem, 0);
 							CString sPath = GetItemText(nItem, 1);
 							CString sMime = GetItemText(nItem, 2);
-							CString sLogCopyText;
-							sLogCopyText.Format(_T("%s: %s  %s\r\n"),
-								(LPCTSTR)sAction, (LPCTSTR)sPath, (LPCTSTR)sMime);
-							sClipdata +=  sLogCopyText;
+							sClipdata.AppendFormat(L"%s: %s  %s\r\n", (LPCTSTR)sAction, (LPCTSTR)sPath, (LPCTSTR)sMime);
 						}
 						CStringUtils::WriteAsciiStringToClipboard(sClipdata);
 					}
@@ -1108,8 +1095,8 @@ void CGitProgressList::SetProgressLabelText(const CString& str)
 
 CGitProgressList::WC_File_NotificationData::WC_File_NotificationData(const CTGitPath& path, git_wc_notify_action_t action)
 : NotificationData()
+, action(action)
 {
-	this->action = action;
 	this->path = path;
 	sPathColumnText = path.GetGitPathString();
 
@@ -1155,9 +1142,9 @@ void CGitProgressList::WC_File_NotificationData::GetContextMenu(CIconMenu& popup
 	{
 		actions.push_back([&]()
 		{
-			CString cmd = _T("/command:log");
+			CString cmd = L"/command:log";
 			CString sPath = g_Git.CombinePath(path);
-			cmd += _T(" /path:\"") + sPath + _T("\"");
+			cmd += L" /path:\"" + sPath + L'"';
 			CAppUtils::RunTortoiseGitProc(cmd);
 		});
 		popup.AppendMenuIcon(actions.size(), IDS_MENULOG, IDI_LOG);
@@ -1185,4 +1172,16 @@ void CGitProgressList::WC_File_NotificationData::HandleDblClick() const
 		return;
 	}
 	CAppUtils::ShellOpen(sWinPath);
+}
+
+void CGitProgressList::OnSysColorChange()
+{
+	__super::OnSysColorChange();
+	if (m_nBackgroundImageID)
+		CAppUtils::SetListCtrlBackgroundImage(GetSafeHwnd(), m_nBackgroundImageID);
+}
+
+ULONG CGitProgressList::GetGestureStatus(CPoint /*ptTouch*/)
+{
+	return 0;
 }

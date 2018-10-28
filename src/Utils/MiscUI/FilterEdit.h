@@ -1,5 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
+// Copyright (C) 2016-2017 - TortoiseGit
 // Copyright (C) 2007-2008 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
@@ -18,9 +19,6 @@
 //
 #pragma once
 #include <memory>
-
-#define WM_FILTEREDIT_INFOCLICKED	(WM_USER + 102)
-#define WM_FILTEREDIT_CANCELCLICKED	(WM_USER + 101)
 
 /**
  * \ingroup Utils
@@ -51,13 +49,13 @@ public:
  *   CMenu popup;
  *   if (popup.CreatePopupMenu())
  *   {
- *     popup.AppendMenu(MF_STRING | MF_ENABLED, 1, _T("string 1"));
+ *     popup.AppendMenu(MF_STRING | MF_ENABLED, 1, L"string 1");
  *     popup.AppendMenu(MF_SEPARATOR, NULL);
- *     popup.AppendMenu(MF_STRING | MF_ENABLED, 2, _T("string 2"));
- *     popup.AppendMenu(MF_STRING | MF_ENABLED, 3, _T("string 3"));
- *     popup.AppendMenu(MF_STRING | MF_ENABLED, 4, _T("string 4"));
- *     popup.AppendMenu(MF_STRING | MF_ENABLED, 5, _T("string 5"));
- *     popup.TrackPopupMenu(TPM_RETURNCMD | TPM_LEFTALIGN | TPM_NONOTIFY, point.x, point.y, this, 0);
+ *     popup.AppendMenu(MF_STRING | MF_ENABLED, 2, L"string 2");
+ *     popup.AppendMenu(MF_STRING | MF_ENABLED, 3, L"string 3");
+ *     popup.AppendMenu(MF_STRING | MF_ENABLED, 4, L"string 4");
+ *     popup.AppendMenu(MF_STRING | MF_ENABLED, 5, L"string 5");
+ *     popup.TrackPopupMenu(TPM_RETURNCMD | TPM_LEFTALIGN | TPM_NONOTIFY, point.x, point.y, this);
  *   }
  *   return 0;
  * }
@@ -70,16 +68,23 @@ public:
 	CFilterEdit();
 	virtual ~CFilterEdit();
 
+	static const UINT WM_FILTEREDIT_INFOCLICKED;
+	static const UINT WM_FILTEREDIT_CANCELCLICKED;
+
 	/**
 	 * Sets the icons to show for the cancel button. The first icon represents
 	 * the normal state, the second one when the button is pressed.
 	 * if \c bShowAlways is true, then the cancel button is shown even if there
 	 * is no text in the control.
+	 *
+	 * The \c cx96dpi and \c cy96dpi specifies width and height of icon in 96 DPI.
+	 * Control will automatically scale icon according to current DPI.
+	 *
 	 * \note To catch the WM_FILTEREDIT_CANCELCLICKED notification, handle the message directly (or use the
 	 * WM_MESSAGE() macro). The LPARAM parameter of the message contains the
 	 * rectangle (pointer to RECT) of the info icon in screen coordinates.
 	 */
-	BOOL SetCancelBitmaps(UINT uCancelNormal, UINT uCancelPressed, BOOL bShowAlways = FALSE);
+	BOOL SetCancelBitmaps(UINT uCancelNormal, UINT uCancelPressed, int cx96dpi, int cy96dpi, BOOL bShowAlways = FALSE);
 
 	/**
 	 * Sets the info icon shown on the left.
@@ -91,12 +96,21 @@ public:
 	 * WM_MESSAGE() macro). The LPARAM parameter of the message contains the
 	 * rectangle (pointer to RECT) of the info icon in screen coordinates.
 	 */
-	BOOL SetInfoIcon(UINT uInfo);
+	BOOL SetInfoIcon(UINT uInfo, int cx96dpi, int cy96dpi);
 
 	/**
-	 * Sets the message Id which is sent when the user clicks on the info
-	 * button.
-	 */
+	 * Sets the info icon shown on the left.
+	 * A notification is sent when the user clicks on that icon.
+	 * The notification is either WM_FILTEREDIT_INFOCLICKED or the one
+	 * set with SetButtonClickedMessageId().
+	 *
+	 * The \c cx96dpi and \c cy96dpi specifies width and height of icon in 96 DPI.
+	 * Control will automatically scale icon according to current DPI.
+	 *
+	 * To catch the notification, handle the message directly (or use the
+	 * WM_MESSAGE() macro). The LPARAM parameter of the message contains the
+	 * rectangle (pointer to RECT) of the info icon in screen coordinates.
+	*/
 	void SetButtonClickedMessageId(UINT iButtonClickedMessageId, UINT iCancelClickedMessageId);
 
 	/**
@@ -108,8 +122,9 @@ public:
 
 	void ValidateAndRedraw();
 protected:
-	virtual void	PreSubclassWindow( );
-	virtual BOOL	PreTranslateMessage( MSG* pMsg );
+	virtual void	PreSubclassWindow() override;
+	virtual BOOL	PreTranslateMessage(MSG* pMsg) override;
+	virtual ULONG	GetGestureStatus(CPoint ptTouch) override;
 
 	afx_msg BOOL	OnEraseBkgnd(CDC* pDC);
 	afx_msg void	OnLButtonUp(UINT nFlags, CPoint point);
@@ -124,6 +139,7 @@ protected:
 	afx_msg void	OnEnKillfocus();
 	afx_msg void	OnEnSetfocus();
 	afx_msg LRESULT	OnPaste(WPARAM wParam, LPARAM lParam);
+	afx_msg void	OnSysColorChange();
 	DECLARE_MESSAGE_MAP()
 
 
@@ -131,6 +147,7 @@ protected:
 	CSize			GetIconSize(HICON hIcon);
 	void			Validate();
 	void			DrawDimText();
+	HICON			LoadDpiScaledIcon(UINT resourceId, int cx96dpi, int cy96dpi);
 
 protected:
 	HICON					m_hIconCancelNormal;
@@ -146,9 +163,9 @@ protected:
 	UINT					m_iButtonClickedMessageId;
 	UINT					m_iCancelClickedMessageId;
 	COLORREF				m_backColor;
-	HBRUSH					m_brBack;
+	CBrush					m_brBack;
 	IFilterEditValidator *	m_pValidator;
-	std::unique_ptr<TCHAR[]>	m_pCueBanner;
+	CString					m_sCueBanner;
 };
 
 

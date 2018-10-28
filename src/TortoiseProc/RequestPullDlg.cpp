@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2011-2014, 2016 - TortoiseGit
+// Copyright (C) 2011-2014, 2016-2017 - TortoiseGit
 
 // with code of PullFetchDlg.cpp
 
@@ -26,12 +26,13 @@
 #include "LogDlg.h"
 #include "MessageBox.h"
 #include "AppUtils.h"
+#include "StringUtils.h"
 
 IMPLEMENT_DYNAMIC(CRequestPullDlg, CHorizontalResizableStandAloneDialog)
 
-CRequestPullDlg::CRequestPullDlg(CWnd* pParent /*=NULL*/)
+CRequestPullDlg::CRequestPullDlg(CWnd* pParent /*=nullptr*/)
 	: CHorizontalResizableStandAloneDialog(CRequestPullDlg::IDD, pParent)
-	, m_regSendMail(_T("Software\\TortoiseGit\\TortoiseProc\\RequestPull\\SendMail"), FALSE)
+	, m_regSendMail(L"Software\\TortoiseGit\\TortoiseProc\\RequestPull\\SendMail", FALSE)
 {
 	m_bSendMail = m_regSendMail;
 }
@@ -69,42 +70,38 @@ BOOL CRequestPullDlg::OnInitDialog()
 	AddAnchor(IDC_COMBOBOXEX_URL, TOP_LEFT,TOP_RIGHT);
 	AddAnchor(IDC_REMOTE_BRANCH, TOP_LEFT,TOP_RIGHT);
 
-	EnableSaveRestore(_T("RequestPullDlg"));
+	EnableSaveRestore(L"RequestPullDlg");
 
 	CString sWindowTitle;
 	GetWindowText(sWindowTitle);
 	CAppUtils::SetWindowTitle(m_hWnd, g_Git.m_CurrentDir, sWindowTitle);
 
 	STRING_VECTOR list;
-	g_Git.GetBranchList(list, NULL, CGit::BRANCH_ALL);
+	g_Git.GetBranchList(list, nullptr, CGit::BRANCH_ALL);
 	m_cStartRevision.SetMaxHistoryItems(0x7FFFFFFF);
 	m_cStartRevision.SetList(list);
 
 	CString WorkingDir=g_Git.m_CurrentDir;
-	WorkingDir.Replace(_T(':'), _T('_'));
+	WorkingDir.Replace(L':', L'_');
 
-	m_RegStartRevision = CRegString(_T("Software\\TortoiseGit\\History\\RequestPull\\")+WorkingDir+_T("\\startrevision"));
-	if(m_StartRevision.IsEmpty()) {
+	m_RegStartRevision = CRegString(L"Software\\TortoiseGit\\History\\RequestPull\\" + WorkingDir + L"\\startrevision");
+	if (m_StartRevision.IsEmpty())
 		m_StartRevision = m_RegStartRevision;
-	}
 	m_cStartRevision.SetWindowTextW(m_StartRevision);
 
 	// store URLs in global history, but save last used local url separately,
 	// because one normally has only one writable repository
 	m_cRepositoryURL.SetCaseSensitive(TRUE);
 	m_cRepositoryURL.SetURLHistory(TRUE);
-	m_cRepositoryURL.LoadHistory(_T("Software\\TortoiseGit\\History\\RequestPull"), _T("url"));
-	m_RegRepositoryURL = CRegString(_T("Software\\TortoiseGit\\History\\RequestPull\\")+WorkingDir+_T("\\repositoryurl"));
+	m_cRepositoryURL.LoadHistory(L"Software\\TortoiseGit\\History\\RequestPull", L"url");
+	m_RegRepositoryURL = CRegString(L"Software\\TortoiseGit\\History\\RequestPull\\" + WorkingDir + L"\\repositoryurl");
 	if(m_RepositoryURL.IsEmpty())
-	{
 		m_RepositoryURL = m_RegRepositoryURL;
-	}
 	m_cRepositoryURL.SetWindowTextW(m_RepositoryURL);
 
-	m_RegEndRevision = CRegString(_T("Software\\TortoiseGit\\History\\RequestPull\\")+WorkingDir+_T("\\endrevision"), _T("HEAD"));
-	if(m_EndRevision.IsEmpty()) {
+	m_RegEndRevision = CRegString(L"Software\\TortoiseGit\\History\\RequestPull\\" + WorkingDir + L"\\endrevision", L"HEAD");
+	if (m_EndRevision.IsEmpty())
 		m_EndRevision = m_RegEndRevision;
-	}
 	m_cEndRevision.SetWindowTextW(m_EndRevision);
 
 	this->UpdateData(FALSE);
@@ -132,7 +129,7 @@ void CRequestPullDlg::OnBnClickedOk()
 		return;
 	}
 
-	if(m_StartRevision.Find(_T("remotes/")) == 0)
+	if (CStringUtils::StartsWith(m_StartRevision, L"remotes/"))
 		m_StartRevision = m_StartRevision.Mid(8);
 
 	m_regSendMail = m_bSendMail;
@@ -149,8 +146,9 @@ void CRequestPullDlg::OnBnClickedButtonLocalBranch()
 	dlg.SetParams(CTGitPath(), CTGitPath(), revision, revision, 0);
 	// tell the dialog to use mode for selecting revisions
 	dlg.SetSelect(true);
+	dlg.ShowWorkingTreeChanges(false);
 	// only one revision must be selected however
 	dlg.SingleSelection(true);
-	if ( dlg.DoModal() == IDOK )
+	if (dlg.DoModal() == IDOK && !dlg.GetSelectedHash().empty())
 		m_cStartRevision.SetWindowText(dlg.GetSelectedHash().at(0).ToString());
 }

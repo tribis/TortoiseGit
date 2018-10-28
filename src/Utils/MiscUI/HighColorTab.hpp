@@ -26,30 +26,30 @@ namespace HighColorTab
 
 	Policy for creating a high color (32 bits) image list. The policy
 	ensure that there is a Win32 image list associated with the CImageList.
-	If this is not the case, a NULL pointer shall be returned.
+	If this is not the case, a nullptr pointer shall be returned.
 
-	Returned image list is wrapped in an std::auto_ptr.
+	Returned image list is wrapped in an std::unique_ptr.
 
 	\sa UpdateImageListFull  */
 	struct CHighColorListCreator
 	{
 	/*! Create the image list.
-		\retval std::auto_ptr<CImageList> Not null if success. */
-	static std::auto_ptr<CImageList> CreateImageList()
+		\retval std::unique_ptr<CImageList> Not null if success. */
+	static std::unique_ptr<CImageList> CreateImageList(int w, int h)
 	{
-		std::auto_ptr<CImageList> apILNew( new CImageList() );
-		if( NULL == apILNew.get() )
+		auto apILNew = std::make_unique<CImageList>();
+		if (!apILNew.get())
 		{
 			// ASSERT: The CImageList object creation failed.
 			ASSERT( FALSE );
-			return std::auto_ptr<CImageList>();
+			return std::unique_ptr<CImageList>();
 		}
 
-		if( 0 == apILNew->Create( 16, 16, ILC_COLOR32|ILC_MASK, 0, 1 ) )
+		if (0 == apILNew->Create(w, h, ILC_COLOR32 | ILC_MASK, 0, 1))
 		{
 			// ASSERT: The image list (Win32) creation failed.
 			ASSERT( FALSE );
-			return std::auto_ptr<CImageList>();
+			return std::unique_ptr<CImageList>();
 		}
 
 		return apILNew;
@@ -62,13 +62,13 @@ namespace HighColorTab
 
 	This method provides full customization via policy over image list creation. The policy
 	must have a method with the signature:
-	<code>static std::auto_ptr<CImageList> CreateImageList()</code>
+	<code>static std::unique_ptr<CImageList> CreateImageList()</code>
 
 	\author Yves Tkaczyk (yves@tkaczyk.net)
 	\date 02/2004 */
 	template<typename TSheet,
 			typename TListCreator>
-	bool UpdateImageListFull(TSheet& rSheet)
+	bool UpdateImageListFull(TSheet& rSheet, int w, int h)
 	{
 		// Get the tab control...
 		CTabCtrl* pTab = rSheet.GetTabControl();
@@ -80,9 +80,9 @@ namespace HighColorTab
 		}
 
 		// Create the replacement image list via policy.
-		std::auto_ptr<CImageList> apILNew( TListCreator::CreateImageList() );
+		std::unique_ptr<CImageList> apILNew(TListCreator::CreateImageList(w, h));
 
-		bool bSuccess = (NULL != apILNew.get() );
+		bool bSuccess = (nullptr != apILNew.get());
 
 		// Reload the icons from the property pages.
 		int nTotalPageCount = rSheet.GetPageCount();
@@ -131,9 +131,9 @@ namespace HighColorTab
 
 	This method uses 32 bits image list creation default policy. */
 	template<typename TSheet>
-	bool UpdateImageList(TSheet& rSheet)
+	bool UpdateImageList(TSheet& rSheet, int w, int h)
 	{
-		return UpdateImageListFull<TSheet, HighColorTab::CHighColorListCreator>( rSheet );
+		return UpdateImageListFull<TSheet, HighColorTab::CHighColorListCreator>(rSheet, w, h);
 	};
 };
 

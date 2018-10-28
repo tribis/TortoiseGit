@@ -1,7 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
 // External Cache Copyright (C) 2005 - 2006,2010, 2014 - TortoiseSVN
-// Copyright (C) 2008-2011 - TortoiseGit
+// Copyright (C) 2008-2011, 2017-2018 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -52,11 +52,11 @@ public:
 	/// Refreshes the cache.
 	void Refresh();
 
-	/// Get the status for a single path (main entry point, called from named-pipe code
-	CStatusCacheEntry GetStatusForPath(const CTGitPath& path, DWORD flags,  bool bFetch = true);
+	/// Get the status for a single path (main entry point, called from named-pipe code)
+	CStatusCacheEntry GetStatusForPath(const CTGitPath& path, DWORD flags);
 
 	/// Find a directory in the cache (a new entry will be created if there isn't an existing entry)
-	CCachedDirectory * GetDirectoryCacheEntry(const CTGitPath& path, bool IsAddtoWatch=true);
+	CCachedDirectory* GetDirectoryCacheEntry(const CTGitPath& path);
 	CCachedDirectory * GetDirectoryCacheEntryNoCreate(const CTGitPath& path);
 
 	/// Add a folder to the background crawler's work list
@@ -67,11 +67,6 @@ public:
 
 	/// Removes all items from the cache
 	void ClearCache();
-
-	/// Call this method before getting the status for a shell request
-	void StartRequest(const CTGitPath& path);
-	/// Call this method after the data for the shell request has been gathered
-	void EndRequest(const CTGitPath& path);
 
 	/// Notifies the shell about file/folder status changes.
 	/// A notification is only sent for paths which aren't currently
@@ -101,13 +96,14 @@ public:
 	bool m_bClearMemory;
 private:
 	static CString GetSpecialFolder(REFKNOWNFOLDERID rfid);
-	bool RemoveCacheForDirectory(CCachedDirectory * cdir);
+	bool RemoveCacheForDirectory(CCachedDirectory* cdir, const CTGitPath& origPath);
+	void RemoveCacheForDirectoryChildren(CCachedDirectory* cdir, const CTGitPath& origPath);
 	CReaderWriterLock m_guard;
+	CReaderWriterLock m_guardcacheddirectories;
 	CAtlList<CString> m_askedList;
 	CCachedDirectory::CachedDirMap m_directoryCache;
 	CComAutoCriticalSection m_NoWatchPathCritSec;
 	std::map<CTGitPath, ULONGLONG> m_NoWatchPaths;	///< paths to block from getting crawled, and the time in ms until they're unblocked
-//	SVNHelper m_svnHelp;
 	ShellCache	m_shellCache;
 
 	static CGitStatusCache* m_pInstance;

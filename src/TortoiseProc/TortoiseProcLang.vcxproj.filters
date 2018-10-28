@@ -35,9 +35,6 @@
     <Image Include="..\Resources\AddBackground.ico">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="..\Resources\cache.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
     <Image Include="..\Resources\cancel-normal.ico">
       <Filter>Resource Files</Filter>
     </Image>
@@ -50,19 +47,10 @@
     <Image Include="..\Resources\CommitBackground.ico">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="..\Resources\CopyBackground.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="..\Resources\DelunversionedBackground.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
     <Image Include="..\Resources\dialogs.ico">
       <Filter>Resource Files</Filter>
     </Image>
     <Image Include="..\Resources\Drives.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="..\Resources\ExportBackground.ico">
       <Filter>Resource Files</Filter>
     </Image>
     <Image Include="..\Resources\filteredit.ico">
@@ -92,16 +80,10 @@
     <Image Include="..\Resources\iconset.ico">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="..\Resources\ImportBackground.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
     <Image Include="..\Resources\logfilter.ico">
       <Filter>Resource Files</Filter>
     </Image>
     <Image Include="..\Resources\lookandfeel.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="..\Resources\MergeBackground.ico">
       <Filter>Resource Files</Filter>
     </Image>
     <Image Include="..\Resources\misc.ico">
@@ -113,9 +95,6 @@
     <Image Include="..\Resources\proxy.ico">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="..\Resources\RenameBackground.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
     <Image Include="..\Resources\RepoBrowserBackground.ico">
       <Filter>Resource Files</Filter>
     </Image>
@@ -125,34 +104,10 @@
     <Image Include="..\Resources\RevertBackground.ico">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="..\Resources\revgraph_added.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="..\Resources\revgraph_addedplus.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="..\Resources\revgraph_deleted.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="..\Resources\revgraph_lastcommit.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="..\Resources\revgraph_renamed.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="..\Resources\revgraph_replaced.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="..\Resources\revgraph_tag.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
     <Image Include="..\Resources\revgraphbar.bmp">
       <Filter>Resource Files</Filter>
     </Image>
     <Image Include="..\Resources\saveddata.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="..\Resources\ssh.ico">
       <Filter>Resource Files</Filter>
     </Image>
     <Image Include="..\Resources\switch.ico">
@@ -165,12 +120,6 @@
       <Filter>Resource Files</Filter>
     </Image>
     <Image Include="..\Resources\tortoisegit_logoflipped.bmp">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="..\Resources\ttf_glyph.bmp">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="..\Resources\UnlockBackground.ico">
       <Filter>Resource Files</Filter>
     </Image>
     <Image Include="..\Resources\UpdateBackground.ico">
@@ -187,11 +136,7 @@
     <None Include="..\Resources\pandown.cur">
       <Filter>Resource Files</Filter>
     </None>
-    <None Include="..\Resources\bin167.avi" />
-    <None Include="..\Resources\bin168.avi" />
-    <None Include="..\Resources\cleananim.avi" />
     <None Include="..\Resources\download.avi" />
-    <None Include="..\Resources\search.avi" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\Resources\TortoiseProcENG.rc">

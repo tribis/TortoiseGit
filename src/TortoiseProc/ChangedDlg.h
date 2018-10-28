@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008, 2011-2014 - TortoiseGit
+// Copyright (C) 2008, 2011-2017 - TortoiseGit
 // Copyright (C) 2003-2006,2008 - Stefan Kueng
 
 // This program is free software; you can redistribute it and/or
@@ -20,9 +20,9 @@
 #pragma once
 
 #include "StandAloneDlg.h"
-#include "Git.h"
 #include "registry.h"
-
+#include "MenuButton.h"
+#include "TGitPath.h"
 #include "GitStatusListCtrl.h"
 
 /**
@@ -34,18 +34,18 @@ class CChangedDlg : public CResizableStandAloneDialog
 	DECLARE_DYNAMIC(CChangedDlg)
 
 public:
-	CChangedDlg(CWnd* pParent = NULL);   // standard constructor
+	CChangedDlg(CWnd* pParent = nullptr);   // standard constructor
 	virtual ~CChangedDlg();
 
 // Dialog Data
 	enum { IDD = IDD_CHANGEDFILES };
 
 protected:
-	virtual void			DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
-	virtual BOOL			OnInitDialog();
-	virtual void			OnOK();
-	virtual void			OnCancel();
-	virtual BOOL			PreTranslateMessage(MSG* pMsg);
+	virtual void			DoDataExchange(CDataExchange* pDX) override;    // DDX/DDV support
+	virtual BOOL			OnInitDialog() override;
+	virtual void			OnOK() override;
+	virtual void			OnCancel() override;
+	virtual BOOL			PreTranslateMessage(MSG* pMsg) override;
 	afx_msg void			OnBnClickedRefresh();
 	afx_msg void			OnBnClickedCommit();
 	afx_msg void			OnBnClickedStash();
@@ -61,7 +61,7 @@ protected:
 	DECLARE_MESSAGE_MAP()
 
 private:
-	CButton					m_ctrlStash;
+	CMenuButton				m_ctrlStash;
 	static UINT				ChangedStatusThreadEntry(LPVOID pVoid);
 	UINT					ChangedStatusThread();
 	void					UpdateStatistics();

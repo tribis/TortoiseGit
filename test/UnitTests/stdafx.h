@@ -5,7 +5,7 @@
 #pragma once
 #define XMESSAGEBOX_APPREGPATH "Software\\TortoiseGit\\"
 
-#include "..\..\src\targetver.h"
+#include "../../src\targetver.h"
 
 #include <afxwin.h>         // MFC core and standard components
 #include <afxext.h>         // MFC extensions
@@ -46,7 +46,10 @@
 #include "scope_exit_noexcept.h"
 #include "DebugOutput.h"
 
+#include "SmartHandle.h"
+
 // Header for gtest
 #include "gtest/gtest.h"
+#include "gmock/gmock.h"
 
 #include "AutoTempDir.h"

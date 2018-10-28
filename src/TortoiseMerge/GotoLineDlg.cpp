@@ -26,13 +26,12 @@
 
 IMPLEMENT_DYNAMIC(CGotoLineDlg, CDialogEx)
 
-CGotoLineDlg::CGotoLineDlg(CWnd* pParent /*=NULL*/)
+CGotoLineDlg::CGotoLineDlg(CWnd* pParent /*=nullptr*/)
 	: CDialogEx(CGotoLineDlg::IDD, pParent)
 	, m_nLine(0)
 	, m_nLow(-1)
 	, m_nHigh(-1)
 {
-
 }
 
 CGotoLineDlg::~CGotoLineDlg()
@@ -74,7 +73,7 @@ void CGotoLineDlg::OnOK()
 	if ((m_nLine < m_nLow)||(m_nLine > m_nHigh))
 	{
 		CString sError;
-		sError.Format(IDS_GOTO_OUTOFRANGE, m_nLow, m_nHigh);
+		sError.FormatMessage(IDS_GOTO_OUTOFRANGE, m_nLow, m_nHigh);
 		m_cNumber.ShowBalloonTip(L"", sError);
 		m_cNumber.SetSel(0, -1);
 		return;

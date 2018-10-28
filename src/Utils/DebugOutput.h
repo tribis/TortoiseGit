@@ -25,7 +25,7 @@ class CTraceToOutputDebugString
 public:
 	static CTraceToOutputDebugString& Instance()
 	{
-		if (m_pInstance == NULL)
+		if (!m_pInstance)
 			m_pInstance = new CTraceToOutputDebugString;
 		return *m_pInstance;
 	}
@@ -61,10 +61,11 @@ public:
 
 private:
 	CTraceToOutputDebugString()
+		: m_LastTick(GetTickCount64())
+		, m_bActive(!!CRegStdDWORD(L"Software\\TortoiseGit\\DebugOutputString", FALSE))
 	{
-		m_LastTick = GetTickCount64();
-		m_bActive = !!CRegStdDWORD(_T("Software\\TortoiseGit\\DebugOutputString"), FALSE);
 	}
+
 	~CTraceToOutputDebugString()
 	{
 		delete m_pInstance;
@@ -102,7 +103,7 @@ private:
 		if (GetTickCount64() - m_LastTick > 10000UL)
 		{
 			m_LastTick = GetTickCount64();
-			m_bActive = !!CRegStdDWORD(_T("Software\\TortoiseGit\\DebugOutputString"), FALSE);
+			m_bActive = !!CRegStdDWORD(L"Software\\TortoiseGit\\DebugOutputString", FALSE);
 		}
 		return m_bActive;
 #endif

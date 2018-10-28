@@ -1,7 +1,7 @@
 ﻿// TortoiseGit - a Windows shell extension for easy version control
 
 // Copyright (C) 2012-2013 - TortoiseGit
-// Copyright (C) 2003-2008, 2011-2015 - TortoiseSVN
+// Copyright (C) 2003-2008, 2011-2016 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -41,6 +41,11 @@ CPOFile::~CPOFile(void)
 {
 }
 
+static bool StartsWith(const wchar_t* heystacl, const wchar_t* needle)
+{
+	return wcsncmp(heystacl, needle, wcslen(needle)) == 0;
+}
+
 BOOL CPOFile::ParseFile(LPCTSTR szPath, BOOL bUpdateExisting, bool bAdjustEOLs)
 {
 	if (!PathFileExists(szPath))
@@ -57,7 +62,7 @@ BOOL CPOFile::ParseFile(LPCTSTR szPath, BOOL bUpdateExisting, bool bAdjustEOLs)
 	//since stream classes still expect the filepath in char and not wchar_t
 	//we need to convert the filepath to multibyte
 	char filepath[MAX_PATH + 1] = { 0 };
-	WideCharToMultiByte(CP_ACP, NULL, szPath, -1, filepath, _countof(filepath)-1, NULL, NULL);
+	WideCharToMultiByte(CP_ACP, 0, szPath, -1, filepath, _countof(filepath) - 1, nullptr, nullptr);
 
 	std::wifstream File;
 	File.imbue(std::locale(std::locale(), new utf8_conversion()));
@@ -72,45 +77,57 @@ BOOL CPOFile::ParseFile(LPCTSTR szPath, BOOL bUpdateExisting, bool bAdjustEOLs)
 	do
 	{
 		File.getline(line.get(), 2*MAX_STRING_LENGTH);
-		if (line.get()[0]==0)
+		if (line[0] == 0)
 		{
 			//empty line means end of entry!
 			RESOURCEENTRY resEntry = {0};
 			std::wstring msgid;
+			std::wstring regexsearch, regexreplace;
 			int type = 0;
 			for (auto I = entry.cbegin(); I != entry.cend(); ++I)
 			{
-				if (wcsncmp(I->c_str(), L"# ", 2)==0)
+				if (StartsWith(I->c_str(), L"# "))
 				{
 					//user comment
-					resEntry.translatorcomments.push_back(I->c_str());
+					if (StartsWith(I->c_str(), L"# regexsearch="))
+						regexsearch = I->substr(14);
+					else if (StartsWith(I->c_str(), L"# regexreplace="))
+						regexreplace = I->substr(15);
+					else
+						resEntry.translatorcomments.push_back(I->c_str());
+					if (!regexsearch.empty() && !regexreplace.empty())
+					{
+						m_regexes.push_back(std::make_tuple(regexsearch, regexreplace));
+						regexsearch.clear();
+						regexreplace.clear();
+					}
 					type = 0;
 				}
-				if (wcsncmp(I->c_str(), L"#.", 2)==0)
+				if (StartsWith(I->c_str(), L"#."))
 				{
 					//automatic comments
 					resEntry.automaticcomments.push_back(I->c_str());
 					type = 0;
 				}
-				if (wcsncmp(I->c_str(), L"#,", 2)==0)
+				if (StartsWith(I->c_str(), L"#,"))
 				{
 					//flag
 					resEntry.flag = I->c_str();
 					type = 0;
 				}
-				if (wcsncmp(I->c_str(), L"msgid", 5)==0)
+				if (StartsWith(I->c_str(), L"msgid"))
 				{
 					//message id
 					msgid = I->c_str();
 					msgid = std::wstring(msgid.substr(7, msgid.size() - 8));
 
 					std::wstring s = msgid;
-					s.erase(s.cbegin(), std::find_if(s.cbegin(), s.cend(), std::not1(std::ptr_fun<wint_t, int>(iswspace))));
+					s.erase(s.cbegin(), std::find_if(s.cbegin(), s.cend(), [](const auto& c) { return !iswspace(c); }));
 					if (s.size())
 						nEntries++;
 					type = 1;
 				}
-				if (wcsncmp(I->c_str(), L"msgstr", 6)==0)
+				if (StartsWith(I->c_str(), L"msgstr"))
 				{
 					//message string
 					resEntry.msgstr = I->c_str();
@@ -119,7 +136,7 @@ BOOL CPOFile::ParseFile(LPCTSTR szPath, BOOL bUpdateExisting, bool bAdjustEOLs)
 						nTranslated++;
 					type = 2;
 				}
-				if (wcsncmp(I->c_str(), L"\"", 1)==0)
+				if (StartsWith(I->c_str(), L"\""))
 				{
 					if (type == 1)
 					{
@@ -161,7 +178,7 @@ BOOL CPOFile::ParseFile(LPCTSTR szPath, BOOL bUpdateExisting, bool bAdjustEOLs)
 			entry.push_back(line.get());
 		}
 	} while (File.gcount() > 0);
-	printf(File.getloc().name().c_str());
+	printf("%s", File.getloc().name().c_str());
 	File.close();
 	RESOURCEENTRY emptyentry = {0};
 	(*this)[std::wstring(L"")] = emptyentry;
@@ -176,7 +193,7 @@ BOOL CPOFile::SaveFile(LPCTSTR szPath, LPCTSTR lpszHeaderFile)
 	//we need to convert the filepath to multibyte
 	char filepath[MAX_PATH + 1] = { 0 };
 	int nEntries = 0;
-	WideCharToMultiByte(CP_ACP, NULL, szPath, -1, filepath, _countof(filepath)-1, NULL, NULL);
+	WideCharToMultiByte(CP_ACP, 0, szPath, -1, filepath, _countof(filepath) - 1, nullptr, nullptr);
 
 	std::wofstream File;
 	File.imbue(std::locale(std::locale(), new utf8_conversion()));
@@ -235,7 +252,7 @@ BOOL CPOFile::SaveFile(LPCTSTR szPath, LPCTSTR lpszHeaderFile)
 	for (auto I = this->cbegin(); I != this->cend(); ++I)
 	{
 		std::wstring s = I->first;
-		s.erase(s.cbegin(), std::find_if(s.cbegin(), s.cend(), std::not1(std::ptr_fun<wint_t, int>(iswspace))));
+		s.erase(s.cbegin(), std::find_if(s.cbegin(), s.cend(), [](const auto& c) { return !iswspace(c); }));
 		if (s.empty())
 			continue;
 

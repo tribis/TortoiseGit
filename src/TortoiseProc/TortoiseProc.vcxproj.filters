@@ -57,7 +57,7 @@
     <Filter Include="Commands\push">
       <UniqueIdentifier>{bfbe5f63-6294-42f3-8cfe-8b61b643602f}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Commands\branch%255ctag">
+    <Filter Include="Commands\branch/tag">
       <UniqueIdentifier>{295ea7b9-86ee-4b71-aa2d-d461c4a1b9d3}</UniqueIdentifier>
     </Filter>
     <Filter Include="Commands\Export">
@@ -158,6 +158,21 @@
     </Filter>
     <Filter Include="Utils\TreePropSheet">
       <UniqueIdentifier>{e772451b-ebd6-46da-b8e2-f4794840702a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="TortoiseGitMerge">
+      <UniqueIdentifier>{69ffded7-2494-4d2b-b7d8-4681289c8b1e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Commands\CommitIsOnRefs">
+      <UniqueIdentifier>{c9518b55-36f2-4643-ab1a-c9e6d30ad1b6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Commands\FirstStart">
+      <UniqueIdentifier>{6356a693-c68f-494c-8b38-ea863b7d5b6b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Commands\RTFM">
+      <UniqueIdentifier>{9c458ff5-6572-4948-b1b3-d8197fc2be5c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Commands\Help">
+      <UniqueIdentifier>{3a3018a4-ac2f-4bf5-a8fe-e8af554e8435}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -312,13 +327,13 @@
       <Filter>Commands\push</Filter>
     </ClCompile>
     <ClCompile Include="Commands\BranchCommand.cpp">
-      <Filter>Commands\branch%255ctag</Filter>
+      <Filter>Commands\branch/tag</Filter>
     </ClCompile>
     <ClCompile Include="CreateBranchTagDlg.cpp">
-      <Filter>Commands\branch%255ctag</Filter>
+      <Filter>Commands\branch/tag</Filter>
     </ClCompile>
     <ClCompile Include="Commands\TagCommand.cpp">
-      <Filter>Commands\branch%255ctag</Filter>
+      <Filter>Commands\branch/tag</Filter>
     </ClCompile>
     <ClCompile Include="Commands\ExportCommand.cpp">
       <Filter>Commands\Export</Filter>
@@ -743,13 +758,7 @@
     <ClCompile Include="..\Utils\MiscUI\FilterEdit.cpp">
       <Filter>Utils\UI</Filter>
     </ClCompile>
-    <ClCompile Include="..\Utils\MiscUI\HintListCtrl.cpp">
-      <Filter>Utils\UI</Filter>
-    </ClCompile>
     <ClCompile Include="..\Utils\MiscUI\HistoryCombo.cpp">
-      <Filter>Utils\UI</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Utils\MiscUI\HTMLFormatter.cpp">
       <Filter>Utils\UI</Filter>
     </ClCompile>
     <ClCompile Include="..\Utils\MiscUI\HyperLink.cpp">
@@ -798,9 +807,6 @@
       <Filter>Utils\General</Filter>
     </ClCompile>
     <ClCompile Include="..\Utils\PathWatcher.cpp">
-      <Filter>Utils\General</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Utils\DropFiles.cpp">
       <Filter>Utils\General</Filter>
     </ClCompile>
     <ClCompile Include="..\Utils\MiscUI\DIB.cpp">
@@ -869,12 +875,6 @@
     <ClCompile Include="..\Git\TGitPath.cpp">
       <Filter>Git</Filter>
     </ClCompile>
-    <ClCompile Include="..\Git\GitStatus.cpp">
-      <Filter>Git</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Git\GitIndex.cpp">
-      <Filter>Git</Filter>
-    </ClCompile>
     <ClCompile Include="..\Utils\ReaderWriterLock.cpp">
       <Filter>Utils\General</Filter>
     </ClCompile>
@@ -907,6 +907,66 @@
     </ClCompile>
     <ClCompile Include="SendMailPatch.cpp">
       <Filter>Commands\SendMail</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Git\GitDataObject.cpp">
+      <Filter>Git</Filter>
+    </ClCompile>
+    <ClCompile Include="..\TortoiseMerge\FileTextLines.cpp">
+      <Filter>TortoiseGitMerge</Filter>
+    </ClCompile>
+    <ClCompile Include="ColumnManager.cpp">
+      <Filter>Utility Dialogs</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Utils\WindowsCredentialsStore.cpp">
+      <Filter>Utils\General</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Utils\MiscUI\FileDlgEventHandler.cpp">
+      <Filter>Utils\UI</Filter>
+    </ClCompile>
+    <ClCompile Include="CommitIsOnRefsDlg.cpp">
+      <Filter>Commands\CommitIsOnRefs</Filter>
+    </ClCompile>
+    <ClCompile Include="Commands\CommitIsOnRefsCommand.cpp">
+      <Filter>Commands\CommitIsOnRefs</Filter>
+    </ClCompile>
+    <ClCompile Include="VersioncheckParser.cpp">
+      <Filter>Commands\UpdateCheck</Filter>
+    </ClCompile>
+    <ClCompile Include="..\TortoiseShell\ShellCache.cpp">
+      <Filter>Utils</Filter>
+    </ClCompile>
+    <ClCompile Include="SyncTabCtrl.cpp">
+      <Filter>Commands\Sync</Filter>
+    </ClCompile>
+    <ClCompile Include="FirstStartWizard.cpp">
+      <Filter>Commands\FirstStart</Filter>
+    </ClCompile>
+    <ClCompile Include="FirstStartWizardStart.cpp">
+      <Filter>Commands\FirstStart</Filter>
+    </ClCompile>
+    <ClCompile Include="FirstStartWizardBasePage.cpp">
+      <Filter>Commands\FirstStart</Filter>
+    </ClCompile>
+    <ClCompile Include="FirstStartWizardGit.cpp">
+      <Filter>Commands\FirstStart</Filter>
+    </ClCompile>
+    <ClCompile Include="FirstStartWizardUser.cpp">
+      <Filter>Commands\FirstStart</Filter>
+    </ClCompile>
+    <ClCompile Include="FirstStartWizardAuthentication.cpp">
+      <Filter>Commands\FirstStart</Filter>
+    </ClCompile>
+    <ClCompile Include="FirstStartWizardLanguage.cpp">
+      <Filter>Commands\FirstStart</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Utils\MiscUI\AnimationManager.cpp">
+      <Filter>Utils\UI</Filter>
+    </ClCompile>
+    <ClCompile Include="GitTagCompareList.cpp">
+      <Filter>Commands\Sync</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Utils\LoadIconEx.cpp">
+      <Filter>Utils\General</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1061,13 +1121,13 @@
       <Filter>Commands\push</Filter>
     </ClInclude>
     <ClInclude Include="Commands\BranchCommand.h">
-      <Filter>Commands\branch%255ctag</Filter>
+      <Filter>Commands\branch/tag</Filter>
     </ClInclude>
     <ClInclude Include="CreateBranchTagDlg.h">
-      <Filter>Commands\branch%255ctag</Filter>
+      <Filter>Commands\branch/tag</Filter>
     </ClInclude>
     <ClInclude Include="Commands\TagCommand.h">
-      <Filter>Commands\branch%255ctag</Filter>
+      <Filter>Commands\branch/tag</Filter>
     </ClInclude>
     <ClInclude Include="Commands\ExportCommand.h">
       <Filter>Commands\Export</Filter>
@@ -1486,9 +1546,6 @@
     <ClInclude Include="..\Utils\UnicodeUtils.h">
       <Filter>Utils\General</Filter>
     </ClInclude>
-    <ClInclude Include="..\Utils\Win7.h">
-      <Filter>Utils\General</Filter>
-    </ClInclude>
     <ClInclude Include="..\Utils\DebugOutput.h">
       <Filter>Utils\General</Filter>
     </ClInclude>
@@ -1504,13 +1561,7 @@
     <ClInclude Include="..\Utils\MiscUI\FilterEdit.h">
       <Filter>Utils\UI</Filter>
     </ClInclude>
-    <ClInclude Include="..\Utils\MiscUI\HintListCtrl.h">
-      <Filter>Utils\UI</Filter>
-    </ClInclude>
     <ClInclude Include="..\Utils\MiscUI\HistoryCombo.h">
-      <Filter>Utils\UI</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Utils\MiscUI\HTMLFormatter.h">
       <Filter>Utils\UI</Filter>
     </ClInclude>
     <ClInclude Include="..\Utils\MiscUI\HyperLink.h">
@@ -1559,9 +1610,6 @@
       <Filter>Utils\General</Filter>
     </ClInclude>
     <ClInclude Include="..\Utils\PathWatcher.h">
-      <Filter>Utils\General</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Utils\DropFiles.h">
       <Filter>Utils\General</Filter>
     </ClInclude>
     <ClInclude Include="..\Utils\MiscUI\DIB.h">
@@ -1636,9 +1684,6 @@
     <ClInclude Include="..\Git\GitStatus.h">
       <Filter>Git</Filter>
     </ClInclude>
-    <ClInclude Include="..\Git\gitindex.h">
-      <Filter>Git</Filter>
-    </ClInclude>
     <ClInclude Include="..\Utils\ReaderWriterLock.h">
       <Filter>Utils\General</Filter>
     </ClInclude>
@@ -1687,6 +1732,96 @@
     <ClInclude Include="SendMailPatch.h">
       <Filter>Commands\SendMail</Filter>
     </ClInclude>
+    <ClInclude Include="..\Utils\LruCache.h">
+      <Filter>Utils\General</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Git\GitDataObject.h">
+      <Filter>Git</Filter>
+    </ClInclude>
+    <ClInclude Include="..\TortoiseMerge\FileTextLines.h">
+      <Filter>TortoiseGitMerge</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Utils\MiscUI\HintCtrl.h">
+      <Filter>Utils\UI</Filter>
+    </ClInclude>
+    <ClInclude Include="ResizableColumnsListCtrl.h">
+      <Filter>Utility Dialogs</Filter>
+    </ClInclude>
+    <ClInclude Include="ColumnManager.h">
+      <Filter>Utility Dialogs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Utils\MiscUI\CommonDialogFunctions.h">
+      <Filter>Utils\UI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Utils\WindowsCredentialsStore.h">
+      <Filter>Utils\General</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Utils\MiscUI\FileDlgEventHandler.h">
+      <Filter>Utils\UI</Filter>
+    </ClInclude>
+    <ClInclude Include="CommitIsOnRefsDlg.h">
+      <Filter>Commands\CommitIsOnRefs</Filter>
+    </ClInclude>
+    <ClInclude Include="Commands\CommitIsOnRefsCommand.h">
+      <Filter>Commands\CommitIsOnRefs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Utils\CreateProcessHelper.h">
+      <Filter>Utils\General</Filter>
+    </ClInclude>
+    <ClInclude Include="VersioncheckParser.h">
+      <Filter>Commands\UpdateCheck</Filter>
+    </ClInclude>
+    <ClInclude Include="..\TortoiseShell\ShellCache.h">
+      <Filter>Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="SyncTabCtrl.h">
+      <Filter>Commands\Sync</Filter>
+    </ClInclude>
+    <ClInclude Include="FirstStartWizard.h">
+      <Filter>Commands\FirstStart</Filter>
+    </ClInclude>
+    <ClInclude Include="FirstStartWizardStart.h">
+      <Filter>Commands\FirstStart</Filter>
+    </ClInclude>
+    <ClInclude Include="FirstStartWizardBasePage.h">
+      <Filter>Commands\FirstStart</Filter>
+    </ClInclude>
+    <ClInclude Include="FirstStartWizardGit.h">
+      <Filter>Commands\FirstStart</Filter>
+    </ClInclude>
+    <ClInclude Include="FirstStartWizardUser.h">
+      <Filter>Commands\FirstStart</Filter>
+    </ClInclude>
+    <ClInclude Include="ConfigureGitExe.h">
+      <Filter>Commands\setting</Filter>
+    </ClInclude>
+    <ClInclude Include="FirstStartWizardAuthentication.h">
+      <Filter>Commands\FirstStart</Filter>
+    </ClInclude>
+    <ClInclude Include="FirstStartWizardLanguage.h">
+      <Filter>Commands\FirstStart</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Utils\MiscUI\HighColorTab.hpp">
+      <Filter>Utils\UI</Filter>
+    </ClInclude>
+    <ClInclude Include="Commands\RTFMCommand.h">
+      <Filter>Commands\RTFM</Filter>
+    </ClInclude>
+    <ClInclude Include="Commands\HelpCommand.h">
+      <Filter>Commands\Help</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Utils\MiscUI\AnimationManager.h">
+      <Filter>Utils\UI</Filter>
+    </ClInclude>
+    <ClInclude Include="GitTagCompareList.h">
+      <Filter>Commands\Sync</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Utils\MiscUI\GestureEnabledControl.h">
+      <Filter>Utils\UI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Utils\LoadIconEx.h">
+      <Filter>Utils\General</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Image Include="..\Resources\actionadded.ico">
@@ -1710,12 +1845,6 @@
     <Image Include="..\Resources\bugtraq.ico">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="..\Resources\cache.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="..\Resources\CacheList.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
     <Image Include="..\Resources\cancel-normal.ico">
       <Filter>Resource Files</Filter>
     </Image>
@@ -1737,12 +1866,6 @@
     <Image Include="..\Resources\copy.ico">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="..\Resources\CopyBackground.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="..\Resources\DelunversionedBackground.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
     <Image Include="..\Resources\dialogs.ico">
       <Filter>Resource Files</Filter>
     </Image>
@@ -1755,16 +1878,10 @@
     <Image Include="..\Resources\explorer.ico">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="..\Resources\ExportBackground.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
     <Image Include="..\Resources\filteredit.ico">
       <Filter>Resource Files</Filter>
     </Image>
     <Image Include="..\Resources\general.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="..\Resources\git.bmp">
       <Filter>Resource Files</Filter>
     </Image>
     <Image Include="..\Resources\gitconfig.ico">
@@ -1792,9 +1909,6 @@
       <Filter>Resource Files</Filter>
     </Image>
     <Image Include="..\Resources\iconset.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="..\Resources\ImportBackground.ico">
       <Filter>Resource Files</Filter>
     </Image>
     <Image Include="..\Resources\ImportPatchesBackground.ico">
@@ -1830,9 +1944,6 @@
     <Image Include="..\Resources\menuadd.ico">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="..\Resources\menublame.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
     <Image Include="..\Resources\menucheckout.ico">
       <Filter>Resource Files</Filter>
     </Image>
@@ -1857,9 +1968,6 @@
     <Image Include="..\Resources\menudelete.ico">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="..\Resources\menudelunversioned.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
     <Image Include="..\Resources\menudiff.ico">
       <Filter>Resource Files</Filter>
     </Image>
@@ -1872,9 +1980,6 @@
     <Image Include="..\Resources\menuignore.ico">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="..\Resources\menuimport.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
     <Image Include="..\Resources\menulog.ico">
       <Filter>Resource Files</Filter>
     </Image>
@@ -1882,9 +1987,6 @@
       <Filter>Resource Files</Filter>
     </Image>
     <Image Include="..\Resources\menupatch.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="..\Resources\menuproperties.ico">
       <Filter>Resource Files</Filter>
     </Image>
     <Image Include="..\Resources\menurelocate.ico">
@@ -1911,13 +2013,7 @@
     <Image Include="..\Resources\menuupdate.ico">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="..\Resources\MergeBackground.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
     <Image Include="..\Resources\misc.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="..\Resources\newfolder.ico">
       <Filter>Resource Files</Filter>
     </Image>
     <Image Include="..\Resources\open.ico">
@@ -1938,9 +2034,6 @@
     <Image Include="..\Resources\reftype.bmp">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="..\Resources\RenameBackground.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
     <Image Include="..\Resources\RepoBrowserBackground.ico">
       <Filter>Resource Files</Filter>
     </Image>
@@ -1954,27 +2047,6 @@
       <Filter>Resource Files</Filter>
     </Image>
     <Image Include="..\Resources\RevertBackground.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="..\Resources\revgraph_added.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="..\Resources\revgraph_addedplus.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="..\Resources\revgraph_deleted.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="..\Resources\revgraph_lastcommit.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="..\Resources\revgraph_renamed.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="..\Resources\revgraph_replaced.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="..\Resources\revgraph_tag.ico">
       <Filter>Resource Files</Filter>
     </Image>
     <Image Include="..\Resources\revgraphbar.bmp">
@@ -1995,9 +2067,6 @@
     <Image Include="..\Resources\showbranches.ico">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="..\Resources\ssh.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
     <Image Include="..\Resources\switch.ico">
       <Filter>Resource Files</Filter>
     </Image>
@@ -2013,7 +2082,7 @@
     <Image Include="..\Resources\Tortoise.ico">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="..\Resources\TortoiseBlame.ico">
+    <Image Include="..\Resources\TortoiseGitBlame.ico">
       <Filter>Resource Files</Filter>
     </Image>
     <Image Include="..\Resources\tortoisegit_logoflipped.bmp">
@@ -2035,15 +2104,6 @@
       <Filter>Resource Files</Filter>
     </Image>
     <Image Include="..\Resources\tsvnmenumultiple.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="..\Resources\ttf_glyph.bmp">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="..\Resources\up.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="..\Resources\update1.ico">
       <Filter>Resource Files</Filter>
     </Image>
     <Image Include="..\Resources\warning-general.ico">
@@ -2082,17 +2142,14 @@
     <Image Include="..\Resources\library-win10.ico">
       <Filter>Resource Files</Filter>
     </Image>
+    <Image Include="..\Resources\reset.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="..\Resources\notepad.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\Resources\bin167.avi">
-      <Filter>Resource Files</Filter>
-    </None>
-    <None Include="..\Resources\bin168.avi">
-      <Filter>Resource Files</Filter>
-    </None>
-    <None Include="..\Resources\cleananim.avi">
-      <Filter>Resource Files</Filter>
-    </None>
     <None Include="..\Resources\download.avi">
       <Filter>Resource Files</Filter>
     </None>
@@ -2100,9 +2157,6 @@
       <Filter>Resource Files</Filter>
     </None>
     <None Include="..\Resources\pandown.cur">
-      <Filter>Resource Files</Filter>
-    </None>
-    <None Include="..\Resources\search.avi">
       <Filter>Resource Files</Filter>
     </None>
     <None Include="..\Resources\TortoiseLoglistCommon.rc2">

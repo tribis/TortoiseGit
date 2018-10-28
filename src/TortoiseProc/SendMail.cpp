@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2013, 2015 - TortoiseGit
+// Copyright (C) 2008-2013, 2015-2016 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -22,16 +22,17 @@
 #include "HwSMTP.h"
 #include "MailMsg.h"
 #include "Git.h"
+#include "WindowsCredentialsStore.h"
 
 class CAppUtils;
 
 CSendMail::CSendMail(const CString& To, const CString& CC, bool bAttachment)
+	: m_sSenderName(g_Git.GetUserName())
+	, m_sSenderMail(g_Git.GetUserEmail())
+	, m_sTo(To)
+	, m_sCC(CC)
+	, m_bAttachment(bAttachment)
 {
-	m_sSenderName = g_Git.GetUserName();
-	m_sSenderMail = g_Git.GetUserEmail();
-	m_sTo = To;
-	m_sCC = CC;
-	m_bAttachment = bAttachment;
 }
 
 CSendMail::~CSendMail(void)
@@ -75,7 +76,7 @@ int CSendMail::SendMail(const CTGitPath &item, CGitProgressList * instance, cons
 
 int CSendMail::SendMail(const CString& FromName, const CString& FromMail, const CString& To, const CString& CC, const CString& subject, const CString& body, CStringArray &attachments, CString *errortext)
 {
-	if (CRegDWORD(_T("Software\\TortoiseGit\\TortoiseProc\\SendMail\\DeliveryType"), SEND_MAIL_MAPI) == SEND_MAIL_MAPI)
+	if (CRegDWORD(L"Software\\TortoiseGit\\TortoiseProc\\SendMail\\DeliveryType", SEND_MAIL_MAPI) == SEND_MAIL_MAPI)
 	{
 		CMailMsg mapiSender;
 		BOOL bMAPIInit = mapiSender.MAPIInitialize();
@@ -109,15 +110,17 @@ int CSendMail::SendMail(const CString& FromName, const CString& FromMail, const 
 	else
 	{
 		CString sender;
-		sender.Format(_T("%s <%s>"), (LPCTSTR)FromName, (LPCTSTR)FromMail);
+		sender.Format(L"%s <%s>", (LPCTSTR)CHwSMTP::GetEncodedHeader(FromName), (LPCTSTR)FromMail);
 
 		CHwSMTP mail;
-		if (CRegDWORD(_T("Software\\TortoiseGit\\TortoiseProc\\SendMail\\DeliveryType"), SEND_MAIL_SMTP_CONFIGURED) == SEND_MAIL_SMTP_CONFIGURED)
+		if (CRegDWORD(L"Software\\TortoiseGit\\TortoiseProc\\SendMail\\DeliveryType", SEND_MAIL_SMTP_CONFIGURED) == SEND_MAIL_SMTP_CONFIGURED)
 		{
 			CString recipients(To);
 			if (!CC.IsEmpty())
 				recipients += L";" + CC;
-			if (mail.SendEmail((CString)CRegString(_T("Software\\TortoiseGit\\TortoiseProc\\SendMail\\Address"), _T("")), (CString)CRegString(_T("Software\\TortoiseGit\\TortoiseProc\\SendMail\\Username"), _T("")), (CString)CRegString(_T("Software\\TortoiseGit\\TortoiseProc\\SendMail\\Password"), _T("")), (BOOL)CRegDWORD(_T("Software\\TortoiseGit\\TortoiseProc\\SendMail\\AuthenticationRequired"), FALSE), sender, recipients, subject, body, nullptr, &attachments, CC, (DWORD)CRegDWORD(_T("Software\\TortoiseGit\\TortoiseProc\\SendMail\\Port"), 25), sender, To, (DWORD)CRegDWORD(_T("Software\\TortoiseGit\\TortoiseProc\\SendMail\\Encryption"), 0)) == TRUE)
+			CString username, password;
+			CWindowsCredentialsStore::GetCredential(L"TortoiseGit:SMTP-Credentials", username, password);
+			if (mail.SendEmail((CString)CRegString(L"Software\\TortoiseGit\\TortoiseProc\\SendMail\\Address", L""), username, password, (BOOL)CRegDWORD(L"Software\\TortoiseGit\\TortoiseProc\\SendMail\\AuthenticationRequired", FALSE), sender, recipients, subject, body, nullptr, &attachments, CC, (DWORD)CRegDWORD(L"Software\\TortoiseGit\\TortoiseProc\\SendMail\\Port", 25), sender, To, (DWORD)CRegDWORD(L"Software\\TortoiseGit\\TortoiseProc\\SendMail\\Encryption", 0)) == TRUE)
 				return 0;
 			else
 			{
@@ -151,9 +154,7 @@ CSendMailCombineable::~CSendMailCombineable()
 int CSendMailCombineable::Send(const CTGitPathList& list, CGitProgressList* instance)
 {
 	if (m_bCombine)
-	{
 		return SendAsCombinedMail(list, instance);
-	}
 	else
 	{
 		instance->SetItemCountTotal(list.GetCount() + 1);
@@ -179,7 +180,7 @@ int GetFileContents(CString &filename, CString &content)
 		{
 			content += str;
 			str.Empty();
-			content += _T("\n");
+			content += L'\n';
 		}
 		return 0;
 	}
@@ -199,7 +200,7 @@ int CSendMailCombineable::SendAsSingleMail(const CTGitPath& path, CGitProgressLi
 		attachments.Add(pathfile);
 	else if (GetFileContents(pathfile, body))
 	{
-		instance->ReportError(_T("Could not open ") + pathfile);
+		instance->ReportError(L"Could not open " + pathfile);
 		return -2;
 	}
 
@@ -215,19 +216,17 @@ int CSendMailCombineable::SendAsCombinedMail(const CTGitPathList &list, CGitProg
 	for (int i = 0; i < list.GetCount(); ++i)
 	{
 		if (m_bAttachment)
-		{
 			attachments.Add(list[i].GetWinPathString());
-		}
 		else
 		{
 			CString filename(list[i].GetWinPathString());
-			body += filename + _T(":\n");
+			body += filename + L":\n";
 			if (GetFileContents(filename, body))
 			{
-				instance->ReportError(_T("Could not open ") + filename);
+				instance->ReportError(L"Could not open " + filename);
 				return -2;
 			}
-			body += _T("\n");
+			body += L'\n';
 		}
 	}
 	return SendMail(CTGitPath(), instance, m_sSenderName, m_sSenderMail, m_sTo, m_sCC, m_sSubject, body, attachments);

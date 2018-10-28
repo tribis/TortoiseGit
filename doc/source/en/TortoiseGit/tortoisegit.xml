@@ -1,6 +1,7 @@
 ﻿<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE book SYSTEM "../../dtd/dblite.dtd">
 <book id="tsvn" lang="en" xmlns:xi="http://www.w3.org/2001/XInclude">
+	<?dbhh topicname="HIDD_FIRSTSTARTWIZARD_START"?>
 	<title>TortoiseGit</title>
 	<subtitle>A Git client for Windows</subtitle>
 	<xi:include href="../version.xml"/>
@@ -34,6 +35,7 @@
 	-->
 	<xi:include href="./tgit_dug/dug.xml"/>
 	<xi:include href="./tgit_app_faq.xml"/>
+	<xi:include href="./tgit_gitwcrev.xml"/>
 	<xi:include href="./tgit_bugtraqprovider.xml"/>
 	<xi:include href="./tgit_app_admins.xml" />
 	<xi:include href="./tgit_app_automation.xml"/>	

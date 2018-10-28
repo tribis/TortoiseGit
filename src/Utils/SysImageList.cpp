@@ -1,6 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2003-2006, 2008-2010 - TortoiseSVN
+// Copyright (C) 2017 - TortoiseGit
+// Copyright (C) 2003-2006, 2008-2010, 2017 - TortoiseSVN
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -22,32 +23,39 @@
 
 // Singleton constructor and destructor (private)
 
-CSysImageList * CSysImageList::instance = 0;
+CSysImageList* CSysImageList::instance = nullptr;
 
 CSysImageList::CSysImageList()
 {
-	SHFILEINFO ssfi;
+	SHFILEINFO ssfi = { 0 };
 	TCHAR windir[MAX_PATH] = {0};
 	GetWindowsDirectory(windir, _countof(windir));  // MAX_PATH ok.
-	HIMAGELIST hSystemImageList =
+	hSystemImageList =
 		(HIMAGELIST)SHGetFileInfo(
 			windir,
 			0,
 			&ssfi, sizeof ssfi,
 			SHGFI_SYSICONINDEX | SHGFI_SMALLICON);
-	Attach(hSystemImageList);
+
+	int cx, cy;
+	ImageList_GetIconSize(hSystemImageList, &cx, &cy);
+	auto emptyImageList = ImageList_Create(cx, cy, ILC_COLOR32 | ILC_MASK, ImageList_GetImageCount(hSystemImageList), 10);
+	Attach(emptyImageList);
+
+	m_dirIconIndex = GetFileIcon(L"Doesn't matter", FILE_ATTRIBUTE_DIRECTORY, 0);
+	m_dirOpenIconIndex = GetFileIcon(L"Doesn't matter", FILE_ATTRIBUTE_DIRECTORY, SHGFI_OPENICON);
+	m_defaultIconIndex = GetFileIcon(L"", FILE_ATTRIBUTE_NORMAL, 0);
 }
 
 CSysImageList::~CSysImageList()
 {
-	Detach();
 }
 
 // Singleton specific operations
 
 CSysImageList& CSysImageList::GetInstance()
 {
-	if (instance == 0)
+	if (!instance)
 		instance = new CSysImageList;
 	return *instance;
 }
@@ -55,7 +63,7 @@ CSysImageList& CSysImageList::GetInstance()
 void CSysImageList::Cleanup()
 {
 	delete instance;
-	instance = 0;
+	instance = nullptr;
 }
 
 // Operations
@@ -65,31 +73,31 @@ int CSysImageList::AddIcon(const HICON hIcon)
 	return this->Add(hIcon);
 }
 
-int CSysImageList::GetDirIconIndex() const
+int CSysImageList::GetDirIconIndex()
 {
-	return GetFileIcon(_T("Doesn't matter"), FILE_ATTRIBUTE_DIRECTORY, 0);
+	return m_dirIconIndex;
 }
 
-int CSysImageList::GetDirOpenIconIndex() const
+int CSysImageList::GetDirOpenIconIndex()
 {
-	return GetFileIcon(_T("Doesn't matter"), FILE_ATTRIBUTE_DIRECTORY, SHGFI_OPENICON);
+	return m_dirOpenIconIndex;
 }
 
-int CSysImageList::GetDefaultIconIndex() const
+int CSysImageList::GetDefaultIconIndex()
 {
-	return GetFileIcon(_T(""), FILE_ATTRIBUTE_NORMAL, 0);
+	return m_defaultIconIndex;
 }
 
-int CSysImageList::GetFileIconIndex(const CString& file) const
+int CSysImageList::GetFileIconIndex(const CString& file)
 {
 	return GetFileIcon(file, FILE_ATTRIBUTE_NORMAL, 0);
 }
 
-int CSysImageList::GetPathIconIndex(const CTGitPath& filePath) const
+int CSysImageList::GetPathIconIndex(const CTGitPath& filePath)
 {
 	CString strExtension = filePath.GetFileExtension();
 	strExtension.MakeUpper();
-	IconIndexMap::iterator it = m_indexCache.lower_bound(strExtension);
+	auto it = m_indexCache.lower_bound(strExtension);
 	if (it == m_indexCache.end() || strExtension < it->first)
 	{
 		// We don't have this extension in the map
@@ -100,7 +108,22 @@ int CSysImageList::GetPathIconIndex(const CTGitPath& filePath) const
 	return it->second;
 }
 
-int CSysImageList::GetFileIcon( LPCTSTR file, DWORD attributes, UINT extraFlags ) const
+int CSysImageList::GetPathIconIndex(const CString& file)
+{
+	CString strExtension = file.Mid(file.ReverseFind(L'.') + 1);
+	strExtension.MakeUpper();
+	auto it = m_indexCache.lower_bound(strExtension);
+	if (it == m_indexCache.end() || strExtension < it->first)
+	{
+		// We don't have this extension in the map
+		int iconIndex = GetFileIconIndex(file);
+		it = m_indexCache.emplace_hint(it, strExtension, iconIndex);
+	}
+	// We must have found it
+	return it->second;
+}
+
+int CSysImageList::GetFileIcon(LPCTSTR file, DWORD attributes, UINT extraFlags)
 {
 	SHFILEINFO sfi = { 0 };
 
@@ -110,5 +133,8 @@ int CSysImageList::GetFileIcon( LPCTSTR file, DWORD attributes, UINT extraFlags 
 		&sfi, sizeof sfi,
 		SHGFI_SYSICONINDEX | SHGFI_SMALLICON | SHGFI_USEFILEATTRIBUTES | extraFlags);
 
-	return sfi.iIcon;
+	auto hIcon = ImageList_ExtractIcon(nullptr, hSystemImageList, sfi.iIcon);
+	auto index = AddIcon(hIcon);
+	DestroyIcon(hIcon);
+	return index;
 }

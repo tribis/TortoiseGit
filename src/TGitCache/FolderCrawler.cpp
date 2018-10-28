@@ -1,7 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
 // External Cache Copyright (C) 2005-2008,2011,2014 - TortoiseSVN
-// Copyright (C) 2008-2014 - TortoiseGit
+// Copyright (C) 2008-2014, 2016-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -27,8 +27,8 @@
 
 CFolderCrawler::CFolderCrawler(void)
 {
-	m_hWakeEvent = CreateEvent(NULL,FALSE,FALSE,NULL);
-	m_hTerminationEvent = CreateEvent(NULL,TRUE,FALSE,NULL);
+	m_hWakeEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+	m_hTerminationEvent = CreateEvent(nullptr, TRUE, FALSE, nullptr);
 	m_lCrawlInhibitSet = 0;
 	m_crawlHoldoffReleasesAt = (LONGLONG)GetTickCount64();
 	m_bRun = false;
@@ -49,9 +49,7 @@ void CFolderCrawler::Stop()
 	{
 		SetEvent(m_hTerminationEvent);
 		if (m_hThread.IsValid() && WaitForSingleObject(m_hThread, 4000) != WAIT_OBJECT_0)
-		{
 			CTraceToOutputDebugString::Instance()(__FUNCTION__ ": Error terminating crawler thread\n");
-		}
 	}
 	m_hThread.CloseHandle();
 	m_hTerminationEvent.CloseHandle();
@@ -70,7 +68,7 @@ void CFolderCrawler::Initialise()
 
 	m_bRun = true;
 	unsigned int threadId;
-	m_hThread = (HANDLE)_beginthreadex(NULL,0,ThreadEntry,this,0,&threadId);
+	m_hThread = (HANDLE)_beginthreadex(nullptr, 0, ThreadEntry, this, 0, &threadId);
 	SetThreadPriority(m_hThread, THREAD_PRIORITY_BELOW_NORMAL);
 }
 
@@ -96,7 +94,7 @@ void CFolderCrawler::AddDirectoryForUpdate(const CTGitPath& path)
 	if (!CGitStatusCache::Instance().IsPathGood(path))
 		return;
 	{
-		CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": AddDirectoryForUpdate %s\n"), path.GetWinPath());
+		CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) L": AddDirectoryForUpdate %s\n", path.GetWinPath());
 
 		AutoLocker lock(m_critSec);
 
@@ -129,7 +127,7 @@ void CFolderCrawler::AddPathForUpdate(const CTGitPath& path)
 
 void CFolderCrawler::ReleasePathForUpdate(const CTGitPath& path)
 {
-	CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": ReleasePathForUpdate %s\n"), path.GetWinPath());
+	CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) L": ReleasePathForUpdate %s\n", path.GetWinPath());
 	AutoLocker lock(m_critSec);
 
 	m_pathsToRelease.Push(path);
@@ -138,7 +136,7 @@ void CFolderCrawler::ReleasePathForUpdate(const CTGitPath& path)
 
 unsigned int CFolderCrawler::ThreadEntry(void* pContext)
 {
-	((CFolderCrawler*)pContext)->WorkerThread();
+	reinterpret_cast<CFolderCrawler*>(pContext)->WorkerThread();
 	return 0;
 }
 
@@ -152,7 +150,7 @@ void CFolderCrawler::WorkerThread()
 
 	for(;;)
 	{
-		bool bRecursive = !!(DWORD)CRegStdDWORD(_T("Software\\TortoiseGit\\RecursiveOverlay"), TRUE);
+		bool bRecursive = !!(DWORD)CRegStdDWORD(L"Software\\TortoiseGit\\RecursiveOverlay", TRUE);
 
 		SetThreadPriority(GetCurrentThread(), THREAD_MODE_BACKGROUND_END);
 
@@ -187,20 +185,20 @@ void CFolderCrawler::WorkerThread()
 			if(m_lCrawlInhibitSet > 0)
 			{
 				// We're in crawl hold-off
-				CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": Crawl hold-off\n"));
+				CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) L": Crawl hold-off\n");
 				Sleep(50);
 				continue;
 			}
 			if (bFirstRunAfterWakeup)
 			{
 				Sleep(20);
-				CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": Crawl bFirstRunAfterWakeup\n"));
+				CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) L": Crawl bFirstRunAfterWakeup\n");
 				bFirstRunAfterWakeup = false;
 				continue;
 			}
 			if ((m_blockReleasesAt < GetTickCount64()) && (!m_blockedPath.IsEmpty()))
 			{
-				CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": Crawl stop blocking path %s\n"), m_blockedPath.GetWinPath());
+				CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) L": Crawl stop blocking path %s\n", m_blockedPath.GetWinPath());
 				m_blockedPath.Reset();
 			}
 			CGitStatusCache::Instance().RemoveTimedoutBlocks();
@@ -253,11 +251,11 @@ void CFolderCrawler::WorkerThread()
 						//       that is relevant for overlays?
 						/*CString lowerpath = workingPath.GetWinPathString();
 						lowerpath.MakeLower();
-						if (lowerpath.Find(_T("\\tmp\\"))>0)
+						if (lowerpath.Find(L"\\tmp\\") > 0)
 							continue;
-						if (lowerpath.Find(_T("\\tmp")) == (lowerpath.GetLength()-4))
+						if (CStringUtils::EndsWith(lowerpath, L"\\tmp"))
 							continue;
-						if (lowerpath.Find(_T("\\log"))>0)
+						if (lowerpath.Find(L"\\log") > 0)
 							continue;*/
 						// Here's a little problem:
 						// the lock file is also created for fetching the status
@@ -267,7 +265,7 @@ void CFolderCrawler::WorkerThread()
 						// But for now, we have to crawl the parent folder
 						// no matter what.
 
-						//if (lowerpath.Find(_T("\\lock"))>0)
+						//if (lowerpath.Find(L"\\lock") > 0)
 						//	continue;
 						// only go back to wc root if we are in .git-dir
 						do
@@ -295,15 +293,15 @@ void CFolderCrawler::WorkerThread()
 						continue;
 					}
 
-					CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": Invalidating and refreshing folder: %s\n"), workingPath.GetWinPath());
+					CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) L": Invalidating and refreshing folder: %s\n", workingPath.GetWinPath());
 					{
 						AutoLocker print(critSec);
-						_sntprintf_s(szCurrentCrawledPath[nCurrentCrawledpathIndex], MAX_CRAWLEDPATHSLEN, _TRUNCATE, _T("Invalidating and refreshing folder: %s"), workingPath.GetWinPath());
+						_sntprintf_s(szCurrentCrawledPath[nCurrentCrawledpathIndex], MAX_CRAWLEDPATHSLEN, _TRUNCATE, L"Invalidating and refreshing folder: %s", workingPath.GetWinPath());
 						++nCurrentCrawledpathIndex;
 						if (nCurrentCrawledpathIndex >= MAX_CRAWLEDPATHS)
 							nCurrentCrawledpathIndex = 0;
 					}
-					InvalidateRect(hWndHidden, NULL, FALSE);
+					InvalidateRect(hWndHidden, nullptr, FALSE);
 					{
 						CAutoReadLock readLock(CGitStatusCache::Instance().GetGuard());
 						// Invalidate the cache of this folder, to make sure its status is fetched again.
@@ -323,7 +321,7 @@ void CFolderCrawler::WorkerThread()
 								if ((status != git_wc_status_normal) && (pCachedDir->GetCurrentFullStatus() != status))
 								{
 									CGitStatusCache::Instance().UpdateShell(workingPath);
-									CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": shell update in crawler for %s\n"), workingPath.GetWinPath());
+									CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) L": shell update in crawler for %s\n", workingPath.GetWinPath());
 								}
 							}
 							else
@@ -350,36 +348,25 @@ void CFolderCrawler::WorkerThread()
 						else
 							workingPath = workingPath.GetContainingDirectory();
 					}
-					CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": Updating path: %s\n"), workingPath.GetWinPath());
+					CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) L": Updating path: %s\n", workingPath.GetWinPath());
 					{
 						AutoLocker print(critSec);
-						_sntprintf_s(szCurrentCrawledPath[nCurrentCrawledpathIndex], MAX_CRAWLEDPATHSLEN, _TRUNCATE, _T("Updating path: %s"), workingPath.GetWinPath());
+						_sntprintf_s(szCurrentCrawledPath[nCurrentCrawledpathIndex], MAX_CRAWLEDPATHSLEN, _TRUNCATE, L"Updating path: %s", workingPath.GetWinPath());
 						++nCurrentCrawledpathIndex;
 						if (nCurrentCrawledpathIndex >= MAX_CRAWLEDPATHS)
 							nCurrentCrawledpathIndex = 0;
 					}
-					InvalidateRect(hWndHidden, NULL, FALSE);
-					// HasAdminDir() already checks if the path points to a dir
-					DWORD flags = TGITCACHE_FLAGS_FOLDERISKNOWN;
-					flags |= (workingPath.IsDirectory() ? TGITCACHE_FLAGS_ISFOLDER : 0);
-					flags |= (bRecursive ? TGITCACHE_FLAGS_RECUSIVE_STATUS : 0);
+					InvalidateRect(hWndHidden, nullptr, FALSE);
 					{
 						CAutoReadLock readLock(CGitStatusCache::Instance().GetGuard());
 						// Invalidate the cache of folders manually. The cache of files is invalidated
 						// automatically if the status is asked for it and the file times don't match
 						// anymore, so we don't need to manually invalidate those.
-						if (workingPath.IsDirectory())
-						{
-							CCachedDirectory * cachedDir = CGitStatusCache::Instance().GetDirectoryCacheEntry(workingPath);
-							if (cachedDir)
-								cachedDir->Invalidate();
-						}
-						CStatusCacheEntry ce = CGitStatusCache::Instance().GetStatusForPath(workingPath, flags);
-						if (ce.GetEffectiveStatus() > git_wc_status_unversioned)
-						{
+						CCachedDirectory* cachedDir = CGitStatusCache::Instance().GetDirectoryCacheEntry(workingPath.GetDirectory());
+						if (cachedDir && workingPath.IsDirectory())
+							cachedDir->Invalidate();
+						if (cachedDir && cachedDir->GetStatusForMember(workingPath, bRecursive).GetEffectiveStatus() > git_wc_status_unversioned)
 							CGitStatusCache::Instance().UpdateShell(workingPath);
-							CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": shell update in folder crawler for %s\n"), workingPath.GetWinPath());
-						}
 					}
 					AutoLocker lock(m_critSec);
 					m_pathsToUpdate.erase(workingPath);
@@ -393,7 +380,7 @@ void CFolderCrawler::WorkerThread()
 					}
 				}
 			}
-			else if (!m_foldersToUpdate.empty())
+			if (!m_foldersToUpdate.empty())
 			{
 				{
 					AutoLocker lock(m_critSec);
@@ -413,11 +400,6 @@ void CFolderCrawler::WorkerThread()
 						continue;
 					}
 				}
-				if (DWORD(workingPath.GetCustomData()) >= currentTicks)
-				{
-					Sleep(50);
-					continue;
-				}
 				if ((!m_blockedPath.IsEmpty())&&(m_blockedPath.IsAncestorOf(workingPath)))
 					continue;
 				if (!CGitStatusCache::Instance().IsPathAllowed(workingPath))
@@ -425,15 +407,15 @@ void CFolderCrawler::WorkerThread()
 				if (!CGitStatusCache::Instance().IsPathGood(workingPath))
 					continue;
 
-				CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": Crawling folder: %s\n"), workingPath.GetWinPath());
+				CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) L": Crawling folder: %s\n", workingPath.GetWinPath());
 				{
 					AutoLocker print(critSec);
-					_sntprintf_s(szCurrentCrawledPath[nCurrentCrawledpathIndex], MAX_CRAWLEDPATHSLEN, _TRUNCATE, _T("Crawling folder: %s"), workingPath.GetWinPath());
+					_sntprintf_s(szCurrentCrawledPath[nCurrentCrawledpathIndex], MAX_CRAWLEDPATHSLEN, _TRUNCATE, L"Crawling folder: %s", workingPath.GetWinPath());
 					++nCurrentCrawledpathIndex;
 					if (nCurrentCrawledpathIndex >= MAX_CRAWLEDPATHS)
 						nCurrentCrawledpathIndex = 0;
 				}
-				InvalidateRect(hWndHidden, NULL, FALSE);
+				InvalidateRect(hWndHidden, nullptr, FALSE);
 				{
 					CAutoReadLock readLock(CGitStatusCache::Instance().GetGuard());
 					// Now, we need to visit this folder, to make sure that we know its 'most important' status
@@ -444,7 +426,7 @@ void CFolderCrawler::WorkerThread()
 					{
 						if (workingPath.HasAdminDir())
 						{
-							CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": Add watch path %s\n"), workingPath.GetWinPath());
+							CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) L": Add watch path %s\n", workingPath.GetWinPath());
 							CGitStatusCache::Instance().AddPathToWatch(workingPath);
 						}
 						if (cachedDir)
@@ -454,7 +436,7 @@ void CFolderCrawler::WorkerThread()
 							CAutoWriteLock writeLock(CGitStatusCache::Instance().GetGuard());
 							CGitStatusCache::Instance().RemoveCacheForPath(workingPath);
 							// now cacheDir is invalid because it got deleted in the RemoveCacheForPath() call above.
-							cachedDir = NULL;
+							cachedDir = nullptr;
 						}
 					}
 					if (cachedDir)
@@ -485,7 +467,8 @@ bool CFolderCrawler::SetHoldoff(DWORD milliseconds /* = 100*/)
 
 void CFolderCrawler::BlockPath(const CTGitPath& path, DWORD ticks)
 {
-	CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": block path %s from being crawled\n"), path.GetWinPath());
+	AutoLocker lock(m_critSec);
+	CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) L": block path %s from being crawled\n", path.GetWinPath());
 	m_blockedPath = path;
 	if (ticks == 0)
 		m_blockReleasesAt = GetTickCount64() + 10000;

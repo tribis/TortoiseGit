@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2011, 2015 - TortoiseGit
+// Copyright (C) 2008-2011, 2015-2017 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -21,16 +21,17 @@
 #pragma once
 
 #include "GitRevLoglist.h"
+#include "GestureEnabledControl.h"
 
 class CPropertiesToolBar : public CMFCToolBar
 {
 public:
-	virtual void OnUpdateCmdUI(CFrameWnd* /*pTarget*/, BOOL bDisableIfNoHndler)
+	virtual void OnUpdateCmdUI(CFrameWnd* /*pTarget*/, BOOL bDisableIfNoHndler) override
 	{
 		CMFCToolBar::OnUpdateCmdUI((CFrameWnd*) GetOwner(), bDisableIfNoHndler);
 	}
 
-	virtual BOOL AllowShowOnList() const { return FALSE; }
+	virtual BOOL AllowShowOnList() const override { return FALSE; }
 };
 
 class CPropertiesWnd : public CDockablePane
@@ -49,12 +50,12 @@ public:
 		m_wndPropList.SetGroupNameFullWidth(bSet);
 	}
 
-	// rev=NULL, means clear properties info;
+	// rev=nullptr, means clear properties info;
 	void UpdateProperties(GitRevLoglist* rev = nullptr);
 
 protected:
 	CFont m_fntPropList;
-	CMFCPropertyGridCtrl m_wndPropList;
+	CGestureEnabledControlTmpl<CMFCPropertyGridCtrl> m_wndPropList;
 
 	void RemoveParent();
 // Implementation

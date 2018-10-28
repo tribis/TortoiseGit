@@ -1,7 +1,7 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
 // Copyright (C) 2003-2008 - TortoiseSVN
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2018 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -26,11 +26,11 @@
 
 
 IMPLEMENT_DYNAMIC(CExportDlg, CHorizontalResizableStandAloneDialog)
-CExportDlg::CExportDlg(CWnd* pParent /*=NULL*/)
+CExportDlg::CExportDlg(CWnd* pParent /*=nullptr*/)
 	: CHorizontalResizableStandAloneDialog(CExportDlg::IDD, pParent)
 	, CChooseVersion(this)
 	, m_bWholeProject(FALSE)
-	, m_Revision(_T("HEAD"))
+	, m_Revision(L"HEAD")
 {
 }
 
@@ -66,6 +66,22 @@ BOOL CExportDlg::OnInitDialog()
 		((CButton *)GetDlgItem(IDC_WHOLE_PROJECT))->SetCheck(TRUE);
 	}
 
+	InitChooseVersion();
+	if (m_initialRefName.IsEmpty() || m_initialRefName == L"HEAD")
+		SetDefaultChoose(IDC_RADIO_HEAD);
+	else if (CStringUtils::StartsWith(m_initialRefName, L"refs/tags/"))
+		SetDefaultChoose(IDC_RADIO_TAGS);
+
+	CWnd* pHead = GetDlgItem(IDC_RADIO_HEAD);
+	CString headText;
+	pHead->GetWindowText(headText);
+	pHead->SetWindowText(headText + " (" + g_Git.GetCurrentBranch() + ")");
+
+	AdjustControlSize(IDC_RADIO_BRANCH);
+	AdjustControlSize(IDC_RADIO_TAGS);
+	AdjustControlSize(IDC_RADIO_VERSION);
+	AdjustControlSize(IDC_RADIO_HEAD);
+
 	AddAnchor(IDC_REPOGROUP, TOP_LEFT, TOP_RIGHT);
 	AddAnchor(IDC_EXPORTFILE_LABEL, TOP_LEFT);
 	AddAnchor(IDC_EXPORTFILE_BROWSE, TOP_RIGHT);
@@ -75,35 +91,18 @@ BOOL CExportDlg::OnInitDialog()
 	AddAnchor(IDCANCEL, BOTTOM_RIGHT);
 	AddAnchor(IDHELP, BOTTOM_RIGHT);
 
-	AdjustControlSize(IDC_RADIO_BRANCH);
-	AdjustControlSize(IDC_RADIO_TAGS);
-	AdjustControlSize(IDC_RADIO_VERSION);
-
 	SetDlgTitle();
 
 	CHOOSE_VERSION_ADDANCHOR;
-	this->AddOthersToAnchor();
-	InitChooseVersion();
-	if (m_initialRefName.IsEmpty() || m_initialRefName == _T("HEAD"))
-	{
-		SetDefaultChoose(IDC_RADIO_HEAD);
-	}
-	else if (m_initialRefName.Left(10) == _T("refs/tags/"))
-		SetDefaultChoose(IDC_RADIO_TAGS);
-
-	CWnd* pHead = GetDlgItem(IDC_RADIO_HEAD);
-	CString headText;
-	pHead->GetWindowText(headText);
-	pHead->SetWindowText(headText + " (" + g_Git.GetCurrentBranch() + ")");
-	AdjustControlSize(IDC_RADIO_HEAD);
+	AddOthersToAnchor();
 
 	m_tooltips.AddTool(IDC_EXPORTFILE, IDS_EXPORTFILE_TT);
 
 	SHAutoComplete(GetDlgItem(IDC_EXPORTFILE)->m_hWnd, SHACF_FILESYSTEM);
 
-	if ((m_pParentWnd==NULL)&&(hWndExplorer))
-		CenterWindow(CWnd::FromHandle(hWndExplorer));
-	EnableSaveRestore(_T("ExportDlg"));
+	if (!m_pParentWnd && GetExplorerHWND())
+		CenterWindow(CWnd::FromHandle(GetExplorerHWND()));
+	EnableSaveRestore(L"ExportDlg");
 	return TRUE;
 }
 
@@ -125,19 +124,17 @@ void CExportDlg::OnOK()
 	{
 		if(::PathIsDirectory(m_strFile))
 		{
-			CMessageBox::Show(NULL, IDS_PROCEXPORTERRFOLDER, IDS_APPNAME, MB_OK | MB_ICONERROR);
+			CMessageBox::Show(GetSafeHwnd(), IDS_PROCEXPORTERRFOLDER, IDS_APPNAME, MB_OK | MB_ICONERROR);
 			return;
 		}
 		CString sMessage;
 		sMessage.Format(IDS_PROC_OVERWRITE_CONFIRM, (LPCTSTR)m_strFile);
-		if (CMessageBox::Show(NULL, sMessage, _T("TortoiseGit"), MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2) != IDYES)
-		{
+		if (CMessageBox::Show(GetSafeHwnd(), sMessage, L"TortoiseGit", MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2) != IDYES)
 			return ;
-		}
 	}
 	else if (m_strFile.IsEmpty())
 	{
-		CMessageBox::Show(NULL, IDS_PROC_NOZIPFILE, IDS_APPNAME, MB_OK | MB_ICONERROR);
+		CMessageBox::Show(GetSafeHwnd(), IDS_PROC_NOZIPFILE, IDS_APPNAME, MB_OK | MB_ICONERROR);
 		return;
 	}
 
@@ -155,17 +152,14 @@ void CExportDlg::OnBnClickedCheckoutdirectoryBrowse()
 	// dialog controls.
 	//
 	this->UpdateRevsionName();
-	CFileDialog dlg(FALSE, _T("zip"), this->m_VersionName, OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT, _T("*.zip"));
+	CString filename = m_VersionName;
+	if (!CAppUtils::FileOpenSave(filename, nullptr, 0, IDS_ARCHIVEFILEFILTER, false, GetSafeHwnd(), L"zip"))
+		return;
 
-	INT_PTR ret = dlg.DoModal();
-	SetCurrentDirectory(g_Git.m_CurrentDir);
-	if (ret == IDOK)
-	{
-		UpdateData(TRUE);
-		m_strFile = dlg.GetPathName();
-		UpdateData(FALSE);
-		OnEnChangeCheckoutdirectory();
-	}
+	UpdateData(TRUE);
+	m_strFile = filename;
+	UpdateData(FALSE);
+	OnEnChangeCheckoutdirectory();
 }
 
 void CExportDlg::OnEnChangeCheckoutdirectory()

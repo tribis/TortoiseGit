@@ -1,6 +1,6 @@
 // TortoiseGit - a Windows shell extension for easy version control
 
-// Copyright (C) 2008-2015 - TortoiseGit
+// Copyright (C) 2008-2018 - TortoiseGit
 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -28,12 +28,13 @@
 #include "cache.h"
 #include "commit.h"
 #include "diff.h"
+#include "packfile.h"
 #include "revision.h"
 #include "diffcore.h"
 #include "dir.h"
 #include "builtin.h"
 #include "exec_cmd.h"
-#include "cache.h"
+#include "config.h"
 #include "quote.h"
 #include "run-command.h"
 #include "mailmap.h"
@@ -42,15 +43,20 @@
 extern char g_last_error[];
 const char * g_prefix;
 
-extern void die_dll(const char *err, va_list params);
+static_assert(sizeof(struct object_id) == sizeof(struct GIT_OBJECT_OID), "Required to be equal in gitdll.h");
+
+extern NORETURN void die_dll(const char* err, va_list params);
+extern void handle_error(const char* err, va_list params);
+extern void handle_warning(const char* warn, va_list params);
 extern int die_is_recursing_dll(void);
 
-extern void free_all_pack();
-extern void reset_git_env();
-extern void drop_attr_stack();
-extern void git_atexit_dispatch();
-extern void git_atexit_clear();
-extern void invalidate_ref_cache(const char* submodule);
+extern void libgit_initialize(void);
+extern void free_all_pack(void);
+extern void reset_git_env(void);
+extern void drop_all_attr_stacks(void);
+extern void git_atexit_dispatch(void);
+extern void git_atexit_clear(void);
+extern void invalidate_ref_cache(void);
 extern void cmd_log_init(int argc, const char** argv, const char* prefix, struct rev_info* rev, struct setup_revision_opt* opt);
 extern int estimate_commit_count(struct rev_info* rev, struct commit_list* list);
 extern int log_tree_commit(struct rev_info*, struct commit*);
@@ -58,18 +64,25 @@ extern int write_entry(struct cache_entry* ce, char* path, const struct checkout
 extern struct object* deref_tag(struct object* o, const char* warn, int warnlen);
 extern void diff_flush_stat(struct diff_filepair* p, struct diff_options* o, struct diffstat_t* diffstat);
 extern void free_diffstat_info(struct diffstat_t* diffstat);
+static_assert(sizeof(unsigned long long) == sizeof(timestamp_t), "Required for each_reflog_ent_fn definition in gitdll.h");
 extern int for_each_reflog_ent(const char* refname, each_reflog_ent_fn fn, void* cb_data);
 extern int for_each_ref_in(const char* prefix, each_ref_fn fn, void* cb_data);
 
-void dll_entry()
+void dll_entry(void)
 {
 	set_die_routine(die_dll);
+	set_error_routine(handle_error);
+	set_warn_routine(handle_warning);
 	set_die_is_recursing_routine(die_is_recursing_dll);
+	libgit_initialize();
 }
 
 int git_get_sha1(const char *name, GIT_HASH sha1)
 {
-	return get_sha1(name,sha1);
+	struct object_id oid = { 0 };
+	int ret = get_oid(name, &oid);
+	hashcpy(sha1, oid.hash);
+	return ret;
 }
 
 static int convert_slash(char * path)
@@ -78,40 +91,32 @@ static int convert_slash(char * path)
 	{
 		if(*path == '\\' )
 			*path = '/';
-		path++;
+		++path;
 	}
 	return 0;
 }
 
-int git_init()
+int git_init(void)
 {
 	char path[MAX_PATH+1];
-	size_t homesize;
 
 	_fmode = _O_BINARY;
 	_setmode(_fileno(stdin), _O_BINARY);
 	_setmode(_fileno(stdout), _O_BINARY);
 	_setmode(_fileno(stderr), _O_BINARY);
 
-	// set HOME if not set already
-	getenv_s(&homesize, NULL, 0, "HOME");
-	if (!homesize)
-	{
-		_wputenv_s(L"HOME", wget_windows_home_directory());
-	}
 	GetModuleFileName(NULL, path, MAX_PATH);
 	convert_slash(path);
 
 	git_extract_argv0_path(path);
 	reset_git_env();
-	drop_attr_stack();
+	// set HOME if not set already
+	gitsetenv("HOME", get_windows_home_directory(), 0);
+	drop_all_attr_stacks();
+	git_config_clear();
 	g_prefix = setup_git_directory();
 	git_config(git_default_config, NULL);
-
-	if (!homesize)
-	{
-		_putenv_s("HOME","");/* clear home evironment to avoid affact third part software*/
-	}
+	invalidate_ref_cache();
 
 	return 0;
 }
@@ -158,7 +163,7 @@ int git_parse_commit(GIT_COMMIT *commit)
 
 	p= (struct commit *)commit->m_pGitCommit;
 
-	memcpy(commit->m_hash,p->object.sha1,GIT_HASH_SIZE);
+	memcpy(commit->m_hash, p->object.oid.hash, GIT_HASH_SIZE);
 
 	commit->m_Encode = NULL;
 	commit->m_EncodeSize = 0;
@@ -195,7 +200,7 @@ int git_parse_commit(GIT_COMMIT *commit)
 		// the headers end after the first empty line
 		else if (*pbuf == '\n')
 		{
-			pbuf++;
+			++pbuf;
 
 			commit->m_Subject=pbuf;
 			end = strchr(pbuf,'\n');
@@ -213,7 +218,7 @@ int git_parse_commit(GIT_COMMIT *commit)
 
 		pbuf = strchr(pbuf,'\n');
 		if(pbuf)
-			pbuf ++;
+			++pbuf;
 	}
 	return 0;
 }
@@ -223,13 +228,16 @@ int git_get_commit_from_hash(GIT_COMMIT* commit, const GIT_HASH hash)
 	int ret = 0;
 
 	struct commit *p;
+	struct object_id oid;
 
 	if (commit == NULL)
 		return -1;
 
 	memset(commit,0,sizeof(GIT_COMMIT));
 
-	commit->m_pGitCommit = p = lookup_commit(hash);
+	hashcpy(oid.hash, hash);
+
+	commit->m_pGitCommit = p = lookup_commit(&oid);
 
 	if(p == NULL)
 		return -1;
@@ -251,6 +259,13 @@ int git_get_commit_first_parent(GIT_COMMIT *commit,GIT_COMMIT_LIST *list)
 	*list = (GIT_COMMIT_LIST*)p->parents;
 	return 0;
 }
+
+int git_commit_is_root(const GIT_COMMIT* commit)
+{
+	struct commit* p = commit->m_pGitCommit;
+	return (struct commit_list**)p->parents ? 1 : 0;
+}
+
 int git_get_commit_next_parent(GIT_COMMIT_LIST *list, GIT_HASH hash)
 {
 	struct commit_list *l;
@@ -262,7 +277,7 @@ int git_get_commit_next_parent(GIT_COMMIT_LIST *list, GIT_HASH hash)
 		return -1;
 
 	if(hash)
-		memcpy(hash, l->item->object.sha1, GIT_HASH_SIZE);
+		memcpy(hash, l->item->object.oid.hash, GIT_HASH_SIZE);
 
 	*list = (GIT_COMMIT_LIST *)l->next;
 	return 0;
@@ -305,15 +320,15 @@ char **strtoargv(char *arg, int *size)
 	{
 		if(*p == '\\')
 			*p='/';
-		p++;
+		++p;
 	}
 	p=arg;
 
 	while(*p)
 	{
 		if(*p == ' ')
-			count ++;
-		p++;
+			++count;
+		++p;
 	}
 
 	argv=malloc(strlen(arg)+1 + (count +2)*sizeof(void*));
@@ -330,7 +345,7 @@ char **strtoargv(char *arg, int *size)
 			{
 				if(*arg == '"')
 				{
-					arg++;
+					++arg;
 					if(space == ' ')
 						space = '"';
 					else
@@ -341,12 +356,12 @@ char **strtoargv(char *arg, int *size)
 
 				*p++ = *arg++;
 			}
-			i++;
+			++i;
 			*p++=0;
 		}
 		if(*arg == 0)
 			break;
-		arg++;
+		++arg;
 	}
 	argv[i]=NULL;
 	*size = i;
@@ -357,12 +372,11 @@ int git_open_log(GIT_LOG * handle, char * arg)
 	struct rev_info *p_Rev;
 	char ** argv=0;
 	int argc=0;
-	unsigned int i=0;
 	struct setup_revision_opt opt;
 
 	/* clear flags */
 	unsigned int obj_size = get_max_object_index();
-	for(i =0; i<obj_size; i++)
+	for (unsigned int i = 0; i < obj_size; ++i)
 	{
 		struct object *ob= get_indexed_object(i);
 		if(ob)
@@ -396,7 +410,7 @@ int git_open_log(GIT_LOG * handle, char * arg)
 
 	memset(p_Rev,0,sizeof(struct rev_info));
 
-	invalidate_ref_cache(NULL);
+	invalidate_ref_cache();
 
 	init_revisions(p_Rev, g_prefix);
 	p_Rev->diff = 1;
@@ -510,13 +524,12 @@ int git_diff_flush(GIT_DIFF diff)
 {
 	struct diff_queue_struct *q = &diff_queued_diff;
 	struct rev_info *p_Rev;
-	int i;
 	p_Rev = (struct rev_info *)diff;
 
 	if(q->nr == 0)
 		return 0;
 
-	for (i = 0; i < q->nr; i++)
+	for (int i = 0; i < q->nr; ++i)
 		diff_free_filepair(q->queue[i]);
 
 	if(q->queue)
@@ -536,13 +549,15 @@ int git_diff_flush(GIT_DIFF diff)
 int git_root_diff(GIT_DIFF diff, GIT_HASH hash,GIT_FILE *file, int *count, int isstat)
 {
 	int ret;
+	struct object_id oid;
 	struct rev_info *p_Rev;
-	int i;
 	struct diff_queue_struct *q = &diff_queued_diff;
 
 	p_Rev = (struct rev_info *)diff;
 
-	ret=diff_root_tree_sha1(hash, "", &p_Rev->diffopt);
+	hashcpy(oid.hash, hash);
+
+	ret = diff_root_tree_oid(&oid, "", &p_Rev->diffopt);
 
 	if(ret)
 		return ret;
@@ -552,17 +567,18 @@ int git_root_diff(GIT_DIFF diff, GIT_HASH hash,GIT_FILE *file, int *count, int i
 		diffcore_std(&p_Rev->diffopt);
 
 		memset(&p_Rev->diffstat, 0, sizeof(struct diffstat_t));
-		for (i = 0; i < q->nr; i++) {
+		for (int i = 0; i < q->nr; ++i) {
 			struct diff_filepair *p = q->queue[i];
 			//if (check_pair_status(p))
 			diff_flush_stat(p, &p_Rev->diffopt, &p_Rev->diffstat);
 		}
-
-		if(file)
-			*file = q;
-		if(count)
-			*count = q->nr;
 	}
+
+	if (file)
+		*file = q;
+	if (count)
+		*count = q->nr;
+
 	return 0;
 }
 
@@ -570,12 +586,15 @@ int git_do_diff(GIT_DIFF diff, GIT_HASH hash1, GIT_HASH hash2, GIT_FILE * file, 
 {
 	struct rev_info *p_Rev;
 	int ret;
-	int i;
+	struct object_id oid1, oid2;
 	struct diff_queue_struct *q = &diff_queued_diff;
 
 	p_Rev = (struct rev_info *)diff;
 
-	ret = diff_tree_sha1(hash1,hash2,"",&p_Rev->diffopt);
+	hashcpy(oid1.hash, hash1);
+	hashcpy(oid2.hash, hash2);
+
+	ret = diff_tree_oid(&oid1, &oid2, "", &p_Rev->diffopt);
 	if( ret )
 	{
 		free_all_pack();
@@ -586,7 +605,7 @@ int git_do_diff(GIT_DIFF diff, GIT_HASH hash1, GIT_HASH hash2, GIT_FILE * file, 
 	{
 		diffcore_std(&p_Rev->diffopt);
 		memset(&p_Rev->diffstat, 0, sizeof(struct diffstat_t));
-		for (i = 0; i < q->nr; i++) {
+		for (int i = 0; i < q->nr; ++i) {
 			struct diff_filepair *p = q->queue[i];
 			//if (check_pair_status(p))
 			diff_flush_stat(p, &p_Rev->diffopt, &p_Rev->diffstat);
@@ -600,7 +619,7 @@ int git_do_diff(GIT_DIFF diff, GIT_HASH hash1, GIT_HASH hash2, GIT_FILE * file, 
 	return 0;
 }
 
-int git_get_diff_file(GIT_DIFF diff,GIT_FILE file,int i, char **newname, char ** oldname,  int *status, int *IsBin, int *inc, int *dec)
+int git_get_diff_file(GIT_DIFF diff, GIT_FILE file, int i, char** newname, char** oldname, int* IsDir, int* status, int* IsBin, int* inc, int* dec)
 {
 	struct diff_queue_struct *q = &diff_queued_diff;
 	struct rev_info *p_Rev;
@@ -612,16 +631,23 @@ int git_get_diff_file(GIT_DIFF diff,GIT_FILE file,int i, char **newname, char **
 	if(i>=q->nr)
 		return -1;
 
-	assert(newname && oldname && status);
+	assert(newname && oldname && status && IsDir);
 
 	*newname = q->queue[i]->two->path;
 	*oldname = q->queue[i]->one->path;
 	*status = q->queue[i]->status;
+	if (*status == 'D')
+		*IsDir = (q->queue[i]->one->mode & S_IFDIR) == S_IFDIR;
+	else
+		*IsDir = (q->queue[i]->two->mode & S_IFDIR) == S_IFDIR;
+
+	if (q->queue[i]->one->mode && q->queue[i]->two->mode && DIFF_PAIR_TYPE_CHANGED(q->queue[i]))
+		*IsDir = 0;
 
 	if(p_Rev->diffstat.files)
 	{
 		int j;
-		for(j=0;j<p_Rev->diffstat.nr;j++)
+		for (j = 0; j < p_Rev->diffstat.nr; ++j)
 		{
 			if(strcmp(*newname,p_Rev->diffstat.files[j]->name)==0)
 				break;
@@ -649,25 +675,8 @@ int git_get_diff_file(GIT_DIFF diff,GIT_FILE file,int i, char **newname, char **
 	return 0;
 }
 
-int git_read_tree(GIT_HASH hash,read_tree_fn_t fn, void *context)
-{
-	struct tree * root;
-	int ret;
-	reprepare_packed_git();
-	root = parse_tree_indirect(hash);
-
-	if (!root)
-	{
-		free_all_pack();
-		return -1;
-	}
-	ret = read_tree_recursive(root, NULL, 0, 0, NULL, fn, context);
-	free_all_pack();
-	return ret;
-}
-
 int git_add_exclude(const char *string, const char *base,
-					int baselen, struct exclude_list *which, int lineno)
+					int baselen, EXCLUDE_LIST which, int lineno)
 {
 	add_exclude(string, base, baselen, which, lineno);
 	return 0;
@@ -682,10 +691,9 @@ int git_create_exclude_list(EXCLUDE_LIST *which)
 
 int git_free_exclude_list(EXCLUDE_LIST which)
 {
-	int i=0;
 	struct exclude_list *p = (struct exclude_list *) which;
 
-	for(i=0; i<p->nr;i++)
+	for (int i = 0; i < p->nr; ++i)
 	{
 		free(p->excludes[i]);
 	}
@@ -696,17 +704,20 @@ int git_free_exclude_list(EXCLUDE_LIST which)
 
 int git_check_excluded_1(const char *pathname,
 							int pathlen, const char *basename, int *dtype,
-							EXCLUDE_LIST el)
+							EXCLUDE_LIST el, int ignorecase)
 {
-	return is_excluded_from_list(pathname, pathlen, basename, dtype, el);
+	ignore_case = ignorecase;
+	return is_excluded_from_list(pathname, pathlen, basename, dtype, el, &the_index);
 }
 
-int git_get_notes(GIT_HASH hash, char **p_note)
+int git_get_notes(const GIT_HASH hash, char** p_note)
 {
+	struct object_id oid;
 	struct strbuf sb;
 	size_t size;
 	strbuf_init(&sb,0);
-	format_display_notes(hash, &sb, "utf-8", 1);
+	hashcpy(oid.hash, hash);
+	format_display_notes(&oid, &sb, "utf-8", 1);
 	*p_note = strbuf_detach(&sb,&size);
 
 	return 0;
@@ -721,20 +732,18 @@ struct cmd_struct {
 #define RUN_SETUP	(1<<0)
 
 static struct cmd_struct commands[] = {
-		{ "notes", cmd_notes, RUN_SETUP },
 		{ "update-index", cmd_update_index, RUN_SETUP },
 	};
 
 int git_run_cmd(char *cmd, char *arg)
 {
 
-	int i=0;
 	char ** argv=0;
 	int argc=0;
 
 	git_init();
 
-	for(i=0;i<	sizeof(commands) / sizeof(struct cmd_struct);i++)
+	for (int i = 0; i < sizeof(commands) / sizeof(struct cmd_struct); ++i)
 	{
 		if(strcmp(cmd,commands[i].cmd)==0)
 		{
@@ -761,7 +770,7 @@ int git_run_cmd(char *cmd, char *arg)
 void git_exit_cleanup(void)
 {
 	git_atexit_dispatch();
-	git_atexit_clear();
+	// do not clear the atexit list, as lots of methods register it just once (and have a local static int flag)
 }
 
 int git_for_each_reflog_ent(const char *ref, each_reflog_ent_fn fn, void *cb_data)
@@ -780,7 +789,7 @@ static int update_some(const unsigned char* sha1, struct strbuf* base,
 	if (S_ISDIR(mode))
 		return READ_TREE_RECURSIVE;
 
-	hashcpy(ce->sha1, sha1);
+	hashcpy(ce->oid.hash, sha1);
 	memcpy(ce->name, base->buf, base->len);
 	memcpy(ce->name + base->len, pathname, strlen(pathname));
 	ce->ce_flags = create_ce_flags((unsigned int)(strlen(pathname) + base->len));
@@ -793,17 +802,17 @@ int git_checkout_file(const char* ref, const char* path, char* outputpath)
 {
 	struct cache_entry *ce;
 	int ret;
-	GIT_HASH sha1;
+	struct object_id oid;
 	struct tree * root;
 	struct checkout state;
 	struct pathspec pathspec;
 	const char *matchbuf[1];
-	ret = get_sha1(ref, sha1);
+	ret = get_oid(ref, &oid);
 	if(ret)
 		return ret;
 
 	reprepare_packed_git();
-	root = parse_tree_indirect(sha1);
+	root = parse_tree_indirect(&oid);
 
 	if(!root)
 	{
@@ -817,7 +826,7 @@ int git_checkout_file(const char* ref, const char* path, char* outputpath)
 	parse_pathspec(&pathspec, PATHSPEC_ALL_MAGIC, PATHSPEC_PREFER_CWD, path, matchbuf);
 	pathspec.items[0].nowildcard_len = pathspec.items[0].len;
 	ret = read_tree_recursive(root, "", 0, 0, &pathspec, update_some, ce);
-	free_pathspec(&pathspec);
+	clear_pathspec(&pathspec);
 
 	if(ret)
 	{
@@ -864,6 +873,23 @@ static int get_config(const char *key_, const char *value_, void *cb)
 
 }
 
+// wchar_t wrapper for program_data_config()
+const wchar_t* wget_program_data_config(void)
+{
+	static const wchar_t *programdata_git_config = NULL;
+	wchar_t wpointer[MAX_PATH];
+
+	if (programdata_git_config)
+		return programdata_git_config;
+
+	if (xutftowcs_path(wpointer, program_data_config()) < 0)
+		return NULL;
+
+	programdata_git_config = _wcsdup(wpointer);
+
+	return programdata_git_config;
+}
+
 // wchar_t wrapper for git_etc_gitconfig()
 const wchar_t *wget_msysgit_etc(void)
 {
@@ -883,59 +909,67 @@ const wchar_t *wget_msysgit_etc(void)
 
 int git_get_config(const char *key, char *buffer, int size)
 {
-	char *local, *global, *globalxdg;
-	const char *home, *system;
+	const char *home, *system, *programdata;
 	struct config_buf buf;
 	struct git_config_source config_source = { 0 };
+
+	struct config_options opts = { 0 };
+	opts.respect_includes = 1;
 
 	buf.buf=buffer;
 	buf.size=size;
 	buf.seen = 0;
 	buf.key = key;
 
+	if (have_git_dir())
+	{
+		opts.git_dir = get_git_dir();
+		char* local = git_pathdup("config");
+		config_source.file = local;
+		config_with_options(get_config, &buf, &config_source, &opts);
+		free(local);
+		if (buf.seen)
+			return !buf.seen;
+	}
+
 	home = get_windows_home_directory();
 	if (home)
 	{
-		global = xstrdup(mkpath("%s/.gitconfig", home));
-		globalxdg = xstrdup(mkpath("%s/.config/git/config", home));
-	}
-	else
-	{
-		global = NULL;
-		globalxdg = NULL;
+		char* global = xstrdup(mkpath("%s/.gitconfig", home));
+		if (global)
+		{
+			config_source.file = global;
+			config_with_options(get_config, &buf, &config_source, &opts);
+			free(global);
+			if (buf.seen)
+				return !buf.seen;
+		}
+		char* globalxdg = xstrdup(mkpath("%s/.config/git/config", home));
+		if (globalxdg)
+		{
+			config_source.file = globalxdg;
+			config_with_options(get_config, &buf, &config_source, &opts);
+			free(globalxdg);
+			if (buf.seen)
+				return !buf.seen;
+		}
 	}
 
 	system = git_etc_gitconfig();
-
-	local = git_pathdup("config");
-
-	if (!buf.seen)
-	{
-		config_source.file = local;
-		git_config_with_options(get_config, &buf, &config_source, 1);
-	}
-	if (!buf.seen && global)
-	{
-		config_source.file = global;
-		git_config_with_options(get_config, &buf, &config_source, 1);
-	}
-	if (!buf.seen && globalxdg)
-	{
-		config_source.file = globalxdg;
-		git_config_with_options(get_config, &buf, &config_source, 1);
-	}
-	if (!buf.seen && system)
+	if (system)
 	{
 		config_source.file = system;
-		git_config_with_options(get_config, &buf, &config_source, 1);
+		config_with_options(get_config, &buf, &config_source, &opts);
+		if (buf.seen)
+			return !buf.seen;
 	}
 
-	if(local)
-		free(local);
-	if(global)
-		free(global);
-	if (globalxdg)
-		free(globalxdg);
+	programdata = git_program_data_config();
+	if (programdata)
+	{
+		config_source.file = programdata;
+		config_with_options(get_config, &buf, &config_source, &opts);
+	}
 
 	return !buf.seen;
 }
@@ -944,17 +978,35 @@ int git_get_config(const char *key, char *buffer, int size)
 const char *get_windows_home_directory(void)
 {
 	static const char *home_directory = NULL;
-	struct strbuf buf = STRBUF_INIT;
+	const char* tmp;
 
 	if (home_directory)
 		return home_directory;
 
-	home_directory = getenv("HOME");
-	if (home_directory && *home_directory)
+	if ((tmp = getenv("HOME")) != NULL && *tmp)
+	{
+		home_directory = _strdup(tmp);
 		return home_directory;
+	}
 
-	strbuf_addf(&buf, "%s%s", getenv("HOMEDRIVE"), getenv("HOMEPATH"));
-	home_directory = strbuf_detach(&buf, NULL);
+	if ((tmp = getenv("HOMEDRIVE")) != NULL)
+	{
+		struct strbuf buf = STRBUF_INIT;
+		strbuf_addstr(&buf, tmp);
+		if ((tmp = getenv("HOMEPATH")) != NULL)
+		{
+			strbuf_addstr(&buf, tmp);
+			if (is_directory(buf.buf))
+			{
+				home_directory = strbuf_detach(&buf, NULL);
+				return home_directory;
+			}
+		}
+		strbuf_release(&buf);
+	}
+
+	if ((tmp = getenv("USERPROFILE")) != NULL && *tmp)
+		home_directory = _strdup(tmp);
 
 	return home_directory;
 }
@@ -1004,7 +1056,7 @@ int get_set_config(const char *key, const char *value, CONFIG_TYPE type)
 	if(!config_exclusive_filename)
 		return -1;
 
-	ret = git_config_set_multivar_in_file(config_exclusive_filename, key, value, NULL, 0);
+	ret = git_config_set_multivar_in_file_gently(config_exclusive_filename, key, value, NULL, 0);
 	free(config_exclusive_filename);
 	return ret;
 }
@@ -1036,19 +1088,31 @@ int git_read_mailmap(GIT_MAILMAP *mailmap)
 		return -1;
 
 	if ((result = read_mailmap(map, NULL)) != 0)
+	{
+		clear_mailmap(map);
+		free(map);
 		return result;
+	}
+
+	if (!map->items)
+	{
+		clear_mailmap(map);
+		free(map);
+		 
+		return -1;
+	}
 
 	*mailmap = map;
 	return 0;
 }
 
-const char * git_get_mailmap_author(GIT_MAILMAP mailmap, const char *email2, void *payload, const char *(*author2_cb)(void *))
+int git_lookup_mailmap(GIT_MAILMAP mailmap, const char** email1, const char** name1, const char* email2, void* payload, const char *(*author2_cb)(void*))
 {
 	struct string_list *map;
 	int imax, imin = 0;
 
 	if (!mailmap)
-		return NULL;
+		return -1;
 
 	map = (struct string_list *)mailmap;
 	imax = map->nr - 1;
@@ -1057,25 +1121,34 @@ const char * git_get_mailmap_author(GIT_MAILMAP mailmap, const char *email2, voi
 		int i = imin + ((imax - imin) / 2);
 		struct string_list_item *si = (struct string_list_item *)&map->items[i];
 		struct mailmap_entry *me = (struct mailmap_entry *)si->util;
-		int comp = strcmp(si->string, email2);
+		int comp = map->cmp(si->string, email2);
 
 		if (!comp)
 		{
 			if (me->namemap.nr)
 			{
 				const char *author2 = author2_cb(payload);
-				unsigned int j;
-				for (j = 0; j < me->namemap.nr; ++j)
+				for (unsigned int j = 0; j < me->namemap.nr; ++j)
 				{
 					struct string_list_item *sj = (struct string_list_item *)&me->namemap.items[j];
 					struct mailmap_info *mi = (struct mailmap_info *)sj->util;
-					
-					if (!strcmp(sj->string, author2))
-						return mi->name;
+
+					if (!map->cmp(sj->string, author2))
+					{
+						if (email1)
+							*email1 = mi->email;
+						if (name1)
+							*name1 = mi->name;
+						return 0;
+					}
 				}
 			}
 
-			return me->name;
+			if (email1)
+				*email1 = me->email;
+			if (name1)
+				*name1 = me->name;
+			return 0;
 		}
 		else if (comp < 0)
 			imin = i + 1;
@@ -1083,7 +1156,7 @@ const char * git_get_mailmap_author(GIT_MAILMAP mailmap, const char *email2, voi
 			imax = i - 1;
 	}
 
-	return NULL;
+	return -1;
 }
 
 void git_free_mailmap(GIT_MAILMAP mailmap)
@@ -1095,3 +1168,8 @@ void git_free_mailmap(GIT_MAILMAP mailmap)
 	free(mailmap);
 }
 
+// just for regression tests
+int git_mkdir(const char* path)
+{
+	return mkdir(path, 0);
+}

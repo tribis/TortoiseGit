@@ -38,11 +38,15 @@
 #include <afxcontrolbars.h>     // MFC support for ribbons and control bars
 #include <afxtaskdialog.h>
 
+#include <UIRibbon.h>           // Native Ribbon API
+#include <UIRibbonPropertyHelpers.h>
+
 #include <vfw.h>
 
 #include <string>
 #include <map>
 #include <vector>
+#include <list>
 #include <algorithm>
 
 #pragma warning(push)
@@ -55,10 +59,7 @@
 
 #include "DebugOutput.h"
 
-#pragma warning(push)
-#pragma warning(disable: 4510 4610)
 #include "git2.h"
-#pragma warning(pop)
 #include "SmartLibgit2Ref.h"
 
 #define USE_GDI_GRADIENT

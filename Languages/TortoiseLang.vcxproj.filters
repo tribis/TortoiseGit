@@ -88,5 +88,17 @@
       <Filter>Translation Files</Filter>
     </None>
     <None Include="Tortoise.pot" />
+    <None Include="Tortoise_fa.po">
+      <Filter>Translation Files</Filter>
+    </None>
+    <None Include="Tortoise_da.po">
+      <Filter>Translation Files</Filter>
+    </None>
+    <None Include="Tortoise_el.po">
+      <Filter>Translation Files</Filter>
+    </None>
+    <None Include="Tortoise_oc.po">
+      <Filter>Translation Files</Filter>
+    </None>
   </ItemGroup>
 </Project>
