@@ -274,6 +274,12 @@
 				Installation of Git for Windows can be done with preselected options, however, no need to install the "Windows Explorer integration".
 				If you know about CRLF and LF line endings and you have editors coping with that, you should select "Checkout as-is, commit as-is" in order to prevent automatic translations.
 			</para>
+			<para>
+				One prerequisite of TortoiseGit is that it requires an already installed (command line) Git client which provides a <filename>git.exe</filename>.
+				<ulink url="https://git-for-windows.github.io/">Git for Windows</ulink> is recommended (Cygwin and Msys2 Git also work, see <xref linkend="tgit-dug-settings-main"/> for configuration. Please note that Cygwin and Msys2 Git are not officially supported by TortoiseGit as the developers only use Git for Windows. Bug reports, however, are welcome).
+				Installation of Git for Windows can be done with preselected options, however, no need to install the "Windows Explorer integration".
+				If you know about CRLF and LF line endings and you have editors coping with that, you should select "Checkout as-is, commit as-is" in order to prevent automatic translations.
+			</para>
 			<important>
 				<para>
 					You need Administrator privileges to install TortoiseGit.

@@ -1086,6 +1086,9 @@ BOOL CSyncDlg::OnInitDialog()
 	AdjustControlSize(IDC_CHECK_PUTTY_KEY);
 	AdjustControlSize(IDC_CHECK_FORCE);
 
+	AdjustControlSize(IDC_CHECK_PUTTY_KEY);
+	AdjustControlSize(IDC_CHECK_FORCE);
+
 	AddAnchor(IDC_SYNC_TAB,TOP_LEFT,BOTTOM_RIGHT);
 
 	AddAnchor(IDC_GROUP_INFO,TOP_LEFT,TOP_RIGHT);
